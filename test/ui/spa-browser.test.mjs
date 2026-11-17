@@ -933,6 +933,10 @@ try {
   await waitFor(`!document.querySelector('[role="dialog"]')`, 'theme options dialog closed');
   await waitFor(`document.body.innerText.includes('SPA R2 Fixture')`, 'theme list after config save');
   const previewRequestStart = networkRequests.length;
+  // 上一轮预览把结果留在同一个全局变量里；先清空，否则等待条件会被旧值立刻满足。
+  // The earlier preview left its result in the same global; clear it so the wait cannot
+  // be satisfied by stale data.
+  await evaluate(`delete window.__spaThemePreviewResult`);
   await evaluate(`document.querySelector('button[aria-label="Preview this revision"]').click()`);
   await waitFor(`window.__spaThemePreviewResult?.themeShort === '${themeId}'`, 'sandbox preview SDK public reads');
   const previewResult = await evaluate('window.__spaThemePreviewResult');
