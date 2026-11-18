@@ -176,11 +176,19 @@ try {
   browser = spawn(chrome, [
     '--headless=new', '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--disable-gpu',
     '--window-size=1440,1000', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank',
-  ], { windowsHide: true, stdio: ['ignore', 'ignore', 'ignore'] });
+  ], { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
   closed = new Promise((done) => browser.once('exit', done));
+  let stderr = '';
+  browser.stderr.setEncoding('utf8').on('data', chunk => { stderr = (stderr + chunk).slice(-4000); });
   let port;
-  for (let i = 0; i < 120; i++) { try { port = Number((await readFile(join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0]); break; } catch { await pause(100); } }
-  assert.ok(port);
+  for (let i = 0; i < 600 && browser.exitCode === null && browser.signalCode === null; i++) {
+    try {
+      const candidate = Number((await readFile(join(profile, 'DevToolsActivePort'), 'utf8')).split('\n')[0]);
+      if (Number.isInteger(candidate) && candidate > 0) { port = candidate; break; }
+    } catch {}
+    await pause(100);
+  }
+  assert.ok(port, `Chrome DevTools did not start (exit ${browser.exitCode}, signal ${browser.signalCode}): ${stderr}`);
   const target = await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT' }).then((response) => response.json());
   socket = new WebSocket(target.webSocketDebuggerUrl);
   await new Promise((done, reject) => { socket.addEventListener('open', done, { once: true }); socket.addEventListener('error', reject, { once: true }); });
