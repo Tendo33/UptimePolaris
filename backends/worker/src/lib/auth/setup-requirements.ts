@@ -15,6 +15,7 @@ export function setupRequirements(env: Env): SetupRequirement[] {
     { key: 'adminToken', required: true, ok: Boolean(env.ADMIN_TOKEN) },
     { key: 'themes', required: false, ok: Boolean(env.THEMES) },
     { key: 'analytics', required: true, ok: Boolean(env.UPTIME) },
+    { key: 'analyticsSql', required: false, ok: typeof env.ANALYTICS_SQL?.query === 'function' },
   ];
 }
 

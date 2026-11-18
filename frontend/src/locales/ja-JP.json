@@ -139,7 +139,7 @@
     "reload": "ページを再読み込み"
   },
   "detail": {
-    "historyUnconfigured": "履歴取得に必要なバインディングが不足しています。管理者にデプロイ設定の確認と再デプロイを依頼してください。",
+    "historyUnconfigured": "履歴取得には UPTIME と ANALYTICS_SQL のバインディングが必要です。デプロイ設定を更新して再デプロイしてください。API トークンは不要です。",
     "historyUnavailable": "履歴を一時的に取得できません。しばらくしてから再試行してください。",
     "historySampled": "履歴にはサンプリングされたデータが含まれるため、統計値は概算です。",
     "historyRecent": "過去24時間",

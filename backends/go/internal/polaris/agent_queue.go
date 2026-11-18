@@ -534,6 +534,48 @@ func (a *App) agentCommandResult(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
+func publicServerMetrics(live, page Object) Object {
+	out := Object{}
+	if boolean(page["showOs"]) {
+		out["os"], out["arch"] = live["os"], live["arch"]
+	}
+	fields := map[string]map[string]string{
+		"cpu":     {"cpu": "cpu_usage"},
+		"memory":  {"memoryUsed": "mem_used", "memoryTotal": "mem_total"},
+		"disk":    {"diskUsed": "disk_used", "diskTotal": "disk_total"},
+		"load":    {"load": "load_1"},
+		"network": {"upload": "net_up_rate", "download": "net_down_rate"},
+		"traffic": {"sent": "net_up_total", "received": "net_down_total"},
+		"uptime":  {"uptime": "uptime"},
+	}
+	for _, metric := range stringsOf(page["metrics"]) {
+		for dest, source := range fields[metric] {
+			out[dest] = live[source]
+		}
+	}
+	return out
+}
+
+func publicServerHistory(points []Object, page Object) []Object {
+	out := []Object{}
+	metrics := stringsOf(page["metrics"])
+	for _, point := range points {
+		row := Object{"ts": point["ts"]}
+		for metric, fields := range map[string]map[string]string{
+			"cpu": {"cpu": "cpu"}, "memory": {"memory": "mem_pct"},
+			"network": {"upload": "net_up", "download": "net_down"},
+		} {
+			if contains(metrics, metric) {
+				for dest, source := range fields {
+					row[dest] = point[source]
+				}
+			}
+		}
+		out = append(out, row)
+	}
+	return out
+}
+
 func (a *App) publicServers(w http.ResponseWriter, r *http.Request) error {
 	kind, enabled, configured, page, e := a.pageContext(r)
 	if e != nil {
@@ -565,27 +607,24 @@ func (a *App) publicServers(w http.ResponseWriter, r *http.Request) error {
 		if group, _ := a.store.get(r.Context(), "agent_group", str(agent, "group_id")); group != nil {
 			row["group"] = Object{"id": group["id"], "name": group["name"]}
 		}
-		for dest, source := range map[string]string{"os": "os", "arch": "arch", "cpu": "cpu_usage", "memoryUsed": "mem_used", "memoryTotal": "mem_total", "diskUsed": "disk_used", "diskTotal": "disk_total", "load": "load_1", "upload": "net_up_rate", "download": "net_down_rate", "sent": "net_up_total", "received": "net_down_total", "uptime": "uptime"} {
-			row[dest] = live[source]
+		for key, value := range publicServerMetrics(live, page) {
+			row[key] = value
 		}
 		servers = append(servers, row)
 	}
 	if id := r.PathValue("id"); id != "" {
 		for _, server := range servers {
 			if str(server, "id") == id {
-				history, e := a.machineHistory(r.Context(), id)
-				if e != nil {
-					return e
+				now := time.Now().Unix()
+				history := []Object{}
+				if boolean(page["showHistory"]) {
+					points, err := a.machineHistory(r.Context(), id, now-integer(page, "historyHours")*3600, now, 60)
+					if err != nil {
+						return err
+					}
+					history = publicServerHistory(points, page)
 				}
-				for _, point := range history {
-					point["memory"] = point["mem_pct"]
-					point["upload"] = point["net_up"]
-					point["download"] = point["net_down"]
-					delete(point, "mem_pct")
-					delete(point, "net_up")
-					delete(point, "net_down")
-				}
-				respond(w, 200, Object{"server": server, "history": history, "now": time.Now().Unix()})
+				respond(w, 200, Object{"server": server, "history": history, "now": now})
 				return nil
 			}
 		}
@@ -643,7 +682,15 @@ func (a *App) publicAgentDetail(w http.ResponseWriter, r *http.Request) error {
 		if live == nil {
 			publicLive = nil
 		}
-		respond(w, 200, Object{"now": time.Now().Unix(), "monitor": Object{"id": m["id"], "num_id": m["num_id"], "name": m["name"], "type": "agent", "active": m["active"]}, "live": publicLive, "buckets": buckets, "online": agentOnline(live, time.Now().Unix()), "staleAfterSec": stale, "availability": a.history(r.Context(), str(m, "id"), points), "ring": ringOf(recent, true, "agent")})
+		agent, err := a.store.get(r.Context(), "agent", str(m, "agent_id"))
+		if err != nil {
+			return err
+		}
+		online := agentOnline(live, time.Now().Unix())
+		if live != nil && agent != nil && !boolean(agent["active"]) {
+			online = new(bool)
+		}
+		respond(w, 200, Object{"now": time.Now().Unix(), "monitor": Object{"id": m["id"], "num_id": m["num_id"], "name": m["name"], "type": "agent", "active": m["active"]}, "live": publicLive, "buckets": buckets, "online": online, "staleAfterSec": stale, "availability": a.history(r.Context(), str(m, "id"), points), "ring": ringOf(recent, true, "agent")})
 		return nil
 	}
 	return failure("not_found", 404)

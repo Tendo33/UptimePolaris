@@ -65,6 +65,7 @@ function fixture(component = 'AddAgentPanel') {
     clsx: (...values) => values.filter(Boolean).join(' '),
     '../../../../shared/agent-install': install,
     './Taxonomy': { useAgentTaxonomy: () => taxonomy, TaxonomyFields: 'TaxonomyFields' },
+    '../useConsoleData': { useFleet: () => ({ data: { agents: [], summary: null }, error: null, mutate: async () => {} }) },
     './api': {
       agentsApi: { createAgent: async input => { creations.push(input); return { id: 'regression-agent', token: 'fixture-token' }; }, listAgents: async () => ({ agents: [], summary: null }) },
       taxonomyApi: { assign: async () => {} },
@@ -191,7 +192,7 @@ test('Agent installation uses defaults immediately and detects the host in its s
       assert.match(command, /install\.(sh|ps1)/);
     }
     assert.ok(f.requests.every(request => request.url === '/api/admin/agents'));
-    assert.deepEqual(f.creations, [{ name: 'Stagewise Agent UI regression', probe_enabled: true, is_public: false }]);
+    assert.deepEqual(f.creations, [{ name: 'Stagewise Agent UI regression', probe_enabled: true }]);
   } finally { f.dispose(); }
 });
 

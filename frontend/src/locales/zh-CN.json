@@ -139,7 +139,7 @@
     "reload": "重新加载页面"
   },
   "detail": {
-    "historyUnconfigured": "历史查询绑定不完整，请管理员检查部署配置并重新部署。",
+    "historyUnconfigured": "历史查询需要 UPTIME 和 ANALYTICS_SQL 绑定。请更新部署配置并重新部署，无需配置 API Token。",
     "historyUnavailable": "历史数据暂时无法读取，请稍后重试。",
     "historySampled": "历史数据包含采样，统计值仅供参考。",
     "historyRecent": "最近 24 小时",

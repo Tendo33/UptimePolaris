@@ -139,7 +139,7 @@
     "reload": "Reload page"
   },
   "detail": {
-    "historyUnconfigured": "History query bindings are incomplete. Ask an administrator to check the deployment configuration and redeploy.",
+    "historyUnconfigured": "History requires the UPTIME and ANALYTICS_SQL bindings. Update the deployment configuration and redeploy; no API token is needed.",
     "historyUnavailable": "History is temporarily unavailable. Please try again later.",
     "historySampled": "History includes sampled data; statistics are approximate.",
     "historyRecent": "Last 24 hours",

@@ -2,7 +2,7 @@
 
 interface PercentGaugeProps {
   /** 0..100. Out-of-range values are clamped at render. / 范围为 0–100；渲染时限制超出范围的值。 */
-  value: number;
+  value: number | null;
   /** One line under the ring. / 圆环下的一行标签。 */
   label: string;
   /**
@@ -48,9 +48,10 @@ export function PercentGauge({
   size = 96,
   tone,
 }: PercentGaugeProps) {
-  const v = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
+  const v = value != null && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : null;
+  const reading = v == null ? '—' : `${v.toFixed(0)}%`;
   const resolved: 'success' | 'warning' | 'danger' =
-    tone ?? (v >= danger ? 'danger' : v >= warn ? 'warning' : 'success');
+    tone ?? (v != null && v >= danger ? 'danger' : v != null && v >= warn ? 'warning' : 'success');
 
   const strokeWidth = Math.max(6, Math.round(size / 12));
   const radius = (size - strokeWidth) / 2;
@@ -64,8 +65,10 @@ export function PercentGauge({
    * 填充部分通过完整圆的虚线模式显示 (v/100)，而非裁剪弧线；浏览器将其余部分
    * 绘制为透明，因此先绘制第二个完整圆作为底轨。
    */
-  const filled = (v / 100) * circumference;
-  const color = TONE_VARS[resolved];
+  const filled = ((v ?? 0) / 100) * circumference;
+  const color = v == null
+    ? { stroke: 'hsl(var(--heroui-default-400))', track: 'hsl(var(--heroui-default-200))' }
+    : TONE_VARS[resolved];
 
   return (
     /**
@@ -85,7 +88,7 @@ export function PercentGauge({
         height={size}
         viewBox={`0 0 ${size} ${size}`}
         role="img"
-        aria-label={`${label}: ${v.toFixed(0)}%`}
+        aria-label={`${label}: ${reading}`}
         className="shrink-0"
       >
         {/* Track / 底轨 */}
@@ -107,6 +110,7 @@ export function PercentGauge({
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={`${filled} ${circumference}`}
+          visibility={v == null ? 'hidden' : undefined}
           // Start at 12 o'clock: rotate -90° about the centre. / 从 12 点方向开始：绕中心旋转 -90°。
           transform={`rotate(-90 ${size / 2} ${size / 2})`}
           style={{ transition: 'stroke-dasharray 300ms ease' }}
@@ -116,10 +120,10 @@ export function PercentGauge({
           y="50%"
           dominantBaseline="central"
           textAnchor="middle"
-          className={`fill-current font-mono font-semibold tabular-nums ${TONE_TEXT[resolved]}`}
+          className={`fill-current font-mono font-semibold tabular-nums ${v == null ? 'text-default-500' : TONE_TEXT[resolved]}`}
           style={{ fontSize: Math.max(14, Math.round(size / 5)) }}
         >
-          {v.toFixed(0)}%
+          {reading}
         </text>
       </svg>
       <span className="w-full truncate text-center text-tiny text-default-500">{label}</span>

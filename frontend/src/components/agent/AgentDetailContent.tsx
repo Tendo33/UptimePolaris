@@ -2,7 +2,7 @@ import type { HistoryStatus } from '../../../../shared/contracts';
 import { HistoryNotice } from '@/components/charts/HistoryNotice';
 
 import { requestJson } from '@/api/client';
-import { isRetryableApiError } from '@/api/errors';
+import { ApiError, isRetryableApiError } from '@/api/errors';
 import { Card, CardBody, CardHeader, Chip } from '@heroui/react';
 import clsx from 'clsx';
 import {
@@ -279,7 +279,7 @@ interface AgentDetailContentProps {
 export function AgentDetailContent({ numId, monitorName, target }: AgentDetailContentProps) {
   // Top-level catalog: `detail.*` is not under the admin namespace. / 顶层词表：`detail.*` 不在 admin 命名空间。
   const t = useTranslations();
-  const { data, error, isLoading, mutate } = useSWR<AgentDetailResponse>(
+  const { data: cachedData, error, isLoading, mutate } = useSWR<AgentDetailResponse>(
     `/api/public/agent/detail/${numId}?minutes=60`,
     fetcher,
     { refreshInterval: 15_000, revalidateOnFocus: false, dedupingInterval: 5_000, shouldRetryOnError: isRetryableApiError, errorRetryCount: 2 },
@@ -292,13 +292,15 @@ export function AgentDetailContent({ numId, monitorName, target }: AgentDetailCo
     return () => clearInterval(h);
   }, []);
 
+  const data = error instanceof ApiError && [401, 403, 404].includes(error.status) ? undefined : cachedData;
   const live = data?.live ?? null;
   const resolvedName = monitorName ?? data?.monitor.name ?? '';
-  const online = live?.reported_at == null
-    ? null
-    : nowTick - live.reported_at <= (data?.staleAfterSec ?? 30);
-  const isUp = online === true;
-  const isDown = online === false;
+  const paused = data?.monitor.active === 0;
+  const online = data?.online === true
+    ? live?.reported_at == null ? null : nowTick - live.reported_at <= data.staleAfterSec
+    : data?.online ?? null;
+  const isUp = !paused && online === true;
+  const isDown = !paused && online === false;
 
   const cpuPct = live?.cpu_usage ?? null;
   const memPct =
@@ -401,7 +403,7 @@ export function AgentDetailContent({ numId, monitorName, target }: AgentDetailCo
                   className={clsx(isUp ? 'text-success' : isDown ? 'text-danger' : 'text-default-500')}
                   startContent={isUp ? <Check size={12} /> : isDown ? <AlertTriangle size={12} /> : undefined}
                 >
-                  {online === null ? t('detail.unknown') : isUp ? t('detail.up') : t('detail.down')}
+                  {paused ? t('timer.paused') : online === null ? t('detail.unknown') : isUp ? t('detail.up') : t('detail.down')}
                 </Chip>
               </div>
             </CardHeader>
@@ -549,7 +551,7 @@ export function AgentDetailContent({ numId, monitorName, target }: AgentDetailCo
               <div className="grid grid-cols-3 gap-2 lg:content-center lg:border-l lg:border-divider lg:pl-6">
                 <div className="flex min-w-0 justify-center">
                   <PercentGauge
-                    value={cpuPct ?? 0}
+                    value={cpuPct}
                     label={t('detail.cpuUsage')}
                     sub={live?.cpu_cores ? `${live.cpu_cores} ${t('detail.cores')}` : undefined}
                     size={80}
@@ -557,7 +559,7 @@ export function AgentDetailContent({ numId, monitorName, target }: AgentDetailCo
                 </div>
                 <div className="flex min-w-0 justify-center">
                   <PercentGauge
-                    value={memPct ?? 0}
+                    value={memPct}
                     label={t('detail.memory')}
                     sub={
                       live?.mem_used != null && live?.mem_total != null
@@ -569,7 +571,7 @@ export function AgentDetailContent({ numId, monitorName, target }: AgentDetailCo
                 </div>
                 <div className="flex min-w-0 justify-center">
                   <PercentGauge
-                    value={diskPct ?? 0}
+                    value={diskPct}
                     label={t('detail.disk')}
                     sub={
                       live?.disk_used != null && live?.disk_total != null

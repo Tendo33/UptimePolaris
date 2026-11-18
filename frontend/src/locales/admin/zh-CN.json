@@ -1071,6 +1071,8 @@
     "checkThemes": "主题存储（R2）",
     "checkThemesHint": "未绑定时可使用内置主题。安装第三方主题需在 Settings → Bindings 中添加 R2 存储桶，变量名填写 THEMES，也可以在初始化后添加。",
     "checkAnalytics": "Analytics Engine",
+    "checkAnalyticsSql": "历史查询",
+    "checkAnalyticsSqlHint": "历史图表和每日归档需要 ANALYTICS_SQL。请保留仓库中的 analytics 配置并重新部署，无需另建资源或配置 API Token。",
     "checkAnalyticsHint": "用于记录监控观测数据。请先在控制台启用 Analytics Engine，再在 Settings → Bindings 中添加数据集，变量名填写 UPTIME。",
     "checkOk": "已配置",
     "checkMissing": "未配置",

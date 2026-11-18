@@ -53,7 +53,9 @@ function bindingConfig(bindings) {
       if (typeof binding.namespace_id !== 'string' || !binding.namespace_id) throw new Error(`KV binding ${binding.name} has no namespace ID.`);
       (config.kv_namespaces ??= []).push({ binding: binding.name, id: binding.namespace_id });
     } else {
+      if (typeof binding.dataset !== 'string' || !binding.dataset) throw new Error(`Analytics Engine binding ${binding.name} has no dataset name.`);
       (config.analytics_engine_datasets ??= []).push({ binding: binding.name, dataset: binding.dataset });
+      config.vars = { ...config.vars, UPTIME_DATASET: binding.dataset };
     }
   }
   return config;
@@ -76,7 +78,8 @@ if (process.env.WORKERS_CI === '1') {
   const generated = kept.length ? resolve(root, '.wrangler-builds.jsonc') : null;
   if (generated) {
     console.log(`[deploy] keeping dashboard bindings: ${kept.map(binding => `${binding.name} (${binding.type})`).join(', ')}`);
-    writeFileSync(generated, JSON.stringify({ ...parsed.config, ...bindingConfig(kept) }, null, 2) + '\n');
+    const resources = bindingConfig(kept);
+    writeFileSync(generated, JSON.stringify({ ...parsed.config, ...resources, vars: { ...parsed.config.vars, ...resources.vars } }, null, 2) + '\n');
   }
   const deploy = spawnSync(...wrangler(['deploy', ...args, '--config', generated ?? path]), {
     cwd: root,

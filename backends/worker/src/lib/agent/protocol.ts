@@ -58,7 +58,7 @@ export interface ReportParams {
   };
   ram: { total: number; used: number };
   swap: { total: number; used: number };
-  load: { load1: number; load5: number; load15: number };
+  load: { load1: number | null; load5: number | null; load15: number | null };
   disk: { total: number; used: number };
   network: {
     /** Bytes/second, over the sampling window. / 采样窗口内的速率（字节/秒）。 */
@@ -68,11 +68,11 @@ export interface ReportParams {
     totalUp: number;
     totalDown: number;
   };
-  connections: { tcp: number; udp: number };
+  connections: { tcp: number | null; udp: number | null };
   /** Seconds since boot. / 自启动以来的秒数。 */
   uptime: number;
   /** Process count. / 进程数。 */
-  process: number;
+  process: number | null;
   /** Free-form note; the agent sets it to its own error state if any. / 自由文本备注；Agent 存在错误时将其设为自身错误状态。 */
   message: string;
   /** Null means no interface details were collected. / null 表示未采集网卡明细。 */
@@ -153,6 +153,10 @@ function num(v: unknown): number | null {
   return typeof v === 'number' && Number.isFinite(v) ? v : null;
 }
 
+function nullableMetric(value: unknown): number | null | undefined {
+  return value === null ? null : typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : undefined;
+}
+
 function obj(v: unknown): Record<string, unknown> | null {
   return typeof v === 'object' && v !== null && !Array.isArray(v)
     ? (v as Record<string, unknown>)
@@ -178,19 +182,19 @@ export function asReportParams(p: unknown): ReportParams | null {
   const ramUsed = num(ram.used);
   const swapTotal = num(swap.total);
   const swapUsed = num(swap.used);
-  const load1 = num(load.load1);
-  const load5 = num(load.load5);
-  const load15 = num(load.load15);
+  const load1 = nullableMetric(load.load1);
+  const load5 = nullableMetric(load.load5);
+  const load15 = nullableMetric(load.load15);
   const diskTotal = num(disk.total);
   const diskUsed = num(disk.used);
   const netUp = num(network.up);
   const netDown = num(network.down);
   const totalUp = num(network.totalUp);
   const totalDown = num(network.totalDown);
-  const connTcp = num(connections.tcp);
-  const connUdp = num(connections.udp);
+  const connTcp = nullableMetric(connections.tcp);
+  const connUdp = nullableMetric(connections.udp);
   const uptime = num(o.uptime);
-  const process = num(o.process);
+  const process = nullableMetric(o.process);
   const observedAt = num(o.observed_at);
   const summaries = asMinuteSummaries(o.summaries);
   const interfaces = asInterfaceArray(o.interfaces);
@@ -201,11 +205,11 @@ export function asReportParams(p: unknown): ReportParams | null {
   if (
     cpuUsage === null || ramTotal === null || ramUsed === null ||
     swapTotal === null || swapUsed === null ||
-    load1 === null || load5 === null || load15 === null ||
+    load1 === undefined || load5 === undefined || load15 === undefined ||
     diskTotal === null || diskUsed === null ||
     netUp === null || netDown === null || totalUp === null || totalDown === null ||
-    connTcp === null || connUdp === null ||
-    uptime === null || process === null
+    connTcp === undefined || connUdp === undefined ||
+    uptime === null || process === undefined
   ) {
     return null;
   }

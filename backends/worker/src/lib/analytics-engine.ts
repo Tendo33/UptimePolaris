@@ -3,6 +3,11 @@ import type { HistoryResult } from '../../../../shared/contracts';
 
 export const AE_POINT_LIMIT = 250;
 export const ANALYTICS_DATASET = 'events.analyticsEngine."uptime_heartbeats"';
+export function analyticsDataset(env: Env): string {
+  if (env.UPTIME_DATASET === undefined) return ANALYTICS_DATASET;
+  if (!env.UPTIME_DATASET) throw new Error('Analytics Engine dataset name is empty');
+  return `events.analyticsEngine."${env.UPTIME_DATASET.replaceAll('\\', '\\\\').replaceAll('"', '""')}"`;
+}
 interface QueryState {
   cached: Map<string, { expires: number; rows: Record<string, unknown>[] }>;
   pending: Map<string, Promise<Record<string, unknown>[]>>;
@@ -18,7 +23,7 @@ export interface AeRow {
 }
 
 export function analyticsReadable(env: Env): boolean {
-  return Boolean(env.UPTIME && env.ANALYTICS_SQL);
+  return Boolean(env.UPTIME && typeof env.ANALYTICS_SQL?.query === 'function');
 }
 
 export async function queryAnalytics(
@@ -91,7 +96,7 @@ export async function queryDaily(env: Env, day: string): Promise<Map<string, AeR
     countIf(double2 = 2) AS warn,
     avgIf(double1, double2 IN (1, 2)) AS avg,
     countIf(double2 IN (1, 2)) AS latency_count
-    FROM ${ANALYTICS_DATASET}
+    FROM ${analyticsDataset(env)}
     WHERE timestamp >= $ingestedSince
       AND ${MONITOR_OBSERVED_AT} >= $start AND ${MONITOR_OBSERVED_AT} < $end
       AND ${MONITOR_POINTS}
@@ -109,7 +114,7 @@ export function queryMonitorHistory(env: Env, id: string, since: number, now: nu
     const rows = await queryAnalytics(env, `SELECT ${MONITOR_OBSERVED_AT} AS t,
       argMax(double2, timestamp) AS up, argMax(double1, timestamp) AS ms,
       APPROX_MAX("sampleInterval") AS sample_interval
-      FROM ${ANALYTICS_DATASET}
+      FROM ${analyticsDataset(env)}
       WHERE index1 = $id AND ${MONITOR_POINTS}
         AND timestamp >= $ingestedSince
         AND ${MONITOR_OBSERVED_AT} >= $start AND ${MONITOR_OBSERVED_AT} < $end

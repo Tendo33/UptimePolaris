@@ -102,6 +102,10 @@ pa command status
 
 默认 60 秒上报时，超过约 180 秒没有报告会判失联；阈值会随配置间隔变化。历史曲线缺口和最后快照不是同一个问题，先看最新报告时间。
 
+Worker 提示历史查询缺少绑定时，确认 `UPTIME` 已绑定，并使用仓库中包含 `analytics` 项的部署配置重新部署，以提供 `ANALYTICS_SQL`。无需配置额外的 API Token。Workers Builds 会自动沿用 `UPTIME` 绑定的数据集名称；手动部署并使用自定义数据集时，将 `UPTIME_DATASET` 设为该名称。不要新建空数据集来替代仍有历史记录的数据集。
+
+实时数据正常但连接数或负载始终为零时，先更新目标机器上的 Agent，再检查最新上报。采集权限不足或平台无法提供的指标会显示 `—`，不会用零值代替。Windows 负载是平滑后的处理器等待队列，不是 CPU 使用率。
+
 ## `pa` 或 `polaris-agent` 找不到
 
 重新打开终端，让 PATH 刷新。用实际二进制路径执行 `command status`；必要时执行 `command register`。命令名被其他程序占用时，注册器会拒绝覆盖，可以换一个目录并明确管理 PATH。
@@ -183,6 +187,8 @@ Never include a credential-bearing connection URL in shared logs or screenshots.
 If Worker setup was interrupted and the database choice is locked, resubmit the original administrator username and password to resume the same setup. The account may already exist in the selected database. If the lease holder crashed, wait up to 10 minutes before retrying. Do not delete a pending control record.
 
 ### Missing checks or Agent data
+
+If Worker reports missing history bindings, keep the `UPTIME` dataset and redeploy with the repository’s `analytics` configuration to provide `ANALYTICS_SQL`; no additional API token is required. Workers Builds selects the bound dataset automatically. For a custom dataset in a manual deployment, set `UPTIME_DATASET` to its name. Preserve the existing dataset rather than replacing it with an empty one. Update the Agent if load or socket counts remain zero; unavailable metrics display `—`, not a fabricated zero. Windows load is a smoothed processor queue length, not CPU usage.
 
 - Confirm the monitor is enabled, the target and check source are correct, and the expected environment is open. Inspect scheduler configuration and recent job errors.
 - Push requires a POST to the monitor's reporting URL with its key in the `Authorization: Bearer` header. Use JSON for status and message; the edit form provides an example. GET returns 405 without recording a heartbeat. Check `ok: true`, the monitor ID, the key, and the reporting deadline.

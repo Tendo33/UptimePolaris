@@ -60,6 +60,11 @@ func (a *App) agentTransportRoutes() {
 }
 func validNumber(v any) bool { n, ok := v.(float64); return ok && !math.IsNaN(n) && !math.IsInf(n, 0) }
 
+func validNullableMetric(row Object, key string) bool {
+	value, exists := row[key]
+	return exists && (value == nil || validNumber(value) && number(value) >= 0)
+}
+
 func normalizedMetricRows(value any, keys []string) (any, bool) {
 	if value == nil {
 		return nil, true
@@ -148,12 +153,16 @@ func validFrame(frame Object) bool {
 				return false
 			}
 			for _, k := range keys {
-				if !validNumber(row[k]) {
+				if key == "load" || key == "connections" {
+					if !validNullableMetric(row, k) {
+						return false
+					}
+				} else if !validNumber(row[k]) {
 					return false
 				}
 			}
 		}
-		if !validNumber(params["uptime"]) || !validNumber(params["process"]) {
+		if !validNumber(params["uptime"]) || !validNullableMetric(params, "process") {
 			return false
 		}
 		if v := params["observed_at"]; !validNumber(v) || number(v) != math.Trunc(number(v)) {

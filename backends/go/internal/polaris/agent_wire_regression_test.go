@@ -6,6 +6,7 @@ package polaris
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 func TestAgentMalformedWireValues(t *testing.T) {
@@ -53,4 +54,30 @@ func TestAgentMalformedWireValues(t *testing.T) {
 		code, out = s.request(t, "POST", "/api/public/agent/push/fixture-token", Object{"method": "report", "params": params}, false)
 		expectStatus(t, code, 400, out)
 	}
+}
+
+func TestAgentNullableRuntimeMetrics(t *testing.T) {
+	s := newTestServer(t)
+	ctx := context.Background()
+	if err := s.app.store.put(ctx, "agent", "nullable", Object{"id": "nullable", "token": "nullable-fixture", "active": true}); err != nil {
+		t.Fatal(err)
+	}
+	params := reportParams(time.Now().Unix())
+	params["load"] = Object{"load1": nil, "load5": nil, "load15": nil}
+	params["connections"] = Object{"tcp": nil, "udp": 0}
+	params["process"] = nil
+	code, out := s.request(t, "POST", "/api/public/agent/push/nullable-fixture", Object{"method": "report", "params": params}, false)
+	expectStatus(t, code, 200, out)
+	live, err := s.app.store.get(ctx, "machine", "nullable")
+	if err != nil || live["load_1"] != nil || live["connections_tcp"] != nil || live["process_count"] != nil || live["connections_udp"] == nil {
+		t.Fatal(live, err)
+	}
+	for _, invalid := range []any{-1, "0"} {
+		params["process"] = invalid
+		code, out = s.request(t, "POST", "/api/public/agent/push/nullable-fixture", Object{"method": "report", "params": params}, false)
+		expectStatus(t, code, 400, out)
+	}
+	delete(params, "process")
+	code, out = s.request(t, "POST", "/api/public/agent/push/nullable-fixture", Object{"method": "report", "params": params}, false)
+	expectStatus(t, code, 400, out)
 }

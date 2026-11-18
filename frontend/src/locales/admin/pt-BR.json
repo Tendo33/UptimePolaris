@@ -1071,6 +1071,8 @@
     "checkThemes": "Armazenamento de temas (R2)",
     "checkThemesHint": "Os temas integrados funcionam sem R2. Para instalar temas de terceiros, adicione um bucket R2 em Settings → Bindings com o nome de vínculo THEMES. Ele pode ser adicionado após a configuração inicial.",
     "checkAnalytics": "Analytics Engine",
+    "checkAnalyticsSql": "Consulta de histórico",
+    "checkAnalyticsSqlHint": "Gráficos e arquivos diários requerem ANALYTICS_SQL. Mantenha a configuração analytics do repositório e faça uma nova implantação; nenhum recurso ou token de API adicional é necessário.",
     "checkAnalyticsHint": "Necessário para registrar as observações. Ative o Analytics Engine no painel e adicione um conjunto de dados em Settings → Bindings com o nome de vínculo UPTIME.",
     "checkOk": "Configurado",
     "checkMissing": "Ausente",

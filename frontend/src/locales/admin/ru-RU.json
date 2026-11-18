@@ -1071,6 +1071,8 @@
     "checkThemes": "Хранилище тем (R2)",
     "checkThemesHint": "Встроенные темы работают без R2. Для установки сторонних тем добавьте бакет R2 в Settings → Bindings с именем привязки THEMES. Это можно сделать после первоначальной настройки.",
     "checkAnalytics": "Analytics Engine",
+    "checkAnalyticsSql": "Запросы истории",
+    "checkAnalyticsSqlHint": "Графикам и ежедневным архивам нужна привязка ANALYTICS_SQL. Сохраните конфигурацию analytics из репозитория и разверните Worker заново; дополнительные ресурсы и токен API не нужны.",
     "checkAnalyticsHint": "Необходим для записи результатов мониторинга. Включите Analytics Engine в панели управления, затем добавьте набор данных в Settings → Bindings с именем привязки UPTIME.",
     "checkOk": "Настроено",
     "checkMissing": "Не настроено",

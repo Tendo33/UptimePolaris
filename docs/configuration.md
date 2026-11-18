@@ -75,10 +75,11 @@ Go 显式选过数据库后，数据目录里的 `database.json` 优先于 `POLA
 | `PBKDF2_ITERATIONS` | `3000`；允许 1–100000 | 密码哈希成本，作为字符串变量配置 |
 | `USAGE_PLAN` | `free`，可选 `paid` | 用量页比较的计划，不会替账号开通付费套餐 |
 | `AUTOMATIC_NOTIFICATIONS_DISABLED` | 未设置 | 精确等于字符串 `true` 时禁用自动通知，不停止采集 |
+| `UPTIME_DATASET` | `uptime_heartbeats` | 历史查询使用的数据集名称；Workers Builds 按 `UPTIME` 的实际绑定自动设置，手动部署时应与绑定的数据集一致 |
 
 Worker 初始化要求绑定 `UPTIME`。延迟趋势、Agent 资源历史和每日归档通过 `ANALYTICS_SQL` 读取 AE；三份部署配置均已声明该绑定，部署后即可使用，无需添加查询凭据。直接使用 Wrangler 部署时，版本需为 4.145.0 或更高。
 
-缺少 `ANALYTICS_SQL` 绑定时，实时状态、近期检查状态条和精确可用率继续工作；历史图表显示缺少绑定的提示，每日 AE 归档暂停。更新部署配置并重新部署后，可继续读取 AE 中仍保留的数据。
+初始化检查会单独列出历史查询绑定。缺少 `ANALYTICS_SQL` 时，实时状态、近期检查状态条和精确可用率继续工作；历史图表提示缺少的绑定，每日 AE 归档暂停。保留配置中的 `analytics` 项并重新部署后，可继续读取 AE 中仍保留的数据。
 
 `PBKDF2_ITERATIONS` 会增加认证时的 CPU 开销。默认成本有限；调整前要结合 Worker 的实际运行预算验证，不能只凭本地计时判断生产环境能否承受。已有密码记录各自保存自己的哈希成本，改这个变量不会立刻重算所有密码。
 
@@ -201,6 +202,7 @@ Manual deployment uses `backends/worker/cloudflare.config.ts`; database npm scri
 | `PBKDF2_ITERATIONS` | `3000`; 1–100000 | Password hash cost, configured as a string |
 | `USAGE_PLAN` | `free`; also `paid` | Plan used for usage comparisons; does not enable a paid plan |
 | `AUTOMATIC_NOTIFICATIONS_DISABLED` | Unset | Exactly `true` disables automatic notifications, not collection |
+| `UPTIME_DATASET` | `uptime_heartbeats` | Dataset used for history queries; Workers Builds sets it from the actual `UPTIME` binding. For manual deployment, match the bound dataset name |
 
 Worker setup requires the `UPTIME` binding. Latency charts, Agent resource history and daily archives read AE through `ANALYTICS_SQL`. All three deployment configurations include this binding; no query credentials are needed. Direct Wrangler deployments require version 4.145.0 or later.
 

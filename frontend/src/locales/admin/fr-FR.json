@@ -1071,6 +1071,8 @@
     "checkThemes": "Stockage des thèmes (R2)",
     "checkThemesHint": "Les thèmes intégrés fonctionnent sans R2. Pour installer des thèmes tiers, ajoutez un bucket R2 dans Settings → Bindings avec le nom de liaison THEMES. Vous pouvez le faire après la configuration initiale.",
     "checkAnalytics": "Analytics Engine",
+    "checkAnalyticsSql": "Requêtes d’historique",
+    "checkAnalyticsSqlHint": "Les graphiques et archives quotidiennes nécessitent ANALYTICS_SQL. Conservez la configuration analytics du dépôt et redéployez ; aucune ressource ni aucun jeton API supplémentaire n’est nécessaire.",
     "checkAnalyticsHint": "Requis pour enregistrer les observations. Activez Analytics Engine dans le tableau de bord, puis ajoutez un jeu de données dans Settings → Bindings avec le nom de liaison UPTIME.",
     "checkOk": "Configuré",
     "checkMissing": "Manquant",

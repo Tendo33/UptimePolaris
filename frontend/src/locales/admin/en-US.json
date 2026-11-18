@@ -1071,6 +1071,8 @@
     "checkThemes": "Theme storage (R2)",
     "checkThemesHint": "Built-in themes work without R2. To install third-party themes, add an R2 bucket under Settings → Bindings with the binding name THEMES. You can add it after setup.",
     "checkAnalytics": "Analytics Engine",
+    "checkAnalyticsSql": "History queries",
+    "checkAnalyticsSqlHint": "History charts and daily archives require ANALYTICS_SQL. Keep the repository’s analytics configuration and redeploy; no extra resource or API token is needed.",
     "checkAnalyticsHint": "Required for monitoring observations. Enable Analytics Engine in the dashboard, then add a dataset under Settings → Bindings with the binding name UPTIME.",
     "checkOk": "Configured",
     "checkMissing": "Missing",

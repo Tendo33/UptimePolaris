@@ -348,6 +348,7 @@ export interface Env {
   AUTOMATIC_NOTIFICATIONS_DISABLED?: string;
   /** Worker 初始化需要启用 Analytics Engine。 / Worker setup requires Analytics Engine. */
   UPTIME?: AnalyticsEngineDataset;
+  UPTIME_DATASET?: string;
   /** Built SPA assets; omitted by runtime harnesses that serve no asset directory. / 构建后的 SPA 资源；不提供资源目录的运行时测试可省略。 */
   ASSETS?: Fetcher;
   /** Installed theme assets in R2; optional when serving only the built-in UI. / R2 中已安装的主题资源；仅提供内置界面时可选。 */

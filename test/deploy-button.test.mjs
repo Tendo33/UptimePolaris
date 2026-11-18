@@ -152,6 +152,7 @@ try {
     ['wrangler', 'deploy', '--config', generated],
     ['config', {
       ...config,
+      vars: { ...config.vars, UPTIME_DATASET: 'fixture_heartbeats' },
       d1_databases: [{ binding: 'DB', database_id: '11111111-1111-4111-8111-111111111111' }],
       r2_buckets: [{ binding: 'THEMES', bucket_name: 'fixture-themes' }],
       analytics_engine_datasets: [{ binding: 'UPTIME', dataset: 'fixture_heartbeats' }],

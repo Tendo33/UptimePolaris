@@ -1071,6 +1071,8 @@
     "checkThemes": "テーマストレージ（R2）",
     "checkThemesHint": "R2 がなくても組み込みテーマは利用できます。外部テーマをインストールする場合は、Settings → Bindings で R2 バケットを追加し、バインド名を THEMES にしてください。初期設定後でも追加できます。",
     "checkAnalytics": "Analytics Engine",
+    "checkAnalyticsSql": "履歴取得",
+    "checkAnalyticsSqlHint": "履歴グラフと日次アーカイブには ANALYTICS_SQL が必要です。リポジトリの analytics 設定を保持して再デプロイしてください。追加リソースや API トークンは不要です。",
     "checkAnalyticsHint": "監視データの記録に必要です。ダッシュボードで Analytics Engine を有効にしてから、Settings → Bindings でデータセットを追加し、バインド名を UPTIME にしてください。",
     "checkOk": "設定済み",
     "checkMissing": "未設定",

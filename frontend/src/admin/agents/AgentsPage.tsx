@@ -49,6 +49,7 @@ import { RackArt, SearchArt } from '../components/illustrations';
 import { OsBadge } from '../components/OsBadge';
 import { FillingPanel } from '../components/Panel';
 import { AdminPage } from '../layout/AdminPage';
+import { useFleet } from '../useConsoleData';
 import { StatusPill } from '../monitors/MonitorIndicators';
 import { AddAgentPanel } from './AddAgentPanel';
 import { AgentCommandsDialog } from './AgentCommandsDialog';
@@ -58,7 +59,7 @@ import { AgentVersionPopover } from './AgentVersionPopover';
 import { agentsApi } from './api';
 import { useAgentTaxonomy } from './Taxonomy';
 import { FleetInsights, FleetOverview } from './FleetOverview';
-import type { AgentCommandRecord, BatchCommandAction, FleetAgent, FleetSummary } from './types';
+import type { AgentCommandRecord, BatchCommandAction, FleetAgent } from './types';
 
 /** A percentage with one decimal, or an em dash. / 保留一位小数的百分比；无值时显示破折号。 */
 function formatPercent(value: number | null): string {
@@ -97,9 +98,10 @@ export function AgentsPage() {
   const taxonomy = useAgentTaxonomy();
   const [groupFilter, setGroupFilter] = useState<string | null>(null);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
-  const [agents, setAgents] = useState<FleetAgent[] | null>(null);
-  const [summary, setSummary] = useState<FleetSummary | null>(null);
-  const [error, setError] = useState('');
+  const fleet = useFleet();
+  const agents = fleet.data?.agents ?? null;
+  const summary = fleet.data?.summary ?? null;
+  const error = fleet.error ? apiErrorMessage(fleet.error) : '';
   const [query, setQuery] = useState('');
   const [stateFilter, setStateFilter] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -121,6 +123,8 @@ export function AgentsPage() {
   const [clock, setClock] = useState(() => Math.floor(Date.now() / 1000));
   const [params, setParams] = useSearchParams();
 
+  useEffect(() => { setClock(Math.floor(Date.now() / 1000)); }, [fleet.data]);
+
   const openAgent = useCallback((agent: FleetAgent) => {
     if (agent.last_reported_at === null) {
       setInstalling(agent);
@@ -131,19 +135,8 @@ export function AgentsPage() {
   }, []);
 
   const load = async () => {
-    try {
-      const fleet = await agentsApi.listAgents();
-      setAgents(fleet.agents);
-      setSummary(fleet.summary);
-      setError('');
-    } catch (e) {
-      setError(apiErrorMessage(e));
-    }
+    await fleet.mutate().catch(() => undefined);
   };
-
-  useEffect(() => {
-    void load();
-  }, []);
 
   /** Deep links `?agent=` and `?enroll=1`, consumed once. / 深链接 `?agent=` 和 `?enroll=1`，读取一次后移除。 */
   useEffect(() => {

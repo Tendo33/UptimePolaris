@@ -52,6 +52,7 @@ Worker 在 `needsSetup` 为 `true` 时还会返回 `setupRequirements` 数组（
 | `adminToken` | `true` | 已配置 `ADMIN_TOKEN` |
 | `themes` | `false` | 已绑定 `THEMES`（R2 主题存储） |
 | `analytics` | `true` | 已绑定 `UPTIME`（Analytics Engine） |
+| `analyticsSql` | `false` | 已绑定 `ANALYTICS_SQL`（历史查询）；缺少时不影响实时监控，但无法读取 AE 历史或执行每日归档 |
 
 Worker 尚未配置数据库时，仍返回选库选项并允许进入初始化表单；其他页面请求重定向到 `/setup`，业务 API 返回 503 `setup_required`，若部署必需项未通过则返回 `deployment_incomplete`。`POST /api/auth/setup` 在缺少 `UPTIME` 时返回 503 `deployment_incomplete`；没有可用的 PostgreSQL 连接时返回 400 `invalid_database_url`，选择未绑定的 D1 时返回 400 `invalid_database_type`。补绑后重新读取会话即可更新检查结果和数据库选项。
 
@@ -114,6 +115,8 @@ curl --fail-with-body 'https://status.example.com/api/public/status'
 `/api/public/maintenance` 返回 `active`、`source`、`serverNow`、统一配置的 `title` 和 `description`、当前窗口的 `startsAt` 和 `endsAt`，以及按开始时间排序的 `scheduled` 列表。`source` 为 `manual`、`scheduled` 或 `null`。手动维护优先于计划维护，一直持续到管理员关闭；手动维护或没有进行中的窗口时，当前窗口时间为 `null`。时间使用 UTC ISO 8601 字符串。响应使用 `no-store`。`/api/public/config` 也提供 `maintenance` 和 `maintenanceList`。维护期间 API 正常服务；公开页面的展示行为见[维护窗口](usage.md#维护窗口)。
 
 ### Worker 历史响应
+
+Agent 上报中的 `load.load1`、`load.load5`、`load.load15`、`connections.tcp`、`connections.udp` 和 `process` 字段必须保留。无法采集时传 `null`；`0` 仅表示实际观测为零。Worker 与 Go 使用相同规则。
 
 `GET /api/public/monitors/:numId` 的 `ring` 是近期实际检查状态，`history` 是从 AE 读取的延迟明细。`GET /api/public/agent/detail/:numId` 的 `buckets` 和 `GET /api/public/servers/:id` 的 `history` 也来自 AE；后者仅在页面启用历史时返回历史状态。
 
@@ -365,6 +368,7 @@ While `needsSetup` is `true`, the Worker also returns `setupRequirements` (an ar
 | `adminToken` | `true` | `ADMIN_TOKEN` is configured |
 | `themes` | `false` | `THEMES` (R2 theme storage) is bound |
 | `analytics` | `true` | `UPTIME` (Analytics Engine) is bound |
+| `analyticsSql` | `false` | `ANALYTICS_SQL` is bound for history queries; missing it leaves live monitoring available but disables AE history reads and daily archives |
 
 Without a configured database, the Worker still returns database options and allows the setup form to open. Other pages redirect to `/setup`; business APIs return 503 `setup_required`, or `deployment_incomplete` if required deployment items are missing. `POST /api/auth/setup` returns 503 `deployment_incomplete` without `UPTIME`, 400 `invalid_database_url` without a usable PostgreSQL connection, or 400 `invalid_database_type` when selecting an unbound D1 database. Read the session again after adding a binding to update both the check and database options.
 
@@ -401,6 +405,8 @@ Errors omit underlying connection details and URLs. Keep database URLs and setup
 `GET /api/capabilities` describes the runtime, probe types, intervals and theme storage. Public reads include `/api/public/health`, `/status`, `/status/detail`, `/config`, `/maintenance`, `/monitors`, `/monitors/:numId`, `/agent/detail/:numId`, `/servers`, `/servers/:id`, `/theme`, `/icon` and `/monitor-icon?id=:numId` under `/api/public`. Visibility and the current presentation domain restrict the objects returned; disabled machine pages return 404 for server reads. Anonymous eligible Worker responses can be cached for 15 seconds. Maintenance is `no-store`; its `source` is `manual`, `scheduled` or `null`, with UTC ISO 8601 window times.
 
 Worker history responses include `history_status` (`ready`, `unconfigured` or `unavailable`) and `history_sampled`. Monitor detail separates the exact recent check `ring` from AE latency `history`. Agent `buckets` and enabled server `history` also read from AE. A successful empty result is `ready`. `unconfigured` means the `ANALYTICS_SQL` binding is missing, and `unavailable` means the read failed temporarily; failed history reads retain live data. Missing metrics remain `null`. Agent management detail additionally returns database-backed `history_daily` and `history_daily_sampled` for archived resource summaries. These fields do not change Go's database-backed history contract.
+
+Agent reports must retain `load.load1`, `load.load5`, `load.load15`, `connections.tcp`, `connections.udp` and `process`. Send `null` when a metric cannot be collected; `0` represents a measured zero. Worker and Go apply the same rule.
 
 Public heartbeat states are `0` DOWN, `1` UP, `2` WARN and `4` PENDING; missing latency is `null`. Worker supports HTTP, TCP, UDP, ICMP, Push and Agent monitors; Go also supports DNS, TLS and WebSocket. Consult capabilities for the current runtime and probe availability.
 

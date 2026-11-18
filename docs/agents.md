@@ -61,7 +61,7 @@ Windows PowerShell：
 | `manual` | Linux、macOS、Windows | 准备程序和配置，按安装输出前台运行 |
 | `docker` | Linux | 生成并启动 Docker Compose 部署，更新通过重建容器完成 |
 
-Linux 会按环境使用 systemd、OpenRC、supervisord、s6 等机制；没有守护进程时，可能退到启动任务或手动模式。用户模式的 POSIX 服务安装目前要求 Linux 的 `systemd --user`；macOS 的用户模式和 Linux 不同，不能照搬。
+Linux 会按环境使用 systemd、OpenRC、supervisord、s6 等机制；没有守护进程时，可能退到启动任务或手动模式。Linux 用户模式要求 `systemd --user`；macOS 用户模式使用当前登录用户的 launchd，在注销后停止。
 
 macOS 系统模式用 launchd；Windows 系统模式和用户模式用计划任务。Windows 系统模式要在管理员 PowerShell 里执行。
 
@@ -228,6 +228,10 @@ Invoke-WebRequest 'https://raw.githubusercontent.com/XingLingQAQ/Polaris-Agent/m
 
 ## 数据与连接
 
+负载、连接数和进程数是独立指标，不是百分比。Windows 负载根据处理器等待队列计算平滑值，Linux 和 macOS 使用系统负载；数值的含义不同，不宜直接横向比较。连接数包含 IPv4 和 IPv6 的 TCP 套接字及 UDP 端点。指标无法采集时显示 `—`，真实的零值仍显示为 `0`。
+
+列表和详情按后端的刷新周期更新。Worker 的最近 24 小时资源历史从 Analytics Engine 读取，每日归档保存已结束日期的摘要；当天数据不需要等到第二天才显示。出现绑定缺失提示时，先按提示更新部署配置，不能靠延长运行时间解决。
+
 Agent 在连接中断或切换传输方式时继续采样，并重试尚未确认的报告。服务端确认报告后，Agent 才移除对应的待发送数据；重复收到的分钟摘要按时间桶去重。停机或自动更新前，Agent 会在有限时间内尽量发送已完成的摘要和最新快照。
 
 服务端用自己的时钟判断报告时间。超过 24 小时的报告会被确认并忽略，不会阻塞后续报告。报告时间超前服务端超过 5 分钟时，服务端要求 Agent 暂缓这条报告；后续有效报告仍可发送。暂缓的报告会继续重试，直到时间进入服务端允许的范围。单个报告里的过期摘要会被跳过，仍在有效期内的摘要仍可保存。
@@ -256,7 +260,7 @@ Agent 启动时通过真实网卡出口发现公网 IP，再按这个 IP 查询�
 
 For installation and reinstallation, the command downloads the script from the Agent GitHub repository and passes the site endpoint and token directly as arguments. The script detects the OS and architecture, reads the latest stable GitHub Release manifest, then downloads the matching version and verifies its size and SHA-256. The token is not sent to GitHub, but can appear in shell history and process arguments. Keep the command private.
 
-System mode is available on Linux, macOS and Windows. User mode depends on the platform's service manager; POSIX user services currently require Linux `systemd --user`. Manual mode prepares files for foreground operation. Linux Docker mode uses Compose; its default system view is the container view unless host resources are explicitly mounted and permitted.
+System mode is available on Linux, macOS and Windows. User mode uses Linux `systemd --user`, macOS launchd in the logged-in user's session, or Windows Task Scheduler. The macOS user service stops at logout. Manual mode prepares files for foreground operation. Linux Docker mode uses Compose; its default system view is the container view unless host resources are explicitly mounted and permitted.
 
 Use `pa start`, `pa stop`, `pa restart`, `pa status`, `pa logs`, `pa logs -f` or `pa logs -n 200` for supported installations. System services may require administrator privileges. `pa restart --dry-run` previews a service operation; `run`, `update` and `rollback` do not support that flag. `polaris-agent run --config /path/to/config.json` runs in the foreground; do not start a second instance alongside an existing service.
 
@@ -279,6 +283,10 @@ Supported actions are `re_report`, `check_update`, `restart` and `upgrade`. The 
 Uninstall uses the scripts in the Agent GitHub repository, not `pa uninstall`. Download `install.sh` and run it with `--uninstall`, or download `install.ps1` and run it with `-Uninstall`. Use the original installation scope, service name and directory. Removing the host program does not delete console monitors; deleting a console entry does not uninstall the host program.
 
 ### Data and connectivity
+
+Load, socket counts and process counts are separate metrics, not percentages. Windows load is a smoothed processor queue length; Linux and macOS use system load averages, so these values are not directly comparable. Counts include IPv4 and IPv6 TCP sockets and UDP endpoints. Unavailable metrics display `—`; measured zero remains `0`.
+
+The list and detail refresh at the backend’s reporting cadence. On Worker, the last 24 hours of resource history are read from Analytics Engine; daily archives summarize ended dates. Current-day history does not require waiting until the next day. A missing-binding notice requires a deployment configuration update, not a longer observation period.
 
 The Agent keeps sampling during connection interruptions and retries unacknowledged reports. Pending snapshots and minute summaries are held in memory, so an abnormal exit or an unsuccessful shutdown flush can lose them. Reports older than 24 hours are acknowledged and ignored; reports more than 5 minutes ahead are deferred until their timestamps fall within the accepted window. The server deduplicates repeated minute summaries by time bucket.
 

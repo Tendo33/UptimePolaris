@@ -139,7 +139,7 @@
     "reload": "Recarregar página"
   },
   "detail": {
-    "historyUnconfigured": "Faltam bindings para consultar o histórico. Peça a um administrador para verificar a configuração de implantação e reimplantar.",
+    "historyUnconfigured": "O histórico requer os bindings UPTIME e ANALYTICS_SQL. Atualize a configuração e faça uma nova implantação; nenhum token de API é necessário.",
     "historyUnavailable": "O histórico está temporariamente indisponível. Tente novamente mais tarde.",
     "historySampled": "O histórico inclui dados amostrados; as estatísticas são aproximadas.",
     "historyRecent": "Últimas 24 horas",

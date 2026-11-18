@@ -11,6 +11,7 @@ const REQUIREMENT_TEXT: Record<SetupRequirementKey, { label: string; hint: strin
   adminToken: { label: 'setup.checkAdminToken', hint: 'setup.checkAdminTokenHint' },
   themes: { label: 'setup.checkThemes', hint: 'setup.checkThemesHint' },
   analytics: { label: 'setup.checkAnalytics', hint: 'setup.checkAnalyticsHint' },
+  analyticsSql: { label: 'setup.checkAnalyticsSql', hint: 'setup.checkAnalyticsSqlHint' },
 };
 
 export function DeploymentCheck({ requirements, ready, onNext }: { requirements: SetupRequirement[]; ready: boolean; onNext: () => void }) {

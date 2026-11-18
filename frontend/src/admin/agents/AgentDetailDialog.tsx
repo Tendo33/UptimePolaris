@@ -32,6 +32,7 @@ import { IconTile } from '../components/IconTile';
 import { OsBadge } from '../components/OsBadge';
 import { formatBytes, formatClock, formatRate } from '../format';
 import { StatusPill } from '../monitors/MonitorIndicators';
+import { useConsoleRefreshInterval } from '../useConsoleData';
 import { agentsApi } from './api';
 import type { AgentAlertRule, AgentDetailResponse, AgentInterface, AgentMount, FleetAgent } from './types';
 
@@ -76,7 +77,7 @@ const ALERT_RESOURCE_KEY: Record<AgentAlertRule['resource'], string> = {
 
 /** 机器详情包含资源、近期历史、探测任务和告警规则。 / Show machine resources, recent history, probe jobs, and alert rules. */
 export function AgentDetailDialog({
-  agent,
+  agent: selectedAgent,
   onClose,
   onEdit,
 }: {
@@ -86,19 +87,22 @@ export function AgentDetailDialog({
 }) {
   const t = useTranslations('admin.agents');
   const { locale } = useLocale();
-  const open = agent !== null;
+  const open = selectedAgent !== null;
+  const refreshInterval = useConsoleRefreshInterval();
   const [detail, setDetail] = useState<AgentDetailResponse | null>(null);
+  const currentDetail = detail?.agent.id === selectedAgent?.id ? detail : null;
+  const agent = currentDetail?.agent ?? selectedAgent;
   const detailRequest = useRef<AbortController | null>(null);
   const [detailState, setDetailState] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
-  const probeEnabled = (detail?.agent ?? agent)?.probe_enabled !== false;
+  const probeEnabled = agent?.probe_enabled !== false;
 
   const memPercent = agent ? percentOf(agent.mem_used, agent.mem_total) : null;
   const diskPercent = agent ? percentOf(agent.disk_used, agent.disk_total) : null;
-  const mounts = detail?.mounts ?? agent?.mounts ?? [];
-  const interfaces = detail?.interfaces ?? agent?.interfaces ?? [];
-  const alerts = detail?.alerts ?? [];
-  const probeTargets = detail?.probe_targets ?? [];
-  const probeJobs = detail?.probe_jobs ?? [];
+  const mounts = currentDetail?.mounts ?? agent?.mounts ?? [];
+  const interfaces = currentDetail?.interfaces ?? agent?.interfaces ?? [];
+  const alerts = currentDetail?.alerts ?? [];
+  const probeTargets = currentDetail?.probe_targets ?? [];
+  const probeJobs = currentDetail?.probe_jobs ?? [];
 
   const refresh = useCallback(async (id: string) => {
     detailRequest.current?.abort();
@@ -113,17 +117,21 @@ export function AgentDetailDialog({
       setDetailState('ready');
     } catch {
       if (signal.aborted) return;
-      setDetail(null);
       setDetailState('error');
+    } finally {
+      if (detailRequest.current === controller) detailRequest.current = null;
     }
   }, []);
 
   useEffect(() => {
-    if (!agent) return;
+    if (!selectedAgent) return;
     setDetail(null);
-    void refresh(agent.id);
-    return () => detailRequest.current?.abort();
-  }, [agent?.id, refresh]);
+    void refresh(selectedAgent.id);
+    const timer = window.setInterval(() => {
+      if (!detailRequest.current) void refresh(selectedAgent.id);
+    }, refreshInterval);
+    return () => { window.clearInterval(timer); detailRequest.current?.abort(); };
+  }, [selectedAgent?.id, refresh, refreshInterval]);
   const liveState: 'online' | 'offline' | 'never' | 'paused' = !agent
     ? 'never'
     : !agent.active
@@ -216,8 +224,8 @@ export function AgentDetailDialog({
                 </p>
               ) : null}
 
-              {detailState === 'ready' ? (
-                <TrendCard detail={detail} t={t} onRetry={() => { if (agent) void refresh(agent.id); }} />
+              {currentDetail ? (
+                <TrendCard detail={currentDetail} t={t} onRetry={() => { if (agent) void refresh(agent.id); }} />
               ) : detailState === 'loading' ? (
                 <div className="polaris-card flex h-[17rem] items-center justify-center">
                   <Loader2 size={18} className="animate-spin text-default-300" />
@@ -261,7 +269,7 @@ export function AgentDetailDialog({
                       value:
                         agent.connections_tcp === null && agent.connections_udp === null
                           ? '—'
-                          : `${agent.connections_tcp ?? 0} / ${agent.connections_udp ?? 0}`,
+                          : `${agent.connections_tcp ?? '—'} / ${agent.connections_udp ?? '—'}`,
                       hint: 'TCP / UDP',
                     },
                     {
@@ -292,7 +300,7 @@ export function AgentDetailDialog({
                 磁盘与网络接口逐行堆叠。原双列网格会让展开一张卡片时同一行的另一张
                 也被拉高，看起来像同时展开；垂直堆叠使各卡独立展开，长挂载路径也有完整宽度。
               */}
-              {detailState === 'ready' ? (
+              {currentDetail ? (
                 <div className="flex flex-col gap-4">
                   <Disclosure
                     key={`mounts-${agent.id}`}
@@ -409,6 +417,7 @@ function TrendCard({
   const [range, setRange] = useState('recent');
   const labels = useTranslations('detail');
   const history = range === 'daily' ? detail?.history_daily ?? [] : detail?.history ?? [];
+  const historyStatus = range === 'daily' && history.length > 0 ? undefined : detail?.history_status;
   const sampled = range === 'daily' ? detail?.history_daily_sampled : detail?.history_sampled;
 
   const points = useMemo<TrendPoint[]>(() => history.flatMap((point, index) => {
@@ -456,7 +465,7 @@ function TrendCard({
           />
         </div>
       ) : null}
-      <HistoryNotice status={range === 'daily' ? undefined : detail?.history_status} sampled={sampled} onRetry={onRetry} />
+      <HistoryNotice status={historyStatus} sampled={sampled} onRetry={onRetry} />
       {points.some((p) => p.value !== null) ? (
         <TrendChart
           data={points}
@@ -469,7 +478,7 @@ function TrendCard({
           domain={metric === 'net' ? undefined : [0, 100]}
           height={190}
         />
-      ) : range !== 'daily' && detail?.history_status && detail.history_status !== 'ready' ? null : (
+      ) : historyStatus && historyStatus !== 'ready' ? null : (
         <p className="polaris-well py-10 text-center text-tiny text-default-500">{t('trendNoData')}</p>
       )}
     </section>

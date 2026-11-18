@@ -108,6 +108,12 @@ try {
   result = { data: [summary] };
   const agent = await queryAgentHistory(env, 'agent', now - 60, now);
   assert.equal(agent.points[0].cpu_avg, null);
+  result = { data: [{ ...summary, sample_count: 1, cpu_samples: 1, cpu_avg: 37, duration_sec: 0, load_1_avg: 2 }] };
+  const singleSample = await queryAgentHistory(env, 'single-sample', now - 60, now);
+  assert.equal(singleSample.points[0].cpu_avg, 37, 'one sample in a minute still carries a real CPU reading');
+  const singleDay = (await queryAgentDaily(env, '2026-11-13', ['single-sample'])).get('single-sample')!;
+  assert.equal(singleDay.load_1_avg, 2, 'single-sample load contributes without inventing elapsed time');
+  assert.equal(singleDay.duration_sec, 0);
   assert.match(sql, /argMax\(double1, timestamp\)/);
   assert.match(sql, /GROUP BY double1/);
   assert.doesNotMatch(sql, /FROM\s*\(|nullif|IS NOT NULL/i);
@@ -145,6 +151,14 @@ try {
   assert.match(sql, /GROUP BY double1/);
   assert.ok(queries.every(query => query.includes('FROM events.analyticsEngine."uptime_heartbeats"') || query.startsWith('invalid-')));
   assert.ok(queries.every(query => !/FORMAT|_sample_interval|accountTag|scope/i.test(query)));
+  result = { data: [summary] };
+  const customDataset = { ...env, UPTIME_DATASET: 'fixture_heartbeats' };
+  await queryAgentHistory(customDataset, 'custom', now - 60, now);
+  assert.match(sql, /FROM events\.analyticsEngine\."fixture_heartbeats"/);
+  await queryDaily(customDataset, '2026-11-13');
+  assert.match(sql, /FROM events\.analyticsEngine\."fixture_heartbeats"/);
+  await queryMonitorHistory(customDataset, 'custom-monitor', now - 60, now);
+  assert.match(sql, /FROM events\.analyticsEngine\."fixture_heartbeats"/);
   console.log('PASS AE budgets, rotation, query isolation, failure states, nullable metrics, exact availability and weighted resource history');
 } finally {
   globalThis.fetch = originalFetch;

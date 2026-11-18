@@ -64,6 +64,7 @@ try {
     { key: 'adminToken', required: true, ok: false },
     { key: 'themes', required: false, ok: false },
     { key: 'analytics', required: true, ok: false },
+    { key: 'analyticsSql', required: false, ok: false },
   ]);
 
   const capabilities = await request(bare, '/api/capabilities');

@@ -139,7 +139,7 @@
     "reload": "페이지 새로고침"
   },
   "detail": {
-    "historyUnconfigured": "기록 조회에 필요한 바인딩이 누락되었습니다. 관리자에게 배포 설정을 확인하고 다시 배포하도록 요청하세요.",
+    "historyUnconfigured": "기록 조회에는 UPTIME 및 ANALYTICS_SQL 바인딩이 필요합니다. 배포 설정을 업데이트한 뒤 다시 배포하세요. API 토큰은 필요하지 않습니다.",
     "historyUnavailable": "일시적으로 기록을 불러올 수 없습니다. 잠시 후 다시 시도하세요.",
     "historySampled": "기록에 샘플링된 데이터가 포함되어 통계는 근사치입니다.",
     "historyRecent": "최근 24시간",

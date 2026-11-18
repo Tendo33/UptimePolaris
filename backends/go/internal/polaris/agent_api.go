@@ -316,7 +316,8 @@ func (a *App) agentDetail(w http.ResponseWriter, r *http.Request) error {
 	if len(agentJobs) > 20 {
 		agentJobs = agentJobs[:20]
 	}
-	history, e := a.machineHistory(r.Context(), str(agent, "id"))
+	now := time.Now().Unix()
+	history, e := a.machineHistory(r.Context(), str(agent, "id"), now-86400, now, 300)
 	if e != nil {
 		return e
 	}
@@ -330,28 +331,18 @@ func project(o Object, keys []string) Object {
 	}
 	return out
 }
-func (a *App) machineHistory(ctx context.Context, id string) ([]Object, error) {
+func (a *App) machineHistory(ctx context.Context, id string, since, until, step int64) ([]Object, error) {
 	rows, e := a.store.list(ctx, "machine_history")
 	if e != nil {
 		return nil, e
 	}
-	out := []Object{}
+	selected := []Object{}
 	for _, row := range rows {
-		if str(row, "agent_id") == id && integer(row, "bucket_ts") >= time.Now().Unix()-86400 {
-			point := Object{"ts": row["bucket_ts"], "cpu": row["cpu_avg"], "mem_pct": row["mem_pct_avg"], "net_up": nil, "net_down": nil}
-			if seconds := number(row["network_duration_sec"]); seconds > 0 {
-				if row["net_up_bytes"] != nil {
-					point["net_up"] = number(row["net_up_bytes"]) / seconds
-				}
-				if row["net_down_bytes"] != nil {
-					point["net_down"] = number(row["net_down_bytes"]) / seconds
-				}
-			}
-			out = append(out, point)
+		if ts := integer(row, "bucket_ts"); str(row, "agent_id") == id && ts >= since && ts <= until {
+			selected = append(selected, row)
 		}
 	}
-	sort.Slice(out, func(i, j int) bool { return integer(out[i], "ts") < integer(out[j], "ts") })
-	return out, nil
+	return aggregateMachineHistory(selected, step), nil
 }
 
 func (a *App) evaluateAgentAlerts(ctx context.Context, m, machine Object, result CheckResult) CheckResult {
@@ -379,6 +370,15 @@ func (a *App) evaluateAgentAlerts(ctx context.Context, m, machine Object, result
 			}
 			value = number(machine["disk_used"]) / number(machine["disk_total"]) * 100
 		case "load":
+			if machine["load_1"] == nil {
+				current := object(state[resource])
+				if boolean(current["active"]) {
+					current["since"] = nil
+					result.Status = 2
+					result.Message = "load resource alert: waiting for a valid reading"
+				}
+				continue
+			}
 			value = number(machine["load_1"])
 		}
 		current := object(state[resource])

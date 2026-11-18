@@ -1,6 +1,6 @@
 import type { HistoryResult } from '../../../../../shared/contracts';
 import type { Env } from '../../types';
-import { ANALYTICS_DATASET, AnalyticsWriter, dayBounds, queryAnalytics, readAnalyticsHistory } from '../analytics-engine';
+import { analyticsDataset, AnalyticsWriter, dayBounds, queryAnalytics, readAnalyticsHistory } from '../analytics-engine';
 import { getDB } from '../db/factory';
 import type { AgentMinuteSummary, ReportParams } from './protocol';
 
@@ -43,14 +43,14 @@ function bucket(row: Record<string, unknown>): AgentHistoryBucket | null {
   })) as unknown as AgentHistoryBucket;
   const required = ['bucket_ts', 'sample_count', 'cpu_samples', 'mem_samples', 'duration_sec', 'network_duration_sec'] as const;
   if (required.some(field => result[field] === null || !Number.isFinite(result[field])) ||
-      result.sample_count <= 0 || result.duration_sec <= 0) return null;
+      result.sample_count <= 0) return null;
   result.quality = 'aggregate';
   return result;
 }
 
 function readAgentBuckets(env: Env, id: string, start: number, end: number, cacheSeconds = 0): Promise<Record<string, unknown>[]> {
   return queryAnalytics(env, `SELECT ${SUMMARY_COLUMNS}, APPROX_MAX("sampleInterval") AS sample_interval
-    FROM ${ANALYTICS_DATASET} WHERE index1 = $id AND blob3 = 'agent_summary'
+    FROM ${analyticsDataset(env)} WHERE index1 = $id AND blob3 = 'agent_summary'
       AND timestamp >= $ingestedSince AND double1 >= $start AND double1 < $end
     GROUP BY double1 ORDER BY bucket_ts DESC LIMIT 1440`,
     { id, ingestedSince: new Date((start - 86400) * 1000).toISOString(), start, end }, cacheSeconds);
@@ -75,7 +75,7 @@ function aggregateAgentDay(day: string, rows: Record<string, unknown>[]): AgentD
   if (!points.length) return null;
   const total = (field: 'sample_count' | 'duration_sec' | 'cpu_samples' | 'mem_samples') =>
     points.reduce((sum, { point, weight }) => sum + point[field] * weight, 0);
-  const average = (field: 'cpu_avg' | 'mem_pct_avg' | 'load_1_avg' | 'load_5_avg', samples: 'cpu_samples' | 'mem_samples' | 'duration_sec') => {
+  const average = (field: 'cpu_avg' | 'mem_pct_avg' | 'load_1_avg' | 'load_5_avg', samples: 'cpu_samples' | 'mem_samples' | 'sample_count') => {
     let sum = 0, count = 0;
     for (const { point, weight } of points) {
       if (point[field] === null || point[samples] <= 0) continue;
@@ -101,7 +101,7 @@ function aggregateAgentDay(day: string, rows: Record<string, unknown>[]): AgentD
     cpu_samples: total('cpu_samples'), mem_samples: total('mem_samples'),
     cpu_avg: average('cpu_avg', 'cpu_samples'), cpu_max: maximum('cpu_max'),
     mem_pct_avg: average('mem_pct_avg', 'mem_samples'), mem_pct_max: maximum('mem_pct_max'),
-    load_1_avg: average('load_1_avg', 'duration_sec'), load_5_avg: average('load_5_avg', 'duration_sec'),
+    load_1_avg: average('load_1_avg', 'sample_count'), load_5_avg: average('load_5_avg', 'sample_count'),
     net_up_bytes: seconds > 0 ? up : null, net_down_bytes: seconds > 0 ? down : null, network_duration_sec: seconds,
   };
 }
