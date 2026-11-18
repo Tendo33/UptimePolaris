@@ -500,7 +500,7 @@ try {
   await waitFor(`document.querySelector('h1')?.textContent === 'Detail fixture'`, 'detail recovers from simultaneous failures');
   checkpoint('real React runtime: locale intent, command retry, SWR revocation and motion subscription');
   await cdp('Page.navigate', { url: browserOrigin });
-  await waitFor(`document.readyState === 'complete'`, 'built SPA shell');
+  await waitFor(`location.origin === ${JSON.stringify(browserOrigin)} && location.pathname !== '/__frontend-runtime' && document.readyState === 'complete'`, 'built SPA shell');
   await evaluate("localStorage.setItem('uptime-polaris-locale','en-US'); localStorage.setItem('theme','light')");
   await cdp('Page.reload');
   await waitFor(`document.readyState === 'complete'`, 'English locale reload');
