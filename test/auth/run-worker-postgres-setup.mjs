@@ -27,12 +27,13 @@ let attempted = false;
 try {
   execFileSync(initdb, ['-D', data, '-U', 'postgres', '--auth=trust', '--no-locale', '--encoding=UTF8'], { stdio: 'inherit', windowsHide: true });
   attempted = true;
-  // 发行版的 initdb 会把 Unix 套接字目录设为 /var/run/postgresql，CI 用户写不了那个目录，
-  // postmaster 会立刻退出。把套接字留在本次临时目录里，同时只监听回环 TCP。
-  // The distribution's initdb sets the Unix socket directory to /var/run/postgresql, which the CI user
-  // cannot write, so the postmaster exits at once. Keep the socket in this temporary directory and
-  // listen on loopback TCP only.
-  execFileSync(pgctl, ['-D', data, '-l', join(root, 'postgres.log'), '-o', `-h 127.0.0.1 -p ${port} -c listen_addresses=127.0.0.1 -c unix_socket_directories=${root.replaceAll('\\', '/')}`, '-w', 'start'], { stdio: 'inherit', windowsHide: true });
+  try {
+    execFileSync(pgctl, ['-D', data, '-l', join(root, 'postgres.log'), '-o', `-h 127.0.0.1 -p ${port} -c listen_addresses=127.0.0.1 -c unix_socket_directories=`, '-w', 'start'], { stdio: 'inherit', windowsHide: true });
+  } catch (error) {
+    const log = join(root, 'postgres.log');
+    if (existsSync(log)) process.stderr.write(`\n--- postgres.log ---\n${readFileSync(log, 'utf8')}\n--- end postgres.log ---\n`);
+    throw error;
+  }
   const outfile = join(root, 'worker-postgres-setup.mjs');
   await build({ entryPoints: ['test/auth/worker-postgres-setup.test.mjs'], outfile, bundle: true, platform: 'node', format: 'esm', packages: 'external',
     plugins: [{ name: 'unused-socket', setup(b) {

@@ -62,6 +62,7 @@ try {
     { key: 'adminToken', required: true, ok: true },
     { key: 'themes', required: false, ok: false },
     { key: 'analytics', required: true, ok: true },
+    { key: 'analyticsSql', required: false, ok: false },
   ]);
   assert.equal((await db.prepare('SELECT COUNT(*) AS n FROM users').first()).n, 0);
   assert.match(initial.response.headers.get('cache-control'), /private, no-store/);

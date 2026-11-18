@@ -167,7 +167,8 @@ try {
   resources.kvNamespaces = { CONFIG: 'config-fixture' };
   await rebound.setOptions(options(bindings, resources));
   const ready = await request(rebound, '/api/auth/session');
-  assert.ok(ready.body.setupRequirements.every((item) => item.ok));
+  assert.ok(ready.body.setupRequirements.every((item) => !item.required || item.ok));
+  assert.deepEqual(ready.body.setupRequirements.find((item) => item.key === 'analyticsSql'), { key: 'analyticsSql', required: false, ok: false });
   assert.deepEqual(ready.body.setupDatabase.types, ['d1', 'postgres']);
 
   delete resources.analyticsEngineDatasets;

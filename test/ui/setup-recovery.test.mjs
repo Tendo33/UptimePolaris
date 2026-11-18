@@ -46,6 +46,7 @@ const requirementList = analytics => [
   { key: 'adminToken', required: true, ok: true },
   { key: 'themes', required: false, ok: false },
   { key: 'analytics', required: true, ok: analytics },
+  { key: 'analyticsSql', required: false, ok: false },
 ];
 const options = { types: ['postgres'], defaultType: 'postgres', postgresConfigured: true, postgresUrlEditable: false };
 const session = requirements => ({ authenticated: false, user: null, needsSetup: true, setupCredential: 'ADMIN_TOKEN', setupDatabase: options, setupRequirements: requirements });
