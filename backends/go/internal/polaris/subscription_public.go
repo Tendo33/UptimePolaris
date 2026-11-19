@@ -45,7 +45,7 @@ func (a *App) subscriptionPublicRoutes() {
 				visible[str(row, "id")] = row
 			}
 		}
-		items, err := a.store.list(r.Context(), "subscription_item")
+		items, err := a.store.subscriptionItemIndex(r.Context(), "", true)
 		if err != nil {
 			return err
 		}
@@ -54,13 +54,24 @@ func (a *App) subscriptionPublicRoutes() {
 		for _, item := range items {
 			subscription := visible[str(item, "subscriptionId")]
 			if subscription != nil && boolean(item["selected"]) && boolean(item["isPublic"]) && item["removedAt"] == nil {
-				result = append(result, publicSubscriptionItem(item, subscription))
+				result = append(result, item)
 			}
 		}
 		page, err := subscriptionPage(r, result)
 		if err != nil {
 			return err
 		}
+		full, err := a.store.subscriptionItemsByIndex(r.Context(), page["items"].([]Object))
+		if err != nil {
+			return err
+		}
+		published := []Object{}
+		for _, item := range full {
+			if boolean(item["selected"]) && boolean(item["isPublic"]) && item["removedAt"] == nil {
+				published = append(published, publicSubscriptionItem(item, visible[str(item, "subscriptionId")]))
+			}
+		}
+		page["items"] = published
 		respond(w, 200, page)
 		return nil
 	})

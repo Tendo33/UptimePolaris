@@ -1,12 +1,14 @@
 import { PageConfigProvider } from '@/components/context/PageConfigContext';
 import { PresentationViewContext } from '@/components/context/PresentationViewContext';
-import { MonitorDetailContent } from '@/components/monitor/MonitorDetailContent';
+import { lazy, Suspense } from 'react';
 import { MonitorDataPreload } from '@/components/status-page/MonitorDataPreload';
 import { StatusPageShell } from '@/components/status-page/StatusPageShell';
 import { toPageConfig } from '@/config/api';
 import { usePublicConfig } from '@/config/usePublicConfig';
 import { useParams, useSearchParams } from 'react-router';
 import { RouteError, RouteLoading } from './RouteStates';
+
+const MonitorDetailContent = lazy(() => import('@/components/monitor/MonitorDetailContent').then(module => ({ default: module.MonitorDetailContent })));
 
 export function MonitorDetailRoute() {
   const { id: monitorId } = useParams<{ id: string }>();
@@ -20,7 +22,7 @@ export function MonitorDetailRoute() {
       <PresentationViewContext.Provider value={data.presentation}>
         <StatusPageShell>
           <MonitorDataPreload pageId={config.pageId} />
-          <MonitorDetailContent monitorId={monitorId ?? ''} />
+          <Suspense fallback={<RouteLoading />}><MonitorDetailContent monitorId={monitorId ?? ''} /></Suspense>
         </StatusPageShell>
       </PresentationViewContext.Provider>
     </PageConfigProvider>

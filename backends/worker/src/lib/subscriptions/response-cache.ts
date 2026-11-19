@@ -1,4 +1,4 @@
-import type { SubscriptionResponseCache } from '../../../../../shared/subscription-fetch';
+import { readSubscriptionJson, type SubscriptionResponseCache } from '../../../../../shared/subscription-fetch';
 import { SubscriptionError, type Subscription } from '../../../../../shared/subscriptions';
 import { decryptSubscriptionSecrets, encryptSubscriptionSecrets } from './credentials';
 import type { SubscriptionStore } from './store';
@@ -13,7 +13,7 @@ export async function readResponseCache(store: SubscriptionStore, subscription: 
   const secret = await decryptSubscriptionSecrets(parts.map(part => part!.value).join(''), `response:${subscription.id}:${subscription.configId}`, material);
   const bytes = Uint8Array.from(atob(String(secret.value)), character => character.charCodeAt(0));
   const decompressed = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
-  return JSON.parse(await new Response(decompressed).text());
+  return (await readSubscriptionJson(new Response(decompressed), 11 * 1024 * 1024)).value as Record<string, SubscriptionResponseCache>;
 }
 export async function responseCacheWrites(store: SubscriptionStore, subscription: Subscription, cache: Record<string, SubscriptionResponseCache>, material: string) {
   const compressed = await new Response(new Blob([JSON.stringify(cache)]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();

@@ -3,6 +3,7 @@ import { SubscriptionError, type Subscription, type SubscriptionItem } from '../
 import { subscriptionItemView } from '../../../../../shared/subscription-runtime';
 
 type Write = { sql: string; params: unknown[] };
+type ItemIndex = Omit<SubscriptionItem, 'days' | 'recent'>;
 export class SubscriptionStore {
   constructor(readonly db: DBAdapter) {}
   sql(value: string): string { let i = 0; return this.db.type === 'postgres' ? value.replace(/\?/g, () => `$${++i}`) : value; }
@@ -32,8 +33,20 @@ export class SubscriptionStore {
     if (sourceIds?.length === 0) return [];
     return (await this.db.query<{ json: string }>(this.sql(`SELECT json FROM subscription_items WHERE subscription_id=?${sourceIds ? ` AND source_id IN (${sourceIds.map(() => '?').join(',')})` : ''} ORDER BY source_id`), [id, ...(sourceIds ?? [])])).map(row => JSON.parse(row.json));
   }
-  async publicItems(): Promise<SubscriptionItem[]> {
-    return (await this.db.query<{ json: string }>('SELECT i.json FROM subscription_items i JOIN subscriptions s ON s.id=i.subscription_id WHERE i.selected=1 AND i.is_public=1 ORDER BY i.subscription_id,i.source_id')).map(row => JSON.parse(row.json));
+  async itemIndex(subscriptionId?: string, publicOnly = false): Promise<ItemIndex[]> {
+    const json = this.db.type === 'postgres' ? "(json::jsonb-'days'-'recent')::text" : "json_remove(json,'$.days','$.recent')";
+    const conditions = [subscriptionId ? 'subscription_id=?' : '1=1', ...(publicOnly ? ['selected=1', 'is_public=1'] : [])];
+    return (await this.db.query<{json: string}>(this.sql(`SELECT ${json} AS json FROM subscription_items WHERE ${conditions.join(' AND ')}`), subscriptionId ? [subscriptionId] : [])).map(row => JSON.parse(row.json));
+  }
+  async itemsById(ids: string[]): Promise<SubscriptionItem[]> {
+    if (!ids.length) return [];
+    const rows: {json: string}[] = [];
+    for (let offset = 0; offset < ids.length; offset += 80) {
+      const batch = ids.slice(offset, offset + 80);
+      rows.push(...await this.db.query<{json: string}>(this.sql(`SELECT json FROM subscription_items WHERE id IN (${batch.map(() => '?').join(',')})`), batch));
+    }
+    const items = new Map(rows.map(row => {const item: SubscriptionItem = JSON.parse(row.json); return [item.id, item];}));
+    return ids.flatMap(id => items.has(id) ? [items.get(id)!] : []);
   }
   async item(id: string): Promise<SubscriptionItem> {
     const row = await this.db.queryOne<{ json: string }>(this.sql('SELECT json FROM subscription_items WHERE id=?'), [id]);

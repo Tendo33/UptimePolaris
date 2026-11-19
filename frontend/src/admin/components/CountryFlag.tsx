@@ -1,9 +1,58 @@
-import {
-  FlagAe, FlagAr, FlagAt, FlagAu, FlagBe, FlagBg, FlagBr, FlagCa, FlagCh, FlagCl, FlagCn, FlagCz, FlagDe, FlagDk,
-  FlagEe, FlagEs, FlagFi, FlagFr, FlagGb, FlagGr, FlagHk, FlagHu, FlagId, FlagIe, FlagIl, FlagIn, FlagIs, FlagIt,
-  FlagJp, FlagKr, FlagKz, FlagLt, FlagLu, FlagLv, FlagMo, FlagMx, FlagMy, FlagNl, FlagNo, FlagNz, FlagPh, FlagPl,
-  FlagPt, FlagRo, FlagRu, FlagSa, FlagSe, FlagSg, FlagTh, FlagTr, FlagTw, FlagUa, FlagUs, FlagVn, FlagZa,
-} from '@sankyu/react-circle-flags';
+import { FlagAe } from '@sankyu/react-circle-flags/flags/ae';
+import { FlagAr } from '@sankyu/react-circle-flags/flags/ar';
+import { FlagAt } from '@sankyu/react-circle-flags/flags/at';
+import { FlagAu } from '@sankyu/react-circle-flags/flags/au';
+import { FlagBe } from '@sankyu/react-circle-flags/flags/be';
+import { FlagBg } from '@sankyu/react-circle-flags/flags/bg';
+import { FlagBr } from '@sankyu/react-circle-flags/flags/br';
+import { FlagCa } from '@sankyu/react-circle-flags/flags/ca';
+import { FlagCh } from '@sankyu/react-circle-flags/flags/ch';
+import { FlagCl } from '@sankyu/react-circle-flags/flags/cl';
+import { FlagCn } from '@sankyu/react-circle-flags/flags/cn';
+import { FlagCz } from '@sankyu/react-circle-flags/flags/cz';
+import { FlagDe } from '@sankyu/react-circle-flags/flags/de';
+import { FlagDk } from '@sankyu/react-circle-flags/flags/dk';
+import { FlagEe } from '@sankyu/react-circle-flags/flags/ee';
+import { FlagEs } from '@sankyu/react-circle-flags/flags/es';
+import { FlagFi } from '@sankyu/react-circle-flags/flags/fi';
+import { FlagFr } from '@sankyu/react-circle-flags/flags/fr';
+import { FlagGb } from '@sankyu/react-circle-flags/flags/gb';
+import { FlagGr } from '@sankyu/react-circle-flags/flags/gr';
+import { FlagHk } from '@sankyu/react-circle-flags/flags/hk';
+import { FlagHu } from '@sankyu/react-circle-flags/flags/hu';
+import { FlagId } from '@sankyu/react-circle-flags/flags/id';
+import { FlagIe } from '@sankyu/react-circle-flags/flags/ie';
+import { FlagIl } from '@sankyu/react-circle-flags/flags/il';
+import { FlagIn } from '@sankyu/react-circle-flags/flags/in';
+import { FlagIs } from '@sankyu/react-circle-flags/flags/is';
+import { FlagIt } from '@sankyu/react-circle-flags/flags/it';
+import { FlagJp } from '@sankyu/react-circle-flags/flags/jp';
+import { FlagKr } from '@sankyu/react-circle-flags/flags/kr';
+import { FlagKz } from '@sankyu/react-circle-flags/flags/kz';
+import { FlagLt } from '@sankyu/react-circle-flags/flags/lt';
+import { FlagLu } from '@sankyu/react-circle-flags/flags/lu';
+import { FlagLv } from '@sankyu/react-circle-flags/flags/lv';
+import { FlagMo } from '@sankyu/react-circle-flags/flags/mo';
+import { FlagMx } from '@sankyu/react-circle-flags/flags/mx';
+import { FlagMy } from '@sankyu/react-circle-flags/flags/my';
+import { FlagNl } from '@sankyu/react-circle-flags/flags/nl';
+import { FlagNo } from '@sankyu/react-circle-flags/flags/no';
+import { FlagNz } from '@sankyu/react-circle-flags/flags/nz';
+import { FlagPh } from '@sankyu/react-circle-flags/flags/ph';
+import { FlagPl } from '@sankyu/react-circle-flags/flags/pl';
+import { FlagPt } from '@sankyu/react-circle-flags/flags/pt';
+import { FlagRo } from '@sankyu/react-circle-flags/flags/ro';
+import { FlagRu } from '@sankyu/react-circle-flags/flags/ru';
+import { FlagSa } from '@sankyu/react-circle-flags/flags/sa';
+import { FlagSe } from '@sankyu/react-circle-flags/flags/se';
+import { FlagSg } from '@sankyu/react-circle-flags/flags/sg';
+import { FlagTh } from '@sankyu/react-circle-flags/flags/th';
+import { FlagTr } from '@sankyu/react-circle-flags/flags/tr';
+import { FlagTw } from '@sankyu/react-circle-flags/flags/tw';
+import { FlagUa } from '@sankyu/react-circle-flags/flags/ua';
+import { FlagUs } from '@sankyu/react-circle-flags/flags/us';
+import { FlagVn } from '@sankyu/react-circle-flags/flags/vn';
+import { FlagZa } from '@sankyu/react-circle-flags/flags/za';
 import { Globe } from 'lucide-react';
 import type { ComponentType } from 'react';
 

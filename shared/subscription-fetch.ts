@@ -200,5 +200,6 @@ export async function fetchSubscriptionResponses(
       result.failures.push({ requestId: id, code: error instanceof SubscriptionError ? error.code : 'subscription_fetch_failed', ...(error instanceof SubscriptionError && error.retryAfterSec ? { retryAfterSec: error.retryAfterSec } : {}) });
     }
   }
+  if (new TextEncoder().encode(JSON.stringify(result.cache)).length > SUBSCRIPTION_LIMITS.runBytes) throw new SubscriptionError('subscription_limit_exceeded', 413);
   return result;
 }

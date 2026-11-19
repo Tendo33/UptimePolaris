@@ -2,17 +2,15 @@
 import { toastError } from '@/components/ui/ToastHost';
 import { type Locale, locales } from '@/i18n/config';
 import { useLocale } from '@/i18n/IntlProvider';
-import {
-  FlagBr,
-  FlagCn,
-  FlagFr,
-  FlagHk,
-  FlagJp,
-  FlagKr,
-  FlagRu,
-  FlagTw,
-  FlagUs,
-} from '@sankyu/react-circle-flags';
+import { FlagBr } from '@sankyu/react-circle-flags/flags/br';
+import { FlagCn } from '@sankyu/react-circle-flags/flags/cn';
+import { FlagFr } from '@sankyu/react-circle-flags/flags/fr';
+import { FlagHk } from '@sankyu/react-circle-flags/flags/hk';
+import { FlagJp } from '@sankyu/react-circle-flags/flags/jp';
+import { FlagKr } from '@sankyu/react-circle-flags/flags/kr';
+import { FlagRu } from '@sankyu/react-circle-flags/flags/ru';
+import { FlagTw } from '@sankyu/react-circle-flags/flags/tw';
+import { FlagUs } from '@sankyu/react-circle-flags/flags/us';
 import { Languages, Loader2 } from 'lucide-react';
 import { useTransition } from 'react';
 import { useTranslations } from 'use-intl';

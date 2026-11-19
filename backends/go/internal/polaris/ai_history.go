@@ -12,18 +12,33 @@ func (a *App) aiHistory(ctx context.Context, id string, days int) (Object, error
 	now := time.Now().Unix()
 	since := now/86400*86400 - int64(days-1)*86400
 	floor := time.Unix(since, 0).UTC().Format("2006-01-02")
-	rows, err := a.store.list(ctx, "ai_day")
+	rows, err := a.store.db.QueryContext(ctx, a.store.query("SELECT data FROM polaris_documents WHERE kind='ai_day' AND id>=? AND id<? ORDER BY id"), id+":"+floor, id+";")
 	if err != nil {
 		return nil, err
 	}
 	byDate := map[string]Object{}
-	for _, row := range rows {
+	for rows.Next() {
+		var raw string
+		if err := rows.Scan(&raw); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		row, err := decodeObject(raw)
+		if err != nil {
+			rows.Close()
+			return nil, err
+		}
 		if row["modelId"] == id && str(row, "date") >= floor {
 			stat := clone(row)
 			delete(stat, "id")
 			delete(stat, "modelId")
 			byDate[str(row, "date")] = stat
 		}
+	}
+	readErr := rows.Err()
+	rows.Close()
+	if readErr != nil {
+		return nil, readErr
 	}
 	live, err := a.store.get(ctx, "ai_live", id)
 	if err != nil {

@@ -58,6 +58,75 @@ func sortSubscriptionItems(items []Object) {
 	})
 }
 
+func (s *Store) subscriptionItemIndex(ctx context.Context, id string, publicOnly bool) ([]Object, error) {
+	projection := "json_remove(data,'$.days','$.recent')"
+	if s.postgres {
+		projection = "(data::jsonb-'days'-'recent')::text"
+	}
+	query := "SELECT " + projection + " FROM polaris_documents WHERE kind='subscription_item'"
+	args := []any{}
+	if id != "" {
+		query += " AND " + s.jsonField("subscriptionId") + "=?"
+		args = append(args, id)
+	}
+	if publicOnly {
+		query += " AND CAST(" + s.jsonField("selected") + " AS TEXT) IN ('1','true') AND CAST(" + s.jsonField("isPublic") + " AS TEXT) IN ('1','true')"
+	}
+	rows, err := s.db.QueryContext(ctx, s.query(query), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Object{}
+	for rows.Next() {
+		var raw string
+		if err := rows.Scan(&raw); err != nil {
+			return nil, err
+		}
+		item, err := decodeObject(raw)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (s *Store) subscriptionItemsByIndex(ctx context.Context, index []Object) ([]Object, error) {
+	if len(index) == 0 {
+		return []Object{}, nil
+	}
+	args := []any{}
+	for _, item := range index {
+		args = append(args, item["id"])
+	}
+	query := "SELECT data FROM polaris_documents WHERE kind='subscription_item' AND id IN (" + strings.TrimSuffix(strings.Repeat("?,", len(index)), ",") + ")"
+	rows, err := s.db.QueryContext(ctx, s.query(query), args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	byID := map[string]Object{}
+	for rows.Next() {
+		var raw string
+		if err := rows.Scan(&raw); err != nil {
+			return nil, err
+		}
+		item, err := decodeObject(raw)
+		if err != nil {
+			return nil, err
+		}
+		byID[str(item, "id")] = item
+	}
+	items := []Object{}
+	for _, item := range index {
+		if full := byID[str(item, "id")]; full != nil {
+			items = append(items, full)
+		}
+	}
+	return items, rows.Err()
+}
+
 func (a *App) subscriptionRunView(ctx context.Context, run Object) Object {
 	if run["state"] != "running" {
 		return run

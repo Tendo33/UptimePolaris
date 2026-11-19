@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -140,6 +142,17 @@ func runSubscriptionManagement(t *testing.T, s *testServer) {
 		t.Fatal(items)
 	}
 	item := object(items[0])
+	index, err := s.app.store.subscriptionItemIndex(context.Background(), id, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(index) != 1 || index[0]["recent"] != nil || index[0]["days"] != nil {
+		t.Fatal("list index loaded histories")
+	}
+	full, err := s.app.store.subscriptionItemsByIndex(context.Background(), index)
+	if err != nil || len(full) != 1 || full[0]["recent"] == nil {
+		t.Fatal("page hydration missing history", err)
+	}
 	public := req("GET", "/api/public/subscriptions/items?category=website", nil, 200)
 	if len(array(public["items"])) != 1 {
 		t.Fatal(public)
@@ -281,5 +294,41 @@ func TestSubscriptionNotificationPolicy(t *testing.T) {
 		if actual := notificationRoutingReason(channel, test.event); actual != test.reason {
 			t.Fatal(test.event, actual, test.reason)
 		}
+	}
+}
+
+func TestSubscriptionPublicAddresses(t *testing.T) {
+	for _, address := range []netip.Addr{
+		netip.AddrFrom16([16]byte{0x20, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}),
+		netip.AddrFrom16([16]byte{0x20, 0x01, 0, 0x1f, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}),
+		netip.AddrFrom16([16]byte{0x20, 0x02, 0x7f, 0, 0, 1}),
+		netip.MustParseAddr("2001:db8::1"), netip.MustParseAddr("::ffff:127.0.0.1"),
+	} {
+		if publicSubscriptionIP(address) {
+			t.Fatal("reserved address accepted", address)
+		}
+	}
+	for _, address := range []netip.Addr{netip.AddrFrom4([4]byte{192, 2, 0, 1}), netip.MustParseAddr("2606:4700:4700::1111")} {
+		if !publicSubscriptionIP(address) {
+			t.Fatal("public address refused", address)
+		}
+	}
+}
+
+func TestSubscriptionCachedAggregateLimit(t *testing.T) {
+	s := newTestServer(t)
+	descriptor := subscriptionFixture(t, "json-website")
+	cache := Object{}
+	for i := 0; i < 6; i++ {
+		id := fmt.Sprintf("extra%d", i)
+		if i == 0 {
+			id = "status"
+		}
+		object(descriptor["requests"])[id] = clone(object(object(descriptor["requests"])["status"]))
+		cache[id] = Object{"value": Object{"data": strings.Repeat("x", 1800000)}, "fetchedAt": time.Now().Unix()}
+	}
+	_, err := s.app.fetchSubscription(context.Background(), descriptor, Object{"baseUrl": "https://status.example.com"}, cache, false)
+	if err == nil || !strings.Contains(err.Error(), "limit_exceeded") {
+		t.Fatal("cached aggregate not bounded", err)
 	}
 }

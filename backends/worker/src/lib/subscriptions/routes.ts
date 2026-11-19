@@ -206,14 +206,15 @@ subscriptionRoutes.delete('/api/admin/subscriptions/:id', async c => {
 });
 subscriptionRoutes.get('/api/admin/subscriptions/:id/items', async c => {
   const store = new SubscriptionStore(getDB(c.env)), subscription = await store.get(c.req.param('id'));
-  let items = (await store.items(subscription.id)).map(item => subscriptionItemView(item, subscription, now()));
+  let items = await store.itemIndex(subscription.id);
   items.sort((a, b) => a.sortOrder - b.sortOrder || (a.localName || a.name).localeCompare(b.localName || b.name) || a.id.localeCompare(b.id));
   const state = c.req.query('state');
   if (state === 'selected') items = items.filter(item => item.selected && item.removedAt === null);
   if (state === 'discovered') items = items.filter(item => !item.selected && item.removedAt === null);
   if (state === 'removed') items = items.filter(item => item.removedAt !== null);
   const query = c.req.query('q')?.toLowerCase(); if (query) items = items.filter(item => (item.localName ?? item.name).toLowerCase().includes(query));
-  return c.json(page(items, c.req.query('offset'), c.req.query('limit')));
+  const result = page(items, c.req.query('offset'), c.req.query('limit'));
+  return c.json({ ...result, items: (await store.itemsById(result.items.map(item => item.id))).map(item => subscriptionItemView(item, subscription, now())) });
 });
 subscriptionRoutes.patch('/api/admin/subscriptions/:id/items', async c => {
   const body = object(await c.req.json()), store = new SubscriptionStore(getDB(c.env)), subscription = await store.get(c.req.param('id'));
@@ -346,8 +347,9 @@ subscriptionRoutes.get('/api/public/subscriptions/items', async c => {
   const kind = category(c.req.query('category'));
   if (!await publicAllowed(c.env, c.req.raw, kind)) throw new SubscriptionError('not_found', 404);
   const store = new SubscriptionStore(getDB(c.env)), subscriptions = new Map((await store.list()).filter(row => row.isPublic && row.archivedAt === null && row.category === kind).map(row => [row.id, row]));
-  const items = (await store.publicItems()).filter(item => item.removedAt === null && subscriptions.has(item.subscriptionId)).sort((a, b) => a.sortOrder - b.sortOrder || (a.localName || a.name).localeCompare(b.localName || b.name) || a.id.localeCompare(b.id)).map(item => publicItem(item, subscriptions.get(item.subscriptionId)!));
-  return c.json(page(items, c.req.query('offset'), c.req.query('limit')));
+  const items = (await store.itemIndex(undefined, true)).filter(item => item.removedAt === null && subscriptions.has(item.subscriptionId)).sort((a, b) => a.sortOrder - b.sortOrder || (a.localName || a.name).localeCompare(b.localName || b.name) || a.id.localeCompare(b.id));
+  const result = page(items, c.req.query('offset'), c.req.query('limit'));
+  return c.json({ ...result, items: (await store.itemsById(result.items.map(item => item.id))).filter(item => item.selected && item.isPublic && item.removedAt === null).map(item => publicItem(item, subscriptions.get(item.subscriptionId)!)) });
 });
 for (const history of [false, true]) subscriptionRoutes.get(`/api/public/subscriptions/items/:id${history ? '/history' : ''}`, async c => {
   c.header('cache-control', 'no-store');

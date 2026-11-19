@@ -139,7 +139,7 @@ func (a *App) subscriptionRoutes() {
 		}
 		dueUpdates := []Object{}
 		for _, row := range result["items"].([]Object) {
-			entries, err := a.subscriptionItems(r.Context(), str(row, "id"))
+			entries, err := a.store.subscriptionItemIndex(r.Context(), str(row, "id"), false)
 			if err != nil {
 				return err
 			}
@@ -190,7 +190,7 @@ func (a *App) subscriptionRoutes() {
 		if err != nil {
 			return err
 		}
-		rows, err := a.subscriptionItems(r.Context(), r.PathValue("id"))
+		rows, err := a.store.subscriptionItemIndex(r.Context(), r.PathValue("id"), false)
 		if err != nil {
 			return err
 		}
@@ -214,6 +214,14 @@ func (a *App) subscriptionRoutes() {
 		if err != nil {
 			return err
 		}
+		full, err := a.store.subscriptionItemsByIndex(r.Context(), result["items"].([]Object))
+		if err != nil {
+			return err
+		}
+		for i, item := range full {
+			full[i] = subscriptionItemView(item, subscription, time.Now().Unix())
+		}
+		result["items"] = full
 		respond(w, 200, result)
 		return nil
 	})

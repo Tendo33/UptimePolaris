@@ -101,6 +101,11 @@ try {
   assert.equal((await store.document<any>('preview', large.id))?.items.length, 1000);
   const largeCreated = await req('POST', '/api/admin/subscriptions', { ...input, previewId: large.id, requestId: 'large-create', selectedIds: large.items.map((item: any) => item.sourceItemId) });
   assert.equal(largeCreated.status, 201);
+  const index = await store.itemIndex(largeCreated.value.subscription.id);
+  assert.equal(index.length,1000); assert.equal('recent' in index[0],false); assert.equal('days' in index[0],false);
+  const paged = (await req('GET',`/api/admin/subscriptions/${largeCreated.value.subscription.id}/items?offset=50&limit=50`)).value;
+  assert.equal(paged.items.length,50);assert.equal(paged.total,1000);assert.equal(paged.nextOffset,100);assert.ok(paged.items.every((item:any)=>Array.isArray(item.recent)));
+  console.log(`Subscription list index: ${JSON.stringify(index).length} bytes; full records: ${JSON.stringify(await store.items(largeCreated.value.subscription.id)).length} bytes`);
   const largeSub = largeCreated.value.subscription, stamp = Math.floor(Date.now() / 1000);
   await store.putDocument('normalized', 'resume-fixture', { items: large.items, issues: [], complete: true }, largeSub.id, stamp + 600);
   await store.putDocument('checkpoint', largeSub.id, { version: largeSub.syncRevision, payloadId: 'resume-fixture', offset: 25, fetchedAt: stamp, failures: [], requests: 1 }, largeSub.id, stamp + 600);

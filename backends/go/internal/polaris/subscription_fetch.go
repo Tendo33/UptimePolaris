@@ -46,9 +46,25 @@ func publicSubscriptionIP(address netip.Addr) bool {
 	if !address.IsGlobalUnicast() || address.IsPrivate() || address.IsLoopback() || address.IsLinkLocalUnicast() {
 		return false
 	}
+	if address.Is6() && address.As16()[0]&0xe0 != 0x20 {
+		return false
+	}
 	for _, block := range []string{"0.0.0.0/8", "100.64.0.0/10", "192.0.0.0/24", "192.0.2.0/24", "198.18.0.0/15", "198.51.100.0/24", "203.0.113.0/24", "240.0.0.0/4", "2001:db8::/32"} {
 		if netip.MustParsePrefix(block).Contains(address) {
 			return false
+		}
+	}
+	if address.Is6() {
+		for _, block := range []netip.Prefix{
+			netip.PrefixFrom(netip.AddrFrom16([16]byte{0x20, 0x01}), 32),
+			netip.PrefixFrom(netip.AddrFrom16([16]byte{0x20, 0x01, 0x00, 0x02}), 48),
+			netip.PrefixFrom(netip.AddrFrom16([16]byte{0x20, 0x01, 0x00, 0x10}), 28),
+			netip.PrefixFrom(netip.AddrFrom16([16]byte{0x20, 0x01, 0x00, 0x20}), 28),
+			netip.PrefixFrom(netip.AddrFrom16([16]byte{0x20, 0x02}), 16),
+		} {
+			if block.Contains(address) {
+				return false
+			}
 		}
 	}
 	return true
@@ -441,6 +457,9 @@ func (a *App) fetchSubscription(ctx context.Context, descriptor, supplied, previ
 			}
 			failures = append(failures, issue)
 		}
+	}
+	if len(encode(cache)) > 10485760 {
+		return nil, subscriptionError("limit_exceeded")
 	}
 	return Object{"responses": responses, "cache": cache, "failures": failures, "requests": 10 - remaining}, nil
 }

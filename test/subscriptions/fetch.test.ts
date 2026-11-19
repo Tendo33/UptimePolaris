@@ -74,3 +74,13 @@ test('cursor pagination omits the first cursor and follows the returned cursor',
   const result = await fetchSubscriptionResponses(descriptor, { baseUrl: parameters.baseUrl }, { validateUrl: async () => {}, fetch: async url => { cursors.push(url.searchParams.get('cursor')); return Response.json({ services: [{ id: cursors.length }], next: cursors.length === 1 ? 'second' : null }); } }, now);
   assert.deepEqual(cursors, [null, 'second']); assert.equal(result.failures.length, 0);
 });
+
+test('cached responses cannot exceed the aggregate memory limit without a network read', async () => {
+  const descriptor=structuredClone(JSON_SUBSCRIPTION),cache:Record<string,any>={};
+  for(let index=0;index<6;index++){
+    const id=index===0?'status':`extra${index}`;
+    descriptor.requests[id]=structuredClone(descriptor.requests.status);
+    cache[id]={value:{data:'x'.repeat(1800000)},fetchedAt:now,etag:null,modified:null};
+  }
+  await assert.rejects(fetchSubscriptionResponses(descriptor,{baseUrl:parameters.baseUrl},{validateUrl:async()=>{},fetch:async()=>{throw new Error('unexpected network read')}},now,cache),{code:'subscription_limit_exceeded'});
+});
