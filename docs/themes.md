@@ -2,7 +2,7 @@
 
 [English](#english)
 
-一个主题包可以同时提供监控状态页和机器状态页的主题。“主题管理”顶部两个看板分别显示两个页面的当前主题；下方已安装主题可以直接应用，会按主题声明的页面类型自动匹配。首次安装后需手动应用；更新已在使用的主题包时，相关页面会自动使用新版。管理控制台、登录、初始化和 API 始终使用内置实现。
+一个主题包可以提供监控状态页、机器状态页和 AI 模型页的主题。“主题管理”顶部按已启用的页面显示当前主题；下方已安装主题可以直接应用，会按主题声明的页面类型自动匹配。首次安装后需手动应用；更新已在使用的主题包时，相关页面会自动使用新版。管理控制台、登录、初始化和 API 始终使用内置实现。
 
 ## 安装与选择
 
@@ -10,9 +10,9 @@
 2. 在主题管理里点击选择或拖入单个 ZIP，也可以填写可下载的 ZIP 地址；上传中或存储不可用时控件会禁用。
 3. 在主题管理里预览包内的各个主题。
 4. 在已安装主题旁点“应用”，主题就用到它声明的页面类型，不用另选监控页或机器页。
-5. 顶部看板显示应用结果；点“主题配置”编辑选项并保存。机器页看板和应用入口只在机器独立展示功能开启时显示。
+5. 顶部看板显示应用结果；点“主题配置”编辑选项并保存。机器页入口随机器独立展示功能显示，AI 页入口随 AI 监控功能显示。AI 内置页可另设标题和说明，通过 `/ai` 或指定的 AI 域名访问。
 
-更新后，已安装列表只显示当前版本，使用该主题包的页面会同步更新。仍受新版支持的有效配置、头部代码和自定义 HTML 会保留；不再支持的选项会移除，新选项使用主题默认值。如果新版缺少正在使用的子主题，更新会被拒绝，原配置不变。要回退，重新上传旧版主题包；也可以在对应看板恢复内置主题。删除主题包会先清掉两个页面对这个包的引用，再删除资源。资源删除失败时，管理记录还在，已经清掉的页面引用不会恢复。
+更新后，已安装列表只显示当前版本，使用该主题包的页面会同步更新。仍受新版支持的有效配置、头部代码和自定义 HTML 会保留；不再支持的选项会移除，新选项使用主题默认值。如果新版缺少正在使用的子主题，更新会被拒绝，原配置不变。要回退，重新上传旧版主题包；也可以在对应看板恢复内置主题。删除主题包会先清掉各页面对这个包的引用，再删除资源。资源删除失败时，管理记录还在，已经清掉的页面引用不会恢复。
 
 主题 JavaScript 会在公开页面运行，只安装可信来源的包。
 
@@ -24,7 +24,9 @@
 
 主题配置里可以填头部代码（最多 16 KiB UTF-8）和自定义 HTML（最多 32 KiB UTF-8）。内置页面在正文下方显示自定义内容；安装主题需要提供内容插槽。这些内容访客都能看到，脚本还有本站同源权限；只用可信代码，不要填凭据。手动切换主题、恢复内置主题或删除主题后，这些内容会清空；更新同一主题包时保留。
 
-主题选项引用的监控或机器，必须位于对应页面的公开范围内。
+主题选项引用的监控或机器，必须位于对应页面的公开范围内。AI 主题的目标类型为 `ai`，可声明 `public.config`、`public.ai-models` 和 `public.ai-history`。网站和 AI 主题还可声明 `public.subscriptions`、`public.subscription-history`，读取对应类别的公开订阅和条目历史。
+
+通过 `polarisTheme.read('subscriptions', { category: 'website', limit: 50, offset: 0 })` 读取订阅；模型类别使用 `model`。通过 `polarisTheme.read('subscription-history', { id: '条目 ID' })` 读取历史。自定义状态页可传 `pageId`。数据仍遵守公开开关、功能开关和页面范围；请保留来源、有效性和时间含义，避免把快照合并成本地 SLA。详见[订阅指南](subscriptions.md)。
 
 ## 预览
 
@@ -46,7 +48,7 @@ ZIP 上传使用 `Content-Type: application/zip`。页面配置使用 `page.them
 
 ## English
 
-Theme packages can provide monitor and machine pages. A newly installed package must be applied manually. Updating a package already in use moves its pages to the new version. The administration console, login, setup and API remain built in. See the [documentation index](README.md#english) and [deployment guide](deployment.md#english) for the surrounding site setup.
+Theme packages can provide monitor, machine and AI model pages. Page panels appear for enabled features. A newly installed package must be applied manually. Updating a package already in use moves its pages to the new version. The administration console, login, setup and API remain built in. See the [documentation index](README.md#english) and [deployment guide](deployment.md#english) for the surrounding site setup.
 
 ### Install and apply
 
@@ -59,6 +61,10 @@ The [Polaris Simple theme](../examples/themes/polaris-simple/README.md#english) 
 ### Configure and preview
 
 Built-in themes can also be configured from their page panel. Set the accent color, corner radius, page width, layout, content density, card columns and information visibility. The layout is the default for visitors who have not saved their own view. Installed themes define their own options. Monitor and machine references must belong to the corresponding public page.
+
+The AI page appears when AI monitoring is enabled. Its built-in theme also supports an independent title and description. Visit `/ai` or assign an AI-page domain. AI themes use target `ai` and capabilities `public.config`, `public.ai-models` and `public.ai-history`. Website and AI themes may also request `public.subscriptions` and `public.subscription-history`.
+
+Use `polarisTheme.read('subscriptions', { category: 'website', limit: 50, offset: 0 })` for website subscriptions; use `model` for models. Read history with `polarisTheme.read('subscription-history', { id: 'item ID' })`. Custom status pages may supply `pageId`. Access follows visibility, feature and page scope. Preserve source, freshness and observation-time labels; do not combine snapshots with local SLA.
 
 `headCode` allows up to 16 KiB of UTF-8 HTML, CSS and JavaScript in the page head. `contentHtml` allows up to 32 KiB of UTF-8 custom HTML. Built-in pages display it below the main content; installed themes need a content slot. Both are public. Scripts on a public theme page run with the site's origin; use trusted code and never include credentials. These values are cleared when manually switching themes, restoring the built-in theme or deleting the theme. Updating the same package preserves them.
 

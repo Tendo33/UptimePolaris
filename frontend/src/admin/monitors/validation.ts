@@ -7,7 +7,7 @@ export function validateAgentOptions(json: string): boolean {
   try { options = JSON.parse(json); } catch { return false; }
   if (!options || typeof options !== 'object' || Array.isArray(options)) return false;
   const root = options as Record<string, unknown>;
-  if (Object.keys(root).some((key) => key !== 'alerts')) return false;
+  if (Object.keys(root).some((key) => key !== 'alerts' && key !== 'notificationChannelIds')) return false;
   if (root.alerts === undefined) return true;
   if (!root.alerts || typeof root.alerts !== 'object' || Array.isArray(root.alerts)) return false;
   const alerts = root.alerts as Record<string, unknown>;

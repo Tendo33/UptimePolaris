@@ -51,6 +51,7 @@ func TestNotificationQueueOrderRetryAndAge(t *testing.T) {
 	if err != nil || str(object(channel["config"]), "url") != endpoint.URL {
 		t.Fatal("saved HTTPS channel missing", channel, err)
 	}
+	put("monitor", "m", Object{"id": "m", "name": "m", "type": "http", "active": true, "options_json": "{}"})
 	err = s.app.store.mutate(ctx, func(tx *transaction) error {
 		for _, status := range []int{0, 1} {
 			_, err := s.app.queueNotifications(tx, Object{"id": "m", "name": "m", "type": "http"}, Object{"st": status, "ts": time.Now().Unix()})

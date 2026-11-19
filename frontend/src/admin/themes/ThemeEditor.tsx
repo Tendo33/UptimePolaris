@@ -12,7 +12,7 @@ import {
   Tooltip,
 } from '@heroui/react';
 import clsx from 'clsx';
-import { AlertTriangle, ExternalLink, Monitor, RotateCcw, Server } from 'lucide-react';
+import { AlertTriangle, ExternalLink, Bot, Monitor, RotateCcw, Server } from 'lucide-react';
 import { useTranslations } from 'use-intl';
 import { useApiErrorMessage } from '@/api/useApiErrorMessage';
 import { ApiError } from '@/api/errors';
@@ -31,7 +31,7 @@ import type { ThemeDefinition, ThemeOption, ThemePreview } from './types';
 type Viewport = 'desktop' | 'tablet' | 'mobile';
 const VIEWPORT_WIDTH: Record<Viewport, number | null> = { desktop: null, tablet: 820, mobile: 390 };
 const BUILTIN_GROUPS: Array<{ key: 'appearance' | 'layout' | 'display'; match: (key: string) => boolean }> = [
-  { key: 'appearance', match: (key) => ['accent', 'radius', 'width'].includes(key) },
+  { key: 'appearance', match: (key) => ['title', 'description', 'accent', 'radius', 'width'].includes(key) },
   { key: 'layout', match: (key) => ['layout', 'density', 'columns'].includes(key) },
   { key: 'display', match: (key) => key.startsWith('show') },
 ];
@@ -102,7 +102,7 @@ export function ThemeEditor({ kind, page, definition, onClose }: {
   if (optionsValid && contentValid) lastValid.current = { values, headCode, contentHtml };
   const draft = lastValid.current ?? { values: saved.values, headCode: saved.headCode, contentHtml: saved.contentHtml };
 
-  const PageIcon = kind === 'monitor' ? Monitor : Server;
+  const PageIcon = kind === 'monitor' ? Monitor : kind === 'ai' ? Bot : Server;
   const width = VIEWPORT_WIDTH[viewport];
   const groups = builtin
     ? BUILTIN_GROUPS.map((group) => ({ key: group.key, options: definition.options.filter((option) => group.match(option.key)) }))
@@ -117,7 +117,7 @@ export function ThemeEditor({ kind, page, definition, onClose }: {
             <IconTile icon={<PageIcon />} size="sm" />
             <div className="min-w-0 flex-1">
               <h2 className="truncate text-[15px] font-semibold text-[var(--polaris-ink)]">{t('configure')}</h2>
-              <p className="truncate text-[12px] text-[var(--polaris-ink-3)]">{t(kind === 'monitor' ? 'monitorBoard' : 'serverBoard')} · {definition.name}</p>
+              <p className="truncate text-[12px] text-[var(--polaris-ink-3)]">{t(kind === 'monitor' ? 'monitorBoard' : kind === 'ai' ? 'aiBoard' : 'serverBoard')} · {definition.name}</p>
             </div>
             <Segmented
               className="order-last w-full justify-center sm:order-none sm:w-auto"

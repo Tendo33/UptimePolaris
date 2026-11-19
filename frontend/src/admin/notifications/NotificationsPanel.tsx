@@ -48,6 +48,7 @@ import type { MonitorGroup } from '../groups/types';
 import { monitorsApi } from '../monitors/api';
 import { StatusPill } from '../monitors/MonitorIndicators';
 import { ProviderLogo } from './ProviderLogo';
+import { NotificationScope, defaultChannelScope } from './NotificationScope';
 import { NOTIFICATION_META, notificationFieldRequired } from './providers';
 import type { ChannelDeliveryStats, DeliveryRecord, NotificationChannel, NotificationInput, NotificationType } from './types';
 
@@ -529,6 +530,7 @@ function ChannelForm({
   const [config, setConfig] = useState<Record<string, string>>({});
   const [language, setLanguage] = useState<NotificationLanguage>(defaultNotificationLanguage);
   const [groupIds, setGroupIds] = useState<string[]>([]);
+  const [scope, setScope] = useState(defaultChannelScope);
   const [active, setActive] = useState(true);
   const [saving, setSaving] = useState(false);
   const currentSession = useRef(session);
@@ -546,6 +548,7 @@ function ChannelForm({
     setConfig(channel?.config ?? {});
     setLanguage(resolveNotificationLanguage(channel ? channel.config.language : locale));
     setGroupIds(channel ? scopeIds(channel) : []);
+    setScope({ event_kinds: channel?.event_kinds ?? ['monitor_state', 'ai_state', 'agent_resource'], source_types: channel?.source_types ?? ['local'], ai_channel_ids: channel?.ai_channel_ids ?? [], subscription_ids: channel?.subscription_ids ?? [] });
     setActive(channel ? channel.active === 1 : true);
     setError(null);
   }, [open, channel, initialType, locale, session]);
@@ -566,6 +569,7 @@ function ChannelForm({
         // for why omitting it is not the same submission.
         // 始终发送范围，包括空数组；省略字段的含义不同，详见 `NotificationInput.group_ids`。
         group_ids: groupIds,
+        ...scope,
         active: active ? 1 : 0,
       };
       if (channel) await notificationsApi.updateNotification(channel.id, payload);
@@ -667,6 +671,8 @@ function ChannelForm({
             </Switch>
             <span className="text-tiny text-default-500">{t('notify.enabledHint')}</span>
           </div>
+
+          <NotificationScope value={scope} onChange={setScope} disabled={saving} />
 
           {/*
             Scope.

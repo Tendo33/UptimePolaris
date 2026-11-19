@@ -409,4 +409,94 @@ export const BOOTSTRAP_FILES: readonly BootstrapFile[] = [
       "CREATE TABLE IF NOT EXISTS agent_history_daily (\n  agent_id TEXT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,\n  days_json TEXT NOT NULL,\n  updated_at INTEGER NOT NULL\n) WITHOUT ROWID",
     ],
   },
+  {
+    name: "0045_ai_management.sql",
+    statements: [
+      "CREATE TABLE IF NOT EXISTS ai_channels (\n  id TEXT PRIMARY KEY,\n  name TEXT NOT NULL UNIQUE,\n  base_url TEXT NOT NULL,\n  protocol TEXT NOT NULL CHECK (protocol = 'openai'),\n  credential_ciphertext TEXT NOT NULL,\n  revision TEXT NOT NULL,\n  created_at BIGINT NOT NULL,\n  updated_at BIGINT NOT NULL\n)",
+      "CREATE TABLE IF NOT EXISTS ai_models (\n  id TEXT PRIMARY KEY,\n  channel_id TEXT NOT NULL REFERENCES ai_channels(id) ON DELETE CASCADE,\n  name TEXT NOT NULL,\n  model_id TEXT NOT NULL,\n  interval_sec INTEGER NOT NULL CHECK (interval_sec BETWEEN 60 AND 86400),\n  timeout_ms INTEGER NOT NULL CHECK (timeout_ms BETWEEN 1000 AND 60000 AND timeout_ms < interval_sec * 1000),\n  enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),\n  is_public INTEGER NOT NULL CHECK (is_public IN (0, 1)),\n  revision TEXT NOT NULL,\n  created_at BIGINT NOT NULL,\n  updated_at BIGINT NOT NULL,\n  UNIQUE (channel_id, model_id),\n  UNIQUE (channel_id, name)\n)",
+    ],
+  },
+  {
+    name: "0046_ai_runtime.sql",
+    statements: [
+      "ALTER TABLE ai_models ADD COLUMN notification_channel_ids TEXT NOT NULL DEFAULT '[]'",
+      "CREATE TABLE IF NOT EXISTS ai_runtime (id INTEGER PRIMARY KEY CHECK (id = 1), json TEXT NOT NULL, revision TEXT NOT NULL)",
+      "INSERT INTO ai_runtime(id,json,revision) VALUES(1,'{\"models\":{},\"channels\":{}}','initial')",
+      "CREATE TABLE IF NOT EXISTS ai_daily (model_id TEXT PRIMARY KEY REFERENCES ai_models(id) ON DELETE CASCADE, days_json TEXT NOT NULL)",
+    ],
+  },
+  {
+    name: "0047_check_queue.sql",
+    statements: [
+      "CREATE TABLE IF NOT EXISTS check_queue_control (id INTEGER PRIMARY KEY CHECK(id=1),json TEXT NOT NULL,revision TEXT NOT NULL)",
+      "INSERT INTO check_queue_control(id,json,revision) VALUES(1,'{\"enabled\":false,\"generation\":\"initial\",\"verification\":null,\"pending\":{},\"lastEnqueuedAt\":null,\"lastProcessedAt\":null,\"lastError\":null}','initial')",
+    ],
+  },
+  {
+    name: "0048_ai_protocols.sql",
+    statements: [
+      "PRAGMA defer_foreign_keys = ON",
+      "CREATE TABLE ai_channels_new (\n  id TEXT PRIMARY KEY,\n  name TEXT NOT NULL UNIQUE,\n  base_url TEXT NOT NULL,\n  protocol TEXT NOT NULL CHECK (protocol IN ('openai', 'openai_responses', 'anthropic', 'gemini')),\n  credential_ciphertext TEXT NOT NULL,\n  revision TEXT NOT NULL,\n  created_at BIGINT NOT NULL,\n  updated_at BIGINT NOT NULL\n)",
+      "CREATE TABLE ai_models_new (\n  id TEXT PRIMARY KEY,\n  channel_id TEXT NOT NULL REFERENCES ai_channels_new(id) ON DELETE CASCADE,\n  name TEXT NOT NULL,\n  model_id TEXT NOT NULL,\n  interval_sec INTEGER NOT NULL CHECK (interval_sec BETWEEN 60 AND 86400),\n  timeout_ms INTEGER NOT NULL CHECK (timeout_ms BETWEEN 1000 AND 60000 AND timeout_ms < interval_sec * 1000),\n  enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),\n  is_public INTEGER NOT NULL CHECK (is_public IN (0, 1)),\n  revision TEXT NOT NULL,\n  created_at BIGINT NOT NULL,\n  updated_at BIGINT NOT NULL,\n  notification_channel_ids TEXT NOT NULL DEFAULT '[]',\n  UNIQUE (channel_id, model_id),\n  UNIQUE (channel_id, name)\n)",
+      "CREATE TABLE ai_daily_new (\n  model_id TEXT PRIMARY KEY REFERENCES ai_models_new(id) ON DELETE CASCADE,\n  days_json TEXT NOT NULL\n)",
+      "INSERT INTO ai_channels_new SELECT id,name,base_url,protocol,credential_ciphertext,revision,created_at,updated_at FROM ai_channels",
+      "INSERT INTO ai_models_new SELECT id,channel_id,name,model_id,interval_sec,timeout_ms,enabled,is_public,revision,created_at,updated_at,notification_channel_ids FROM ai_models",
+      "INSERT INTO ai_daily_new SELECT model_id,days_json FROM ai_daily",
+      "DROP TABLE ai_daily",
+      "DROP TABLE ai_models",
+      "DROP TABLE ai_channels",
+      "ALTER TABLE ai_channels_new RENAME TO ai_channels",
+      "ALTER TABLE ai_models_new RENAME TO ai_models",
+      "ALTER TABLE ai_daily_new RENAME TO ai_daily",
+      "PRAGMA defer_foreign_keys = OFF",
+    ],
+  },
+  {
+    name: "0049_ai_request_options.sql",
+    statements: [
+      "ALTER TABLE ai_channels ADD COLUMN headers_ciphertext TEXT NOT NULL DEFAULT ''",
+      "ALTER TABLE ai_channels ADD COLUMN header_names_json TEXT NOT NULL DEFAULT '[]'",
+      "ALTER TABLE ai_models ADD COLUMN request_json TEXT NOT NULL DEFAULT '{\"prompt\":\"Reply OK.\",\"maxOutputTokens\":64,\"expectedText\":\"\"}'",
+    ],
+  },
+  {
+    name: "0050_ai_presentation.sql",
+    statements: [
+      "UPDATE presentation_state SET config_json=json_set(config_json,\n  '$.aiEnabled',json(CASE WHEN EXISTS(SELECT 1 FROM ai_channels) THEN 'true' ELSE 'false' END),\n  '$.aiOnMonitorPage',json('true'),\n  '$.pages.ai',json('{\"theme\":null,\"themeOptions\":{}}')),\n  revision='ai-pages-'||revision WHERE id='main'",
+      "INSERT INTO presentation_state(id,config_json,revision,updated_at)\nSELECT 'main','{\"agentEnabled\":false,\"aiEnabled\":true,\"aiOnMonitorPage\":true,\"workerService\":\"uptime-polaris\",\"domains\":[],\"pages\":{\"monitor\":{\"theme\":null,\"themeOptions\":{}},\"agent\":{\"theme\":null,\"themeOptions\":{}},\"ai\":{\"theme\":null,\"themeOptions\":{}}}}','ai-pages-initial',0\nWHERE EXISTS(SELECT 1 FROM ai_channels) AND NOT EXISTS(SELECT 1 FROM presentation_state WHERE id='main')",
+    ],
+  },
+  {
+    name: "0051_ai_check_revisions.sql",
+    statements: [
+      "ALTER TABLE ai_channels ADD COLUMN check_revision TEXT NOT NULL DEFAULT ''",
+      "UPDATE ai_channels SET check_revision=revision",
+      "ALTER TABLE ai_models ADD COLUMN check_revision TEXT NOT NULL DEFAULT ''",
+      "UPDATE ai_models SET check_revision=revision",
+    ],
+  },
+  {
+    name: "0052_notification_routing.sql",
+    statements: [
+      "ALTER TABLE ai_channels ADD COLUMN notification_channel_ids TEXT NOT NULL DEFAULT '[]'",
+      "ALTER TABLE ai_models DROP COLUMN notification_channel_ids",
+    ],
+  },
+  {
+    name: "0053_subscriptions.sql",
+    statements: [
+      "CREATE TABLE IF NOT EXISTS subscriptions (\n  id TEXT PRIMARY KEY,\n  json TEXT NOT NULL,\n  revision TEXT NOT NULL,\n  sync_revision TEXT NOT NULL,\n  enabled INTEGER NOT NULL DEFAULT 1,\n  next_due BIGINT NOT NULL DEFAULT 0,\n  lease_token TEXT,\n  lease_until BIGINT NOT NULL DEFAULT 0\n)",
+      "CREATE INDEX IF NOT EXISTS subscriptions_due ON subscriptions(enabled,next_due)",
+      "CREATE TABLE IF NOT EXISTS subscription_items (\n  id TEXT PRIMARY KEY,\n  subscription_id TEXT NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,\n  source_id TEXT NOT NULL,\n  json TEXT NOT NULL,\n  revision TEXT NOT NULL,\n  selected INTEGER NOT NULL DEFAULT 0,\n  is_public INTEGER NOT NULL DEFAULT 0,\n  UNIQUE(subscription_id,source_id)\n)",
+      "CREATE INDEX IF NOT EXISTS subscription_items_public ON subscription_items(is_public,subscription_id)",
+      "CREATE TABLE IF NOT EXISTS subscription_documents (\n  kind TEXT NOT NULL,\n  id TEXT NOT NULL,\n  subscription_id TEXT,\n  json TEXT NOT NULL,\n  expires_at BIGINT NOT NULL DEFAULT 0,\n  PRIMARY KEY(kind,id)\n)",
+      "CREATE INDEX IF NOT EXISTS subscription_documents_expiry ON subscription_documents(expires_at)",
+      "CREATE INDEX IF NOT EXISTS subscription_documents_owner ON subscription_documents(subscription_id,kind)",
+      "ALTER TABLE ai_channels ADD COLUMN notification_enabled INTEGER NOT NULL DEFAULT 1",
+      "ALTER TABLE notifications ADD COLUMN event_kinds TEXT NOT NULL DEFAULT '[\"monitor_state\",\"ai_state\",\"agent_resource\"]'",
+      "ALTER TABLE notifications ADD COLUMN source_types TEXT NOT NULL DEFAULT '[\"local\"]'",
+      "ALTER TABLE notifications ADD COLUMN ai_channel_ids TEXT NOT NULL DEFAULT '[]'",
+      "ALTER TABLE notifications ADD COLUMN subscription_ids TEXT NOT NULL DEFAULT '[]'",
+    ],
+  },
 ];

@@ -9,6 +9,7 @@
 - [添加第一个监控](#添加第一个监控)
 - [控制台总览](#控制台总览)
 - [HTTP 监控](#http-监控)
+- [AI 模型监控](#ai-模型监控)
 - [TCP 监控](#tcp-监控)
 - [UDP 与 ICMP Ping](#udp-与-icmp-ping)
 - [Go 原生 DNS、TLS 与 WebSocket](#go-原生-dnstls-与-websocket)
@@ -47,6 +48,10 @@ Worker 的检查间隔为 60–86400 秒，超时为 1000–60000 毫秒。Go �
 - 在浮层里可以暂停或恢复监控、立即检查、打开详情、复制一份摘要，或把浮层固定住。
 - “通知动态”只列状态翻转事件。未读数按浏览器记录，可以只看未读、全部标为已读，或暂停新动态提示 15 分钟。
 
+启用 AI 监控后，顶部浮层会汇总模型的正常、异常、状态待确认和暂停数量。异常条目可直接打开所属渠道并定位模型。过期、跳过和未检查的模型不会计为正常。
+
+点击左上角版本号可以检查 GitHub 仓库中的正式版本标签，并查看对应版本的更新记录。有新版本时，版本号旁显示更新图标。自动检查结果在当前浏览器缓存 6 小时，也可手动重新检查。
+
 首页的指标卡分别显示运行中监控的平均可用率、最近的证书或域名到期时间，以及当天发生的故障次数。第一次使用时会出现“开始使用”清单，列出添加监控、设置站点名称、配置通知和接入 Agent 四项。每一步只在部署里确实存在对应内容后才算完成，不是点过按钮就算；清单可以关闭，关闭状态按浏览器保存。
 
 在控制台任意页面按 `Ctrl+K`（macOS 为 `⌘K`）打开命令面板，可以搜索页面、监控项和 Agent，也可以执行当前页面的快捷操作。
@@ -71,6 +76,10 @@ Worker 的检查间隔为 60–86400 秒，超时为 1000–60000 毫秒。Go �
 接口返回 HTTP 200，也可能因为正文、响应头或延迟不满足断言而判为异常。先只配必要条件跑出正常基线，再逐项加断言，出问题时更容易定位。
 
 Worker 从 Cloudflare 发起检查，和你的浏览器、内网主机不在同一个网络。目标只开放在局域网时，选一台能访问它的 Agent 作为来源。
+
+## AI 模型监控
+
+从独立的“AI 监控”页面添加渠道和模型，不在普通 HTTP 监控里配置。每个模型分别设置检查间隔、通知和公开选项；真实文本生成检查可能收费。渠道连接测试与模型调用结果分开显示，详见 [AI 模型监控](ai-monitoring.md)。
 
 ## TCP 监控
 
@@ -191,17 +200,17 @@ HTTP/TCP 选了 Agent 来源后，由这台 Agent 领取探测任务并提交结
 
 ## 公开页面与域名
 
-Uptime Polaris 分别提供监控状态页和机器状态页。先在部署侧完成 DNS 和 Cloudflare Worker 域名绑定，确认域名能访问当前服务；后台的域名配置不会创建 DNS 记录，也不会绑定 Worker。
+Uptime Polaris 在 `/` 提供监控状态页，在 `/servers` 提供机器页，在 `/ai` 提供 AI 模型页。机器页和 AI 页需要先在展示设置中启用。使用路径访问不要求配置额外域名。
 
-在后台设置的公开展示面板里启用独立机器页，再分别配置两种页面的域名。例如把 `status.example.com` 指向监控页，把 `servers.example.com` 指向机器页。只填主机名，不填协议、端口或路径。有效修改自动保存；保存失败会保留输入并允许重试。
+如需独立域名，先完成 DNS 和部署侧域名绑定，再配置页面映射。例如把 `status.example.com` 的首页指向监控页，把 `servers.example.com` 的首页指向机器页。只填主机名，不填协议、端口或路径。后台配置不会创建 DNS 记录或绑定 Worker。有效修改自动保存；保存失败会保留输入并允许重试。
 
-关闭独立机器页后，所有域名映射停止生效并隐藏，所有域名都显示监控页。已保存的映射会保留，重新启用后恢复。域名添加后立即生效，没有逐项开关。配置映射后，只有匹配的域名显示对应页面，其他域名显示未配置。
+域名映射决定首页显示哪个页面；配置映射后，未匹配域名的首页显示未配置。`/servers` 和 `/ai` 仍按对应功能开关访问。关闭机器页不会关闭 AI 页；两种可选页面都关闭后，域名映射暂停生效，已保存配置保留。
 
 两个域名的 `/admin` 进入同一套后台，登录会留在当前域名。会话 Cookie 按域名保存，第一次访问另一个域名的后台时，需要在该域名下登录。
 
 机器页默认关闭。新建 Agent 默认开启“在状态页显示”；启用机器页后，这些机器即可公开展示。可在 Agent 管理列表或编辑表单中调整，也可批量公开或隐藏。关闭机器页后，所有 Agent 公开控制隐藏，已有选择保留；机器公开接口停止返回数据，上报和探测继续运行。停用的机器不会出现在公开页。监控状态页只展示监控自己标记为公开的条目。
 
-“主题管理”顶部的看板分别显示监控页和机器页当前的主题。在下方已安装主题里点“应用”，会按主题声明的页面类型自动匹配，不用再选下拉框。应用后在对应看板里配置选项或恢复内置主题，选项自动保存。安装和制作主题见[主题指南](themes.md)。
+“主题管理”顶部的看板分别显示监控页、机器页和 AI 页当前的主题。在下方已安装主题里点“应用”，会按主题声明的页面类型自动匹配，不用再选下拉框。应用后在对应看板里配置选项或恢复内置主题，选项自动保存。安装和制作主题见[主题指南](themes.md)。
 
 ## 使用公开机器页
 
@@ -267,6 +276,10 @@ After [deployment and setup](deployment.md#english), manage monitors at `/admin`
 
 The console opens at `/admin`. The status popover summarises the fleet, lists offline Agents, and allows pausing or resuming a monitor, checking immediately, opening details, copying a summary, or pinning the panel. The activity feed lists state changes only; unread counts, mark-all-read and a 15-minute notification snooze are per browser. The three KPI cards show average availability across running monitors, the nearest certificate or domain expiry, and today's incidents. A first-run checklist covers adding a monitor, naming the site, configuring notifications and connecting an Agent; each step counts as done only when the object actually exists. `Ctrl+K` (`⌘K` on macOS) opens the command palette for pages, monitors, Agents and current-page actions.
 
+When AI monitoring is enabled, the top status panel includes models that are up, down, awaiting status or paused. Select a model issue to open its channel and highlight the model. Stale, skipped and unchecked models are not counted as healthy.
+
+Select the version number at the top left to check the repository's stable version tags and view the corresponding change history. An update icon appears when a newer version is available. Automatic results are cached in this browser for six hours; manual checks are available at any time.
+
 ### Manage monitors day to day
 
 Filter the monitor list by status (all, down, pending, warning, up, paused; states without monitors are hidden), group or tag, and search by name or target. The list refreshes at the backend cadence (60 seconds on Worker, 5 seconds on Go), shown at the bottom. The row menu edits, pauses or resumes, checks immediately, toggles public visibility, and deletes. Bulk actions currently cover public visibility only; move members in the Groups page. Pausing stops new checks and removes the monitor from public pages. Deleting a monitor also deletes its availability history and events and cannot be undone.
@@ -283,6 +296,10 @@ In monitor management, add an HTTP monitor with a name and URL such as `https://
 
 Worker accepts intervals of 60–86,400 seconds and timeouts of 1,000–60,000 ms; Go accepts 5–86,400 seconds and 100–120,000 ms. Site defaults only fill new forms and do not rewrite existing monitors. `monitor.defaultRetries` controls failure confirmation at runtime.
 
+### AI monitoring
+
+Use the separate **AI monitoring** page to add channels and models. Each model has its own interval, alerts and public visibility. Text-generation checks may incur charges; channel connection tests and model results are shown separately. See [AI monitoring](ai-monitoring.md#english).
+
 ### Check types and sources
 
 - **HTTP:** configure the URL, method, status codes and, when needed, headers, body, Basic or Bearer authentication, JSON or response-header assertions, and a latency threshold. An HTTP 200 can still fail an assertion.
@@ -298,7 +315,7 @@ HTTP and TCP monitors support SSL, domain-expiry and DNS add-ons; Go also suppor
 
 Monitor groups organize status pages and notification scope; monitor tags classify monitors. Agent groups and tags are separate. A channel with no group scope applies to all monitors, including ungrouped ones. Recheck channel scope after moving monitors or deleting a group.
 
-The optional machine page is disabled by default. New Agents have public visibility enabled and appear once the machine page is enabled. Use the Agent list or edit form to change visibility, individually or in bulk. Configure DNS and the Worker or server domain before setting public-page domain mappings in the console. Disabling the machine page hides its public controls and stops its public API from serving machine data; Agent reporting continues. Cookies are scoped to each domain, so a second domain may require a separate login.
+The optional machine page is disabled by default. Enable it to use `/servers` without an extra domain; details remain at `/server/:id`, with comparison, tags and back links returning to the machine list. New Agents have public visibility enabled. Use the Agent list or editor to change visibility, individually or in bulk. Domain mappings optionally select the homepage after DNS and deployment-side domain bindings are configured. Unmapped homepages show an unconfigured state, while `/servers` and `/ai` follow their feature switches. Disabling the machine page stops its public API but not Agent reporting or the AI page. Cookies are scoped to each domain, so a second domain may require a separate login.
 
 The built-in machine page supports search, state/group/tag/region filters, card and list views, and a map when recognizable region data exists. Select 2–4 machines for comparison. History charts and CSV export are limited to published fields and available samples. Filter, view and comparison choices are shareable in the URL; pins and refresh interval are stored in the browser, and live samples in the current tab session.
 

@@ -1,0 +1,5 @@
+[
+  {"name":"quota-is-failure-not-warn","steps":[{"status":200,"body":{"choices":[{"message":{"content":"OK"}}]},"outcome":"ok","backoff":0},{"status":429,"body":{"error":{"code":"rate_limit_exceeded"}},"outcome":"rate_limited","retryAfter":7200,"backoff":7200},{"status":429,"body":{"error":{"code":"insufficient_quota"}},"outcome":"quota_exhausted","backoff":3600},{"status":200,"body":{"choices":[{"message":{"content":"OK"}}]},"outcome":"ok","backoff":0}],"total":4,"ok":2,"settled":"up"},
+  {"name":"three-confirmed-failures","steps":[{"status":503,"body":{},"outcome":"upstream_unavailable","backoff":0},{"status":503,"body":{},"outcome":"upstream_unavailable","backoff":0},{"status":503,"body":{},"outcome":"upstream_unavailable","backoff":0}],"total":3,"ok":0,"settled":"down"},
+  {"name":"authentication-backoff","steps":[{"status":401,"body":{},"outcome":"authentication_failed","backoff":3600}],"total":1,"ok":0,"settled":"up"}
+]

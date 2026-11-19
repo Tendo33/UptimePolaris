@@ -34,6 +34,7 @@ const ERROR_KEYS: Record<string, string> = {
   target_required: 'admin.form.targetError.required', hostname_invalid: 'admin.form.targetError.need_hostname',
   color_invalid: 'admin.error.color_invalid', weight_invalid: 'admin.error.weight_invalid',
   group_not_found: 'admin.error.group_not_found', tag_not_found: 'admin.error.tag_not_found',
+  notification_channel_not_found: 'admin.ai.errors.notification_channel_not_found',
   monitor_paused: 'error.monitorPaused', monitor_changed: 'error.monitorChanged',
   push_not_probeable: 'error.passiveMonitor', agent_not_probeable: 'error.passiveMonitor', agent_source_not_probeable: 'error.agentCheck',
   agent_probe_disabled: 'error.sourceUnavailable', agent_probe_capability_required: 'admin.form.agentUpgrade',

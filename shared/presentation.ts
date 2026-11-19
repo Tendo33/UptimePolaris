@@ -1,7 +1,7 @@
 import { validateBuiltinThemeOptions } from './builtin-theme';
 
-export type PageKind = 'monitor' | 'agent';
-export const PAGE_KINDS: PageKind[] = ['monitor', 'agent'];
+export type PageKind = 'monitor' | 'agent' | 'ai';
+export const PAGE_KINDS: PageKind[] = ['monitor', 'agent', 'ai'];
 export interface DomainPage {
   hostname: string;
   page: PageKind;
@@ -23,6 +23,8 @@ export const CONTENT_HTML_MAX_BYTES = 32 * 1024;
 export const utf8Length = (value: string) => new TextEncoder().encode(value).length;
 export interface PresentationConfig {
   agentEnabled: boolean;
+  aiEnabled: boolean;
+  aiOnMonitorPage: boolean;
   workerService: string;
   domains: DomainPage[];
   pages: Record<PageKind, PageSettings>;
@@ -59,11 +61,14 @@ export type PageView = typeof DEFAULT_PAGE_VIEW;
 export function defaultPresentation(): PresentationConfig {
   return {
     agentEnabled: false,
+    aiEnabled: false,
+    aiOnMonitorPage: true,
     workerService: 'uptime-polaris',
     domains: [],
     pages: {
       monitor: { theme: null, themeOptions: {} },
       agent: { theme: null, themeOptions: {} },
+      ai: { theme: null, themeOptions: {} },
     },
   };
 }
@@ -94,12 +99,12 @@ export function parsePresentation(value: unknown): PresentationConfig | null {
   if (
     Object.keys(config).some(
       (key) =>
-        !['agentEnabled', 'workerService', 'domains', 'pages'].includes(key),
+        !['agentEnabled', 'aiEnabled', 'aiOnMonitorPage', 'workerService', 'domains', 'pages'].includes(key),
     )
   )
     return null;
   if (
-    typeof config.agentEnabled !== 'boolean' ||
+    typeof config.agentEnabled !== 'boolean' || typeof config.aiEnabled !== 'boolean' || typeof config.aiOnMonitorPage !== 'boolean' ||
     typeof config.workerService !== 'string' ||
     !/^[a-z0-9][a-z0-9-]{0,62}$/.test(config.workerService) ||
     !Array.isArray(config.domains) ||
@@ -172,6 +177,8 @@ export function parsePresentation(value: unknown): PresentationConfig | null {
   }
   return {
     agentEnabled: config.agentEnabled,
+    aiEnabled: config.aiEnabled,
+    aiOnMonitorPage: config.aiOnMonitorPage,
     workerService: config.workerService,
     domains,
     pages,

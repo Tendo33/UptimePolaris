@@ -97,6 +97,15 @@ jobs:
           node test/monitors/cron-lease.test.mjs
           node test/monitors/budget-capacity.test.mjs
           node test/monitors/sync-recovery.test.mjs
+      - name: AI monitoring and Queue contracts
+        run: |
+          set -euo pipefail
+          npm run test:ai-probe
+          node test/ai/run-api.mjs
+          node test/ai/run-runtime.mjs
+          npm run test:ai-ui
+          node test/queue/run.mjs
+          node test/subscriptions/run.mjs
       - name: Agent and theme contracts
         run: |
           set -euo pipefail
@@ -182,6 +191,10 @@ jobs:
       - run: npm run test:pg-real
       - run: npm run test:worker-postgres-setup
       - run: npm run test:go-postgres
+      - run: npm run test:ai-api:postgres
+      - run: npm run test:ai-runtime:postgres
+      - run: npm run test:check-queue:postgres
+      - run: npm run test:subscriptions:postgres
 
   browser:
     needs: checks

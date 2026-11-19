@@ -1,4 +1,6 @@
 import type { Env } from '../../types';
+import { monitorNotificationIds } from '../../../../../shared/notification-routing';
+import { monitorNotificationEnabled, notificationRoutingReason } from '../../../../../shared/notification-policy';
 import { mapConcurrent } from '../concurrency';
 import { getDB } from '../db/factory';
 import { eventsSQL } from '../db/sql/events';
@@ -9,8 +11,11 @@ import type { NotificationChannel } from './channels';
 import { loadChannels } from './channels';
 import { recordDelivery } from './delivery-history';
 import type { NotifyEvent } from './message';
-import { scopeMatches } from './scope';
 import { SEND_TIMEOUT_MS, sendToChannel } from './send';
+
+function matches(channel: NotificationChannel, event: NotifyEvent): boolean {
+  return notificationRoutingReason(channel, event) === null;
+}
 
 /** Bound simultaneous sends; callers coordinate this with probe egress. / 限制并发发送数；调用方将其与探测外部请求协调。 */
 const CONCURRENCY = 6;
@@ -37,7 +42,7 @@ export async function dispatch(
 
   const sends = channels.flatMap((channel) =>
     events
-      .filter((event) => scopeMatches(channel.group_ids, event.groupId))
+      .filter((event) => matches(channel, event))
       .map((event) => ({ channel, event })),
   );
 
@@ -139,7 +144,7 @@ export async function prepareNotificationOutbox(
   const matched = new Set<NotifyEvent>();
   for (const channel of channels) {
     for (const event of events) {
-      if (!scopeMatches(channel.group_ids, event.groupId)) continue;
+      if (!matches(channel, event)) continue;
       matched.add(event);
       const transitionId = `${event.prevStatus ?? 'new'}-${event.status}`;
       const eventId = `${event.monitorId ?? event.monitorName}:${event.eventKey ?? transitionId}@${event.at}`;
@@ -190,7 +195,58 @@ export async function retryPending(env: Env, now: number, budget?: ExternalReque
     try { payload = JSON.parse(row.payload_json) as typeof payload; }
     catch { await db.execute(eventsSQL[db.type].deletePending, [row.event_id, row.channel_id]); return; }
     const channel = channels.find((item) => item.id === row.channel_id && item.id === payload.channelId);
-    if (!channel || !scopeMatches(channel.group_ids, payload.event.groupId)) {
+    let validAi = true;
+    if (payload.event.subscriptionId) {
+      const { SubscriptionStore } = await import('../subscriptions/store');
+      const store = new SubscriptionStore(db);
+      try {
+        const subscription = await store.get(payload.event.subscriptionId);
+        const policy = payload.event.eventKind === 'subscription_sync' ? subscription.notifications.sync : subscription.notifications.monitor;
+        validAi = subscription.enabled && subscription.archivedAt === null && subscription.syncRevision === payload.event.syncRevision;
+        payload.event.notificationEnabled = policy.notificationEnabled;
+        payload.event.notificationChannelIds = policy.notificationChannelIds;
+        if (subscription.category === 'model') {
+          const { loadPresentation } = await import('../presentation/store');
+          validAi &&= (await loadPresentation(env)).config.aiEnabled;
+        }
+        if (payload.event.subscriptionItemId) {
+          const item = await store.item(payload.event.subscriptionItemId);
+          validAi &&= item.selected && !item.muted && item.removedAt === null;
+          payload.event.groupId = item.category === 'website' ? item.groupId : null;
+        }
+      } catch (error) {
+        if ((error as { code?: string }).code !== 'not_found') throw error;
+        validAi = false;
+      }
+    } else if (payload.event.aiModelId) {
+      const { loadPresentation } = await import('../presentation/store');
+      if (!(await loadPresentation(env)).config.aiEnabled) {
+        await db.execute(eventsSQL[db.type].deletePending, [row.event_id, row.channel_id]);
+        return;
+      }
+      const pg = db.type === 'postgres';
+      let current: { revision: string; channel_revision: string; enabled: number; notification_channel_ids: string; notification_enabled: number; channel_id: string } | null;
+      try { current = await db.queryOne(
+        `SELECT m.check_revision AS revision,m.enabled,m.channel_id,c.notification_channel_ids,c.notification_enabled,c.check_revision AS channel_revision FROM ai_models m JOIN ai_channels c ON c.id=m.channel_id WHERE m.id=${pg ? '$1' : '?'}`, [payload.event.aiModelId]);
+      } catch { console.warn(JSON.stringify({event:'notify_ai_source_unavailable'})); return; }
+      validAi = Boolean(current?.enabled && current.revision === payload.event.aiRevision && current.channel_revision === payload.event.aiChannelRevision);
+      if (current) {
+        payload.event.notificationChannelIds = JSON.parse(current.notification_channel_ids);
+        payload.event.notificationEnabled = current.notification_enabled !== 0;
+        payload.event.aiChannelId = current.channel_id;
+      }
+    } else if (payload.event.monitorId) {
+      const current = await db.queryOne<{ active: number; options_json: string; group_id: string | null }>(
+        `SELECT active,options_json,group_id FROM monitors WHERE id=${db.type === 'postgres' ? '$1' : '?'}`, [payload.event.monitorId]);
+      if (!current?.active) {
+        await db.execute(eventsSQL[db.type].deletePending, [row.event_id, row.channel_id]);
+        return;
+      }
+      payload.event.notificationChannelIds = monitorNotificationIds(current.options_json);
+      payload.event.notificationEnabled = monitorNotificationEnabled(current.options_json);
+      payload.event.groupId = current.group_id;
+    }
+    if (!channel || !validAi || !matches(channel, payload.event)) {
       await db.execute(eventsSQL[db.type].deletePending, [row.event_id, row.channel_id]);
       return;
     }

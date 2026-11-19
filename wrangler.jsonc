@@ -2,7 +2,7 @@
   "name": "uptime-polaris",
   "main": "backends/worker/src/index.ts",
   "compatibility_date": "2025-01-01",
-  "compatibility_flags": ["nodejs_compat"],
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
   "keep_vars": true,
   "exports": { "SetupConfiguration": { "type": "durable-object", "state": "deleted" } },
   "analytics": { "binding": "ANALYTICS_SQL" },
@@ -12,7 +12,7 @@
     "run_worker_first": [
       "/api", "/api/*",
       "/", "/admin", "/admin/*", "/login", "/login/*", "/setup", "/setup/*",
-      "/monitor/*", "/status/*", "/server/*",
+      "/monitor/*", "/status/*", "/server/*", "/servers", "/servers/", "/ai", "/ai/",
       "/theme/*", "/polaris-maintenance.js", "/agent/*", "/__scheduled"
     ],
     "not_found_handling": "single-page-application",

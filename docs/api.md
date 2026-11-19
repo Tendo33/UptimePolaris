@@ -10,6 +10,9 @@
 - [公开读取](#公开读取)
 - [公开展示设置](#公开展示设置)
 - [管理监控](#管理监控)
+- [AI 渠道和模型](#ai-渠道和模型)
+- [外部订阅](#外部订阅)
+- [Worker Queue](#worker-queue)
 - [Push 接入](#push-接入)
 - [Agent 接入](#agent-接入)
 - [通知与设置](#通知与设置)
@@ -133,11 +136,11 @@ Agent 上报中的 `load.load1`、`load.load5`、`load.load15`、`connections.tc
 | `GET /api/admin/presentation` | 读取生效配置 `config` 和并发控制用的 `revision` |
 | `PUT /api/admin/presentation` | 提交完整 `config` 和读取到的 `revision`，保存后立即生效 |
 
-展示设置只有一份生效配置。`revision` 变了会返回 409 `presentation_conflict`，这时重新读取并合并修改。配置包含 `agentEnabled`、`workerService`、`domains` 和 `pages`；域名项为 `{ hostname, page }`，添加后立即生效，没有逐项开关。每个页面保存 `theme`、`themeOptions`，以及可选的 `headCode` 和 `contentHtml`，约束见[主题页面自定义内容](#主题页面自定义内容--theme-page-custom-content)。域名映射由管理员手动填写。先在部署侧完成 DNS 配置和 Worker 或服务器的域名绑定，再保存映射。
+展示设置只有一份生效配置。`revision` 变了会返回 409 `presentation_conflict`，这时重新读取并合并修改。配置包含 `agentEnabled`、`aiEnabled`、`aiOnMonitorPage`、`workerService`、`domains` 和 `pages`；域名项为 `{ hostname, page }`，`page` 为 `monitor`、`agent` 或 `ai`。添加后立即生效，没有逐项开关。每个页面保存 `theme`、`themeOptions`，以及可选的 `headCode` 和 `contentHtml`，约束见[主题页面自定义内容](#主题页面自定义内容--theme-page-custom-content)。域名映射由管理员手动填写。先在部署侧完成 DNS 配置和 Worker 或服务器的域名绑定，再保存映射。
 
-`agentEnabled` 为 `false` 时，独立页面设置和 Agent 公开控制隐藏，所有域名映射停止生效，所有域名都显示监控页。重新开启后，已保存的映射和机器公开选择恢复。
+`agentEnabled` 控制机器独立展示，`aiEnabled` 控制 AI 监控及公开读取。关闭 AI 时停止定时、Queue 和手动 AI 调用，保留配置与历史；手动调用返回 409 `ai_disabled`。`aiOnMonitorPage` 控制 AI 模型是否出现在主监控页，不影响独立 AI 页。机器和 AI 功能都关闭时，域名映射停止生效，默认显示监控页；已保存的配置不删除。
 
-主题预览请求带 `preview=monitor` 或 `preview=agent` 时，需要管理会话或 `ADMIN_TOKEN`，并使用当前配置里对象的公开状态。预览响应不进共享缓存；匿名请求预览返回 401。各页面的主题和选项分别保存在 `pages.monitor` 和 `pages.agent`，安装、配置和预览方法见[主题指南](themes.md)。
+主题预览请求带 `preview=monitor`、`preview=agent` 或 `preview=ai` 时，需要管理会话或 `ADMIN_TOKEN`，并使用当前配置里对象的公开状态。预览响应不进共享缓存；匿名请求预览返回 401。各页面的主题和选项分别保存在 `pages.monitor`、`pages.agent` 和 `pages.ai`。公开的 `/ai` 页面请求 API 时附带 `view=ai`；已绑定的 AI 域名直接使用对应页面范围。安装、配置和预览方法见[主题指南](themes.md)。
 
 ## 管理监控
 
@@ -200,6 +203,90 @@ TCP 可用 `send`、`expect` 和 `check_source`。DNS 选项放在 `dns` 里，�
 Worker 上的 `udp` 和 `icmp` 必须显式选择 Agent 来源，机器要在线并上报 `probe_udp` 或 `probe_icmp`。缺少来源或设成 Worker 来源都会被拒绝。Go 可以直接执行 UDP，ICMP 是否可用取决于启动时的实际权限检测。UDP 选项为 `send`、可选的 `expect`、`encoding`（`text` 或 `hex`）及 `check_source`；ICMP 选项只用 `check_source`。Go 新增类型的请求示例见 [Go 后端说明](../backends/go/README.md#原生探测与-api)。
 
 同步立即检查会拒绝暂停条目、Push、Agent 主机和 Agent 来源监控。表单配置测试也不会把 Agent 来源改成 Worker 探测；应等待实际任务结果。
+
+## AI 渠道和模型
+
+AI 管理接口使用相同的管理员会话或 Bearer Token。写请求来自 Cookie 会话时要求同源。API Key 只在创建或替换时提交，读取响应仅包含 `hasApiKey`，不返回原密钥或密文。
+
+| 方法与路径 | 用途 |
+| --- | --- |
+| `GET /api/admin/ai/channels` | 渠道列表，返回 `{ channels }` |
+| `POST /api/admin/ai/channels` | 添加渠道：`{ name, baseUrl, protocol: "openai", apiKey }` |
+| `GET /api/admin/ai/channels/:id` | 读取渠道，返回 `{ channel }` |
+| `PUT /api/admin/ai/channels/:id` | 修改渠道，提交 `name`、`baseUrl`、`protocol`、当前 `revision`；省略 `apiKey` 保留原密钥 |
+| `DELETE /api/admin/ai/channels/:id` | 提交 `{ revision }`，删除渠道及其模型 |
+| `POST /api/admin/ai/channels/:id/test` | 提交 `{ revision }`，检查模型列表接口 |
+| `GET /api/admin/ai/channels/:id/models` | 读取渠道提供的模型，返回 `{ models: [{ id, name }], fetchedAt }` |
+| `GET /api/admin/ai/models` | 模型列表，包含各模型的 `live` 定时状态，返回 `{ models }` |
+| `POST /api/admin/ai/models` | 添加模型，字段见下方示例 |
+| `GET /api/admin/ai/models/:id` | 读取模型，返回 `{ model }` |
+| `PUT /api/admin/ai/models/:id` | 提交完整配置和当前 `revision` |
+| `DELETE /api/admin/ai/models/:id` | 提交 `{ revision }`，删除模型 |
+| `POST /api/admin/ai/models/:id/check` | 提交 `{ revision, channelRevision, confirmPaid: true }`，执行可能收费的手动检查 |
+| `GET /api/admin/ai/models/:id/history?days=7` | 历史汇总和明细；`days` 范围为 1～90 |
+
+渠道的 `protocol` 必填，可选值为 `openai`（Chat Completions）、`openai_responses`、`anthropic` 和 `gemini`。`baseUrl` 填写含版本路径的接口前缀，生成路径由所选协议追加。Gemini 的 `modelId` 使用不含 `models/` 的模型名称，仅支持英文字母、数字、点、下划线和连字符，且必须以字母或数字开头。无效名称或向 Gemini 切换时已有模型名称不合要求，返回 400 `invalid_ai_model_id`。地址和模型示例见 [AI 模型监控](ai-monitoring.md#添加渠道和模型)。
+
+渠道写入可带 `headers` 字符串键值对象，不限制条数，编码后的 JSON 不超过 64 KiB。头名称忽略大小写，不可重复；值不超过 2048 个可打印 ASCII 字符。认证、路由、Cookie 和连接控制类请求头不能覆盖，非法内容返回 400 `invalid_ai_headers`。更新时省略 `headers` 保留原值，`{}` 清除。列表和写入响应只返回 `headerNames`；管理员读取 `GET /api/admin/ai/channels/:id` 时另返回解密后的 `headers`，用于再次编辑。API Key 和密文始终不返回。
+
+渠道写入可带 `notificationChannelIds`，最多选择 32 个已有通知渠道 ID，适用于该 AI 渠道下的所有模型。更新时省略则保留；`[]` 使用全局规则，向未限定分组的已启用渠道发送。非空数组只向指定渠道发送。渠道读取返回该字段，模型不包含该字段。普通监控通过 `options_json.notificationChannelIds` 使用相同选择规则；留空时按原有通知分组范围匹配。
+
+`baseUrl` 支持 HTTP、HTTPS、本机、容器服务名和内网地址，仍拒绝 URL 凭据、查询参数、片段及云元数据地址。云端 Worker 能否连接取决于其网络环境，不能将 `localhost` 解释为用户电脑。
+
+添加模型的请求体示例，其中 `channelId` 换成创建渠道后得到的 ID：
+
+```json
+{
+  "channelId": "CHANNEL_ID",
+  "name": "主力对话模型",
+  "modelId": "example-chat",
+  "intervalSec": 300,
+  "timeoutMs": 30000,
+  "request": {
+    "prompt": "Reply OK.",
+    "maxOutputTokens": 64,
+    "expectedText": ""
+  },
+  "enabled": true,
+  "isPublic": false
+}
+```
+
+修改或删除必须使用最新读取的 `revision`。渠道密钥、地址、协议或模型配置变更会更新版本；409 `revision_conflict` 时重新读取，不覆盖其他人的修改。手动模型检查同时校验渠道版本；配置在调用中变更时也可能返回 409，而上游请求可能已经收费。手动结果不写入定时历史和可用率。
+
+每次编辑都会更新并发控制用的 `revision`。探测版本单独保存：修改名称、公开设置、通知渠道或暂停状态不清空最近结果和状态条；修改地址、协议、密钥、请求头、模型 ID、检查间隔、超时或请求内容后，等待新配置的实际检查。`live.revision` 和 `live.channelRevision` 是探测版本，不能用于修改或删除请求。
+
+后台模型列表、单个模型和对应的公开响应包含 `recent`。每项为 `{ checkedAt, outcome, latencyMs, statusCode }`，按时间从旧到新，最多 60 项，仅包含实际执行的定时检查。手动检查、预算不足和其他未执行轮次不会加入。暂无记录时返回 `[]`，不会补造历史。
+
+渠道模型列表使用渠道的认证和自定义请求头，不发起文本生成。支持四种协议及游标分页，合并重复 ID；Gemini 去除 `models/` 前缀，排除明确不支持 `generateContent` 的模型。单次读取总超时 15 秒，最多 10 页、10000 个模型和 2 MiB 响应。上游失败或超限返回 502 `{ error: "ai_models_unavailable", outcome }`，不将未读完的列表作为完整结果返回。渠道不存在返回 404，读取期间渠道被修改返回 409。
+
+`request` 在创建时可省略，使用示例中的默认值；更新时省略会保留原设置。提供时须包含 `prompt`、`maxOutputTokens` 和 `expectedText`：提示词最多 2000 个字符，token 上限为 1～4096 的整数，期望文本最多 200 个字符。匹配使用区分大小写的包含判断，留空只校验有效文本；不匹配的检查结果为 `response_mismatch`，非法设置返回 400 `invalid_ai_request`。
+
+可选的 `request.body` 是最多 64 KiB、嵌套不超过 32 层的 JSON 对象，与协议默认请求体递归合并；数组整体替换，`{}` 清除自定义内容。模型 ID、非流式和输出上限由表单字段控制，Responses 固定 `store: false`。OpenAI 自定义体包含 `max_completion_tokens` 时使用该参数承载表单的输出上限，不再同时发送 `max_tokens`。请求头、提示词和自定义请求体不进入公开响应。
+
+公开读取使用 `GET /api/public/ai/models`、`GET /api/public/ai/models/:id` 和 `GET /api/public/ai/models/:id/history?days=7`，仅返回启用且公开的模型；其余模型返回 404。公开响应不包含渠道地址、密钥、请求或供应商响应正文。
+
+公开模型包含 `channel: { id, name }`，用于按渠道分组和搜索；后台模型另包含 `channelName`。渠道名称属于公开信息，不应包含敏感内容。只返回当前可公开模型的渠道分组信息，不提供匿名读取所有渠道的接口。
+
+历史响应为 `{ modelId, days, points, detailStatus, sampled }`。每日汇总含实际总次数、成功次数、可用率和平均耗时；`sampled` 仅描述明细，不能据此重新计算精确次数。`detailStatus` 为 `unconfigured` 或 `unavailable` 时仍可能有可读的每日汇总。使用方式与密钥恢复见 [AI 模型监控](ai-monitoring.md)。
+
+历史范围包含当前 UTC 日期在内的 `days` 个自然日，与前端的 7、30、90 天切换一致；明细最多返回范围内最近 100 次实际检查。
+
+## Worker Queue
+
+以下接口仅用于 Worker，要求管理员认证，同源写入规则与 AI 管理接口一致。Go 不提供 Queue 功能。
+
+| 方法与路径 | 用途 |
+| --- | --- |
+| `GET /api/admin/check-queue` | 返回 Queue 状态，包括 `bound`、`enabled`、`canEnable`、`schema`、`revision`、`verification`、积压和处理时间 |
+| `POST /api/admin/check-queue/probe` | 提交 `{ revision }`，发送往返探测消息；202 响应仅表示已接受，不代表消费者已确认 |
+| `PUT /api/admin/check-queue` | 提交 `{ revision, enabled }`，显式启用或关闭分批检查 |
+
+三个接口直接返回 `CheckQueueStatus` 对象，不套 `status` 字段。`verification.state` 为 `never`、`pending`、`passed`、`timed_out` 或 `failed`；探测不调用监控目标。客户端读取状态，直到消费者确认或到达 `verification.expiresAt`，不要把 POST 返回成功当成检测通过。
+
+只有 `canEnable=true` 才能启用；已通过的检测超过有效期后需重新检测。修改携带最新 `revision`，409 `revision_conflict` 时重新读取。`schema` 为 `missing` 或 `unavailable` 时不能修改 Queue 配置，普通未启用 Queue 的监控不因此新增部署前提。
+
+`pendingTasks` 为程序记录的待处理任务数，`oldestPendingAt`、`lastEnqueuedAt`、`lastProcessedAt` 为 Unix 秒或 `null`，不等同于 Cloudflare 控制台的消息总数。绑定与运维步骤见 [Worker Queue](queue.md)。
 
 ## Push 接入
 
@@ -347,6 +434,40 @@ curl --fail-with-body -X POST \
 
 写请求失败不要无条件重放，尤其是创建、立即检查、测试通知、主题安装和远程指令。先确认服务端有没有已经接受操作。用户界面应把业务码映射到对应翻译，不要直接显示 HTML、堆栈或原始敏感异常。
 
+## 外部订阅
+
+以下管理接口需要管理员认证。列表使用 `offset`、`limit` 分页，默认 50、最多 200，返回 `items`、`total` 和 `nextOffset`。
+
+| 方法与路径 | 用途 |
+| --- | --- |
+| `GET /api/admin/subscription-catalog` | 官方与本地配置目录 |
+| `POST /api/admin/subscription-catalog/refresh` | 刷新官方目录，受限频保护 |
+| `GET /api/admin/subscription-catalog/:templateId` | 读取配置描述 |
+| `POST /api/admin/subscription-configs/import` | 传 `{url}` 或 `{descriptor}` 导入本地配置 |
+| `DELETE /api/admin/subscription-configs/:configId` | 移除本地库条目 |
+| `POST /api/admin/subscription-configs/preview` | 传 `{templateId,parameters}` 或 `{descriptor,parameters,sourceUrl?}` 读取预览 |
+| `GET /api/admin/subscription-previews/:previewId` | 轮询预览结果；有效期 10 分钟 |
+| `GET /api/admin/subscriptions` | 按 `category`、`q`、`health`、`archived` 筛选 |
+| `POST /api/admin/subscriptions` | 从预览创建，传 `requestId`、`previewId`、`name`、`category`、`selectedIds` |
+| `GET/PATCH/DELETE /api/admin/subscriptions/:id` | 读取、编辑、删除；写入携带 `revision` |
+| `GET/PATCH /api/admin/subscriptions/:id/items` | 读取、批量编辑条目；写入 `{items:[{id,revision,…}]}`，最多 100 项，返回逐项结果 |
+| `POST /api/admin/subscriptions/:id/sync` | 立即同步，返回任务 ID |
+| `GET /api/admin/subscription-runs/:runId` | 轮询同步状态与阶段 |
+| `GET /api/admin/subscriptions/:id/runs` | 读取近期同步记录 |
+| `GET /api/admin/subscriptions/:id/config` | 读取已保存描述及非敏感参数 |
+| `GET /api/admin/subscriptions/:id/config/export` | 导出 JSON 描述 |
+| `POST /api/admin/subscriptions/:id/config/check-update` | 检查配置更新 |
+| `POST /api/admin/subscriptions/:id/config/preview` | 传 `revision`、描述、参数生成更新预览；`rollback:true` 预览上一版 |
+| `PUT /api/admin/subscriptions/:id/config` | 传 `revision`、`previewId` 应用预览 |
+
+`category` 是 `website` 或 `model`。创建还可传 `intervalSec`、`staleAfterSec`、`isPublic`、`autoSubscribe`、网站 `groupId` 和 `notifications`。预览和同步返回 202，需轮询到状态不再为 `running`。预览不修改历史和通知；同步会更新状态。重复创建使用相同 `requestId` 可避免产生两个订阅。
+
+条目身份变化时，应用请求还需 `confirmIdentityChange:true`。`identityMappings:[{itemId,sourceItemId}]` 显式关联旧条目和新 ID；未关联的旧条目归档。更新预览必须属于当前订阅和 `revision`。
+
+`notifications` 包含 `monitor`、`sync`，每项有 `notificationEnabled`、`notificationChannelIds`，`sync` 另有 `afterSec`。新订阅默认均关闭。普通监控在 `options_json`、AI 渠道在本体上使用相同的通知开关和渠道字段。`POST /api/notifications/resolve` 接受事件来源、类型、对象及通知策略，返回有效渠道、排除原因和静默状态，不会发送消息。
+
+公开接口为 `GET /api/public/subscriptions/items?category=website` 和 `GET /api/public/subscriptions/items/:id/history`；支持 `pageId` 页面范围。模型类别使用 `model`。响应只包含公开条目、来源、有效性、观测及可用率，不能从中读取接口配置或凭据。使用与备份方法见[订阅指南](subscriptions.md)。
+
 ## API reference
 
 This reference describes endpoints, authentication and request fields for integrations and automation.
@@ -410,7 +531,7 @@ Agent reports must retain `load.load1`, `load.load5`, `load.load15`, `connection
 
 Public heartbeat states are `0` DOWN, `1` UP, `2` WARN and `4` PENDING; missing latency is `null`. Worker supports HTTP, TCP, UDP, ICMP, Push and Agent monitors; Go also supports DNS, TLS and WebSocket. Consult capabilities for the current runtime and probe availability.
 
-`GET` and `PUT /api/admin/presentation` read and replace the presentation configuration using `revision` for concurrency. A stale revision returns 409 `presentation_conflict`. `agentEnabled` controls machine-page routing; disabling it retains saved selections. Enter domain mappings manually after configuring DNS and binding the domain to the Worker or server. Authenticated `preview=monitor` or `preview=agent` does not use shared cache. Theme installation, configuration and preview are covered in [the theme guide](themes.md#english).
+`GET` and `PUT /api/admin/presentation` read and replace the presentation configuration using `revision` for concurrency. A stale revision returns 409 `presentation_conflict`. `agentEnabled` controls machine-page routing. `aiEnabled` controls AI checks, calls and public access; disabling preserves configuration and history. `aiOnMonitorPage` controls main-page inclusion independently of the AI page. Page and domain kinds include `monitor`, `agent` and `ai`. Enter domain mappings manually after configuring DNS and binding the domain to the Worker or server. Authenticated `preview=monitor`, `preview=agent` or `preview=ai` does not use shared cache. Theme installation, configuration and preview are covered in [the theme guide](themes.md#english).
 
 ### Monitors and Push
 
@@ -419,6 +540,42 @@ Management uses `GET` and `POST /api/monitors`, `PUT` and `DELETE /api/monitors/
 `POST /api/monitors/visibility` accepts `{ "ids": ["UUID"], "is_public": false }` for 1–500 monitors. Any missing ID rejects the change. HTTP options can include headers, authentication, JSON matching and `check_source`. Native source types are `worker` and `server` for the respective runtime; an Agent source uses `{ "type": "agent", "agent_id": "UUID" }`. Worker UDP and ICMP require an online Agent with the relevant capability. Immediate checks reject paused, Push, Agent-host and Agent-source monitors.
 
 Creating a Push monitor returns `id` and `push_token`; ordinary edits preserve and return the current key. Switching away from Push revokes the key, and switching back generates a new one. Send heartbeats with `POST /api/public/push/:id`, an `Authorization: Bearer <push_token>` header, and JSON such as `{"status":1,"message":"job-ok"}`. Status must be the integer `0` (down), `1` (up), or `2` (warning); omitted status or an empty body defaults to `1`. The optional `message` accepts up to 200 Unicode characters. Invalid JSON, invalid status, oversized messages, unknown fields, and URL query parameters are rejected. Success returns 200 and `{"ok":true}`. Missing or invalid keys, unknown monitors, paused monitors, and non-Push monitors return 401. Non-empty bodies require `Content-Type: application/json` (415 otherwise), with a 4096-byte limit (413 when exceeded). GET returns 405 without recording a heartbeat. Keep the key private and the scheduler running to detect missed heartbeats. Push does not measure latency.
+
+### AI channels and models
+
+Authenticated AI management uses `/api/admin/ai/channels` and `/api/admin/ai/models`: `GET` lists, `POST` creates, and `GET`, `PUT`, `DELETE` on `/:id` read, update and delete. Channel writes use `{ name, baseUrl, protocol: "openai", apiKey? }`; creation requires the key, while omitting it on update preserves it. Reads return `hasApiKey`, never the key or ciphertext. Deleting a channel also deletes its models.
+
+The required `protocol` accepts `openai` (Chat Completions), `openai_responses`, `anthropic` or `gemini`. `baseUrl` includes the version prefix, without a generation path. Gemini model IDs must be bare names without `models/`, beginning with a letter or digit and containing only ASCII letters, digits, dots, underscores and hyphens. Invalid IDs, including existing IDs incompatible with a switch to Gemini, return 400 `invalid_ai_model_id`. Protocol changes update the channel revision. See [protocol and address examples](ai-monitoring.md#add-a-channel-and-model).
+
+Channel writes may include string-valued `headers`, without an entry-count limit and with a 64 KiB encoded JSON limit. Values are encrypted. List and write responses expose only `headerNames`; authenticated `GET /api/admin/ai/channels/:id` also returns decrypted `headers` for editing. API keys and ciphertext are never returned. Omitting headers preserves them; an empty object clears them. Protocol-managed authentication, routing, cookies and connection-control headers cannot be overridden. Invalid headers return 400 `invalid_ai_headers`.
+
+Base URLs accept HTTP, HTTPS, localhost, container service names and private hosts, while rejecting URL credentials, queries, fragments and cloud metadata endpoints. Reachability depends on the backend network; a cloud Worker's localhost is not the user's computer.
+
+Model writes use the fields in the JSON example above. The optional `request` contains `prompt` (up to 2000 characters), `maxOutputTokens` (integer 1–4096) and `expectedText` (up to 200 characters). Creation defaults to Reply OK., 64 tokens and no expected text. Omitting it on update preserves the saved options. Expected text uses a case-sensitive substring match; mismatches produce `response_mismatch`, invalid options return 400 `invalid_ai_request`. Disabled AI monitoring rejects manual calls with 409 `ai_disabled`. Public access is available on the independent AI page (`view=ai`) or the main page when enabled by presentation settings. Updates send the full configuration and the current `revision`. AI channel writes accept `notificationChannelIds`, up to 32 existing notification channel IDs, shared by all models in that channel. Omitting it on update preserves the selection; `[]` uses enabled global channels with no group restriction. A nonempty selection overrides group scope. The field is returned on channels, not models. Ordinary monitors use `options_json.notificationChannelIds`; an empty selection follows the global group rules. Deletions send `{ revision }`. Model list entries include `live` scheduled state.
+
+Optional `request.body` is a JSON object of up to 64 KiB and 32 nesting levels. It merges recursively into the protocol defaults; arrays replace their defaults and `{}` clears overrides. The form controls model ID, non-streaming mode and output limits; Responses always sets `store: false`. If OpenAI overrides contain `max_completion_tokens`, that parameter carries the form's output limit instead of `max_tokens`. Public responses exclude headers, prompts and custom bodies.
+
+`POST /api/admin/ai/channels/:id/test` accepts `{ revision }` and tests model listing without text generation. `POST /api/admin/ai/models/:id/check` requires `{ revision, channelRevision, confirmPaid: true }`. Manual checks may incur charges and do not update scheduled history or availability. On a 409 `revision_conflict`, reread the configuration rather than overwriting it. A revision change during an upstream call can produce a conflict after the call has already incurred a charge.
+
+Every edit updates the concurrency `revision`. Probe versions are separate: name, visibility, notification selection and pause changes preserve the latest result and recent checks. Endpoint, protocol, credentials, custom headers, model ID, interval, timeout and request changes require a new observation. `live.revision` and `live.channelRevision` identify probe configuration; do not submit them as edit or delete revisions.
+
+Admin and public model responses include `recent`: up to 60 scheduled observations, oldest first, each containing `{ checkedAt, outcome, latencyMs, statusCode }`. Manual and skipped checks are excluded. No observations yields `[]`; missing checks are not invented.
+
+`GET /api/admin/ai/channels/:id/models` returns `{ models: [{ id, name }], fetchedAt }` using the channel's authentication and custom headers without generating text. It handles all four protocols, follows cursor pagination and deduplicates IDs. Gemini IDs omit `models/`; models explicitly lacking `generateContent` are excluded. The complete read is bounded to 15 seconds, 10 pages, 10000 models and 2 MiB. Upstream failures and exceeded limits return 502 `{ error: "ai_models_unavailable", outcome }`, never a partial list presented as complete. Missing channels return 404; concurrent channel edits return 409.
+
+`GET /api/admin/ai/models/:id/history?days=7` returns `{ modelId, days, points, detailStatus, sampled }`, accepting 1–90 days. Daily summaries use exact check counts; sampling applies only to details. `unconfigured` or `unavailable` details do not invalidate readable daily summaries.
+
+The range covers `days` UTC calendar dates including today, matching the 7/30/90-day selector. Details contain at most the latest 100 observations in that range.
+
+Anonymous reads use `/api/public/ai/models`, `/api/public/ai/models/:id` and `/api/public/ai/models/:id/history?days=7`. Only enabled public models are readable; other models return 404. Public responses exclude channel URLs, credentials, requests and provider response bodies. See [AI monitoring](ai-monitoring.md#english).
+
+Public models include `channel: { id, name }` for grouping and search; admin models also include `channelName`. Channel names are public and must not contain sensitive information. Only channels belonging to readable models appear; no anonymous channel-directory endpoint is provided.
+
+### Worker Queue
+
+Worker-only authenticated endpoints are `GET /api/admin/check-queue`, `POST /api/admin/check-queue/probe` with `{ revision }`, and `PUT /api/admin/check-queue` with `{ revision, enabled }`. They return the status object directly. `bound`, `enabled`, `canEnable`, `schema`, `revision`, `verification` and processing/backlog fields describe the current state.
+
+A 202 probe response means accepted, not verified. Poll until `verification.state` becomes `passed`, `timed_out` or `failed`, respecting `verification.expiresAt`. Probes do not call monitoring targets. Enable only when `canEnable=true`; expired verification requires another probe. On revision conflict, reread rather than overwriting. Pending tasks are application records, not the Cloudflare message count. Go does not provide this feature. See [Worker Queue](queue.md#english).
 
 ### Agent management
 
@@ -429,6 +586,16 @@ Create a machine with `POST /api/admin/agents`; the 201 response contains `id` a
 `POST /api/admin/agents/:id/commands` accepts `{ "action": "re_report" }`; supported actions are `re_report`, `check_update`, `restart` and `upgrade`. Worker returns 202 and Go 200 when queued. Query `GET /api/admin/agents/:id/commands` for the outcome. Batch requests use `ids` and `action`; inspect each result. The Worker limit is 100 deduplicated IDs and the Go limit is 500. The feature switch, Agent capability and online status gate commands; the Agent also checks whether restart or upgrade is safe. Installation, rollback and configuration details are in [the Agent guide](agents.md#agent-guide).
 
 Agent installation downloads `install.sh` or `install.ps1` from the Agent GitHub repository and passes the site endpoint as an argument. The script queries GitHub and downloads the latest stable binary on the target machine. The separate `/api/public/agent/manifest`, `/api/public/agent/download/:file` and `/api/public/agent/capabilities` release endpoints are not prerequisites for installation or reinstallation. Agent reporting, jobs and configuration use a machine token even though their paths contain `public`; never log those URLs. Agent groups and tags are separate from monitor groups and tags. Unified group management is under `/api/admin/groups`; destructive membership changes require `confirm_membership_reset: true`.
+
+### External subscriptions
+
+The subscription management endpoints in the table above require administrator authentication. List responses use `items`, `total`, `nextOffset`, with `offset` and `limit` (default 50, maximum 200). Categories are `website` and `model`.
+
+Import an HTTPS JSON URL or descriptor, create a preview, and poll its ID until it leaves `running`. Create with `requestId`, `previewId`, `name`, `category`, and source `selectedIds`. Reusing `requestId` makes creation idempotent. Updates and deletion require the current `revision`. Item batches carry each item's `id` and `revision` and return individual results.
+
+Configuration changes require a preview bound to the subscription and revision. Identity changes also require `confirmIdentityChange:true`; `identityMappings:[{itemId,sourceItemId}]` explicitly preserves associations. Unlinked old items are archived. `rollback:true` previews the previous descriptor.
+
+Public lists use `GET /api/public/subscriptions/items?category=website` (or `model`), with optional `pageId`. Public history uses `/api/public/subscriptions/items/:id/history`. Visibility and page scope apply to both endpoints. Responses exclude descriptors and credentials.
 
 ### Notifications and operations
 

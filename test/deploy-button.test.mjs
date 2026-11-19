@@ -36,6 +36,7 @@ assert.equal(config.d1_databases, undefined);
 assert.equal(config.r2_buckets, undefined);
 assert.equal(config.analytics_engine_datasets, undefined);
 assert.equal(config.kv_namespaces, undefined);
+assert.equal(config.queues, undefined);
 assert.equal(config.durable_objects, undefined);
 assert.equal(config.migrations, undefined);
 // 旧版初始化配置的 Durable Object 类已删除；三份配置都要保留 tombstone，否则线上部署报 10064。
@@ -160,6 +161,44 @@ try {
     }],
   ]);
   assert.equal(existsSync(generated), false);
+
+  const queuePath = '/client/v4/accounts/fixture-account/queues?page=1&per_page=100';
+  const consumersPath = '/client/v4/accounts/fixture-account/queues/fixture-queue-id/consumers';
+  const withQueue = { success: true, result: { bindings: [...dashboard.result.bindings, { type: 'queue', name: 'CHECK_QUEUE', queue_name: 'fixture-checks', delivery_delay: 0 }] } };
+  const queueRoutes = {
+    [settingsPath('uptimepolaris')]: [200, withQueue],
+    [queuePath]: [200, { success: true, result: [{ queue_name: 'fixture-checks', queue_id: 'fixture-queue-id' }], result_info: { total_pages: 1 } }],
+    [consumersPath]: [200, { success: true, result: [{ type: 'worker', script_name: 'uptimepolaris', dead_letter_queue: 'failed-checks', settings: { batch_size: 1, max_wait_time_ms: 5000, max_retries: 0, max_concurrency: null, retry_delay: 30 } }] }],
+  };
+  reset();
+  assert.equal(builds([], queueRoutes, { WRANGLER_CI_OVERRIDE_NAME: 'uptimepolaris', FAKE_READ_CONFIG: '1' }).status, 0);
+  assert.deepEqual(calls().find(call => call[0] === 'config')[1].queues, {
+    producers: [{ binding: 'CHECK_QUEUE', queue: 'fixture-checks', delivery_delay: 0 }],
+    consumers: [{ queue: 'fixture-checks', max_batch_size: 1, max_batch_timeout: 5, max_retries: 0, max_concurrency: null, retry_delay: 30, dead_letter_queue: 'failed-checks' }],
+  });
+  assert.equal(existsSync(generated), false);
+
+  reset();
+  const foreign = { ...queueRoutes, [consumersPath]: [200, { success: true, result: [{ type: 'worker', script_name: 'another-worker', settings: { batch_size: 10 } }] }] };
+  assert.equal(builds([], foreign, { WRANGLER_CI_OVERRIDE_NAME: 'uptimepolaris', FAKE_READ_CONFIG: '1' }).status, 0);
+  assert.deepEqual(calls().find(call => call[0] === 'config')[1].queues.consumers, []);
+
+  reset();
+  const paginated = { ...queueRoutes, [queuePath]: [200, { success: true, result: Array.from({ length: 100 }, (_, i) => ({ queue_name: `other-${i}`, queue_id: `other-id-${i}` })), result_info: { total_pages: 2 } }], '/client/v4/accounts/fixture-account/queues?page=2&per_page=100': queueRoutes[queuePath] };
+  assert.equal(builds([], paginated, { WRANGLER_CI_OVERRIDE_NAME: 'uptimepolaris', FAKE_READ_CONFIG: '1' }).status, 0);
+  assert.equal(calls().some(call => call[1]?.includes?.('page=2')), true);
+
+  for (const routes of [
+    { ...queueRoutes, [queuePath]: [403, { success: false }] },
+    { ...queueRoutes, [consumersPath]: [403, { success: false }] },
+    { ...queueRoutes, [queuePath]: [200, { success: true, result: [], result_info: { total_pages: 1 } }] },
+    { [settingsPath('uptimepolaris')]: [200, { success: true, result: { bindings: [{ type: 'queue', name: 'CHECK_QUEUE' }] } }] },
+  ]) {
+    reset();
+    assert.notEqual(builds([], routes, { WRANGLER_CI_OVERRIDE_NAME: 'uptimepolaris' }).status, 0);
+    assert.equal(calls().some(call => call[0] === 'wrangler'), false);
+    assert.equal(existsSync(generated), false);
+  }
 
   // 没有账号 ID 时使用令牌下唯一的账号。 / Without an account ID, use the token's only account.
   reset();

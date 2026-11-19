@@ -8,7 +8,7 @@ export interface ThemeOption {
 }
 export interface ThemeDefinition {
   id: string; name: string; target: PageKind; entry: string;
-  capabilities: Array<'public.status' | 'public.config' | 'public.monitors' | 'public.monitor-detail' | 'public.agent-detail' | 'public.servers' | 'public.server-detail'>;
+  capabilities: Array<'public.status' | 'public.config' | 'public.monitors' | 'public.monitor-detail' | 'public.agent-detail' | 'public.servers' | 'public.server-detail' | 'public.ai-models' | 'public.ai-history' | 'public.subscriptions' | 'public.subscription-history'>;
   options: ThemeOption[];
 }
 export interface ThemeManifest {
@@ -19,7 +19,8 @@ export type ManifestResult = { ok: true; manifest: ThemeManifest; raw: Record<st
 const idPattern = /^[a-z0-9][a-z0-9-]{0,62}$/;
 const versionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/;
 const capabilitySets = {
-  monitor: new Set(['public.config','public.status','public.monitors','public.monitor-detail','public.agent-detail']),
+  monitor: new Set(['public.config','public.status','public.monitors','public.monitor-detail','public.agent-detail','public.subscriptions','public.subscription-history']),
+  ai: new Set(['public.config','public.ai-models','public.ai-history','public.subscriptions','public.subscription-history']),
   agent: new Set(['public.config','public.servers','public.server-detail']),
 };
 function object(value: unknown): value is Record<string, unknown> { return !!value && typeof value === 'object' && !Array.isArray(value); }
@@ -52,7 +53,7 @@ export function parseManifest(value: unknown): ManifestResult {
     if (!object(item) || !known(item,['id','name','target','entry','capabilities','options'])) return fail('manifest_theme_invalid');
     if (typeof item.id !== 'string' || !idPattern.test(item.id) || ids.has(item.id)) return fail('manifest_theme_id_invalid');
     ids.add(item.id);
-    if (typeof item.name !== 'string' || !item.name.trim() || item.name.length > 120 || !['monitor','agent'].includes(String(item.target))) return fail('manifest_theme_invalid');
+    if (typeof item.name !== 'string' || !item.name.trim() || item.name.length > 120 || !['monitor','agent','ai'].includes(String(item.target))) return fail('manifest_theme_invalid');
     if (typeof item.entry !== 'string' || !isSafeThemePath(item.entry) || !/\.html?$/i.test(item.entry)) return fail('manifest_entry_invalid');
     const target = item.target as PageKind;
     if (!Array.isArray(item.capabilities) || item.capabilities.some(cap => !capabilitySets[target].has(String(cap)))) return fail('manifest_capability_invalid');

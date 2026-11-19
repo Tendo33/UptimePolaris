@@ -107,7 +107,7 @@ function fixture() {
   const document = { hidden: false, addEventListener: (_event, fn) => listeners.add(fn), removeEventListener: (_event, fn) => listeners.delete(fn) };
   const window = { setInterval: (fn, ms) => { assert.equal(ms, 30_000); timers.add(fn); return fn; }, clearInterval: fn => timers.delete(fn) };
   const requestJson = (url, options) => new Promise((resolve, reject) => requests.push({ url, signal: options.signal, resolve, reject }));
-  const hook = compile(source('useServerData.ts'), 'useServerData', { useState, useRef, useCallback, useEffect, requestJson, ApiError, window, document, AbortController });
+  const hook = compile(source('useServerData.ts'), 'useServerData', { useState, useRef, useCallback, useEffect, requestJson, publicApiUrl: path => path, ApiError, window, document, AbortController });
   return { requests, document, timers, listeners,
     render(nextPath = path, nextInterval = interval) { path = nextPath; interval = nextInterval; cursor = 0; pending = []; const out = hook(path, interval); pending.forEach(fn => fn()); return out; },
     tick() { timers.forEach(fn => fn()); },

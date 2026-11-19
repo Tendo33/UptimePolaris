@@ -23,6 +23,7 @@ import { readAll } from '../settings/store';
 import { clampInteger } from '../util';
 import { invalidateConfig, invalidateLive, lastD1Meta, loadAllMonitors, logMeta } from './store';
 import { deleteMonitor } from './writes';
+import { notificationChannelIds } from '../../../../../shared/notification-routing';
 
 // Mounted behind the management gate in api.ts.
 // 在 api.ts 的管理鉴权之后挂载。
@@ -419,6 +420,14 @@ function bindingId(type: MonitorType, selected: unknown, json: string): string |
 }
 
 async function checkRefs(env: Env, body: MonitorBody): Promise<string | null> {
+  if (body.options_json !== undefined) {
+    const opts = typeof body.options_json === 'string' ? JSON.parse(body.options_json || '{}') : body.options_json;
+    const ids = (opts as { notificationChannelIds?: string[] } | null)?.notificationChannelIds ?? [];
+    const db = getDB(env);
+    for (const id of ids) {
+      if (!await db.queryOne(`SELECT id FROM notifications WHERE id=${db.type === 'postgres' ? '$1' : '?'}`, [id])) return 'notification_channel_not_found';
+    }
+  }
   if (body.group_id !== undefined && body.group_id !== null) {
     if (typeof body.group_id !== 'string') return 'group_not_found';
 
@@ -596,15 +605,18 @@ function normalizeOptions(type: MonitorType, input: unknown, checkDns = false): 
   }
 
   const opts = parsed as Record<string, unknown>;
-  if (type === 'push' && Object.keys(opts).length > 0) return { error: 'options_json_invalid' };
+  if (opts.notificationEnabled !== undefined && typeof opts.notificationEnabled !== 'boolean') return { error: 'options_json_invalid' };
+  if (opts.notificationChannelIds !== undefined && notificationChannelIds(opts.notificationChannelIds) === null) return { error: 'options_json_invalid' };
+  const probeKeys = Object.keys(opts).filter(key => key !== 'notificationChannelIds' && key !== 'notificationEnabled');
+  if (type === 'push' && probeKeys.length > 0) return { error: 'options_json_invalid' };
   if (type === 'udp') {
-    if (Object.keys(opts).some(key => !['check_source', 'send', 'expect', 'encoding'].includes(key))) return { error: 'udp_options_invalid' };
+    if (probeKeys.some(key => !['check_source', 'send', 'expect', 'encoding'].includes(key))) return { error: 'udp_options_invalid' };
     if (!udpPacketOptions(opts)) return { error: 'udp_options_invalid' };
     Object.assign(opts, { send: opts.send ?? 'ping', expect: opts.expect ?? '', encoding: opts.encoding ?? 'text' });
   }
-  if (type === 'icmp' && Object.keys(opts).some(key => key !== 'check_source')) return { error: 'options_json_invalid' };
+  if (type === 'icmp' && probeKeys.some(key => key !== 'check_source')) return { error: 'options_json_invalid' };
 
-  if (type === 'agent' && Object.keys(opts).some((key) => key !== 'alerts')) return { error: 'agent_options_invalid' };
+  if (type === 'agent' && probeKeys.some((key) => key !== 'alerts')) return { error: 'agent_options_invalid' };
   if (type === 'agent' && opts.alerts !== undefined) {
     if (typeof opts.alerts !== 'object' || opts.alerts === null || Array.isArray(opts.alerts)) return { error: 'agent_alerts_invalid' };
     const rules = opts.alerts as Record<string, unknown>;

@@ -39,13 +39,15 @@ const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const part = src.slice(src.indexOf('function ChannelForm('));
   const code = esbuild.transformSync(part + '\nreturn ChannelForm;', { loader: 'tsx', jsx: 'transform' }).code;
   let states = [], deps = [], cursor = 0, effects = [];
-  const useState = initial => { const i = cursor++; if (!(i in states)) states[i] = initial; return [states[i], v => { states[i] = typeof v === 'function' ? v(states[i]) : v; }]; };
+  const useState = initial => { const i = cursor++; if (!(i in states)) states[i] = typeof initial === 'function' ? initial() : initial; return [states[i], v => { states[i] = typeof v === 'function' ? v(states[i]) : v; }]; };
   const useRef = initial => { const i = cursor++; return states[i] ??= { current: initial }; };
   const useEffect = (fn, next) => { const i = cursor++; if (!deps[i] || next.some((v,j) => v !== deps[i][j])) { deps[i] = next; effects.push(fn); } };
   const React = { createElement: (type, props, ...children) => ({ type, props: { ...props, children } }) };
   let resolve;
   const pending = new Promise(r => { resolve = r; });
   const env = {React,useState,useRef,useEffect,notificationFieldRequired:()=>true,useTranslations:()=>key=>key,useLocale:()=>({locale:'en-US'}),useApiErrorMessage:()=>String,defaultNotificationLanguage:'en-US',resolveNotificationLanguage:()=> 'en-US',isNotificationLanguage:()=>true,messageLanguages:[],NOTIFICATION_META:{telegram:{fields:[],labelKey:'provider',hintKey:'hint'}},scopeIds:()=>[],notificationsApi:{createNotification:()=>pending}};
+  env.defaultChannelScope = () => ({ event_kinds: ['monitor_state', 'ai_state', 'agent_resource'], source_types: ['local'], ai_channel_ids: [], subscription_ids: [] });
+  env.NotificationScope = 'NotificationScope';
   for (const name of ['Drawer','DrawerBody','DrawerContent','DrawerFooter','DrawerHeader','Input','Select','SelectItem','Switch','Button','ProviderTile','Loader2']) env[name]=name;
   const Form = Function(...Object.keys(env),code)(...Object.values(env));
   let currentSession = 1, open = true;
@@ -82,7 +84,9 @@ function compile(part, name, env) {
   const normalize=compile(part,'normalizeForSubmit',{addonsDisabled:false,selectedSource:'',backendSource:'server',isProbeMonitorType:()=>false,parseOptions:JSON.parse});
   const tcp={type:'tcp',target:'example:1',options_json:'{"send":"PING"}'};
   const push=normalize({...tcp,type:'push'});
-  assert.equal(push.target,'');assert.equal(push.options_json,'{}');assert.equal(tcp.options_json,'{"send":"PING"}');
+  assert.equal(push.target,'');assert.deepEqual(JSON.parse(push.options_json),{notificationChannelIds:[],notificationEnabled:true});assert.equal(tcp.options_json,'{"send":"PING"}');
+  const configured=normalize({...tcp,type:'push',options_json:JSON.stringify({send:'PING',notificationEnabled:false,notificationChannelIds:['mail']})});
+  assert.deepEqual(JSON.parse(configured.options_json),{notificationChannelIds:['mail'],notificationEnabled:false});
 }
 {
   const src=source('frontend/src/admin/themes/ThemesPage.tsx');

@@ -21,6 +21,10 @@ POLARIS_DATA_DIR=./data
 
 `.env`、数据库连接和带自动密钥的启动日志都按敏感文件管理，不要提交到仓库或放进公开截图。数据库选择已经写进 `database.json` 时，这个文件优先于 `POLARIS_DATABASE_URL` 和 `--database-url`。
 
+## AI 渠道密钥
+
+Worker 使用已有 `ADMIN_TOKEN` 加密 AI 渠道密钥，不需要新增 Secret。Go + SQLite 在首次保存渠道时自动建立数据目录内的 `ai-credential.key`；Go + PostgreSQL 要预先通过 `POLARIS_AI_KEY_FILE` 指定安全的 32 字节原始密钥文件，多个实例使用相同内容。配置与恢复方法见 [AI 模型监控](ai-monitoring.md#密钥保存与恢复)。未使用 AI 监控的部署不需要配置此项。
+
 ## 初始化时选择数据库
 
 Worker 的 `/setup` 页面分为三步：部署检查、数据库配置、管理员账号。第一步检查必需的 `ADMIN_TOKEN`、`UPTIME` 和 `CONFIG` KV，D1、R2 为可选项；第二步选择数据库、填写连接地址并验证，成功后才能设置账号。Go 后端仍使用同一张初始化表单。
@@ -62,6 +66,7 @@ Go 显式选过数据库后，数据目录里的 `database.json` 优先于 `POLA
 | `THEMES` | R2，可选 | 第三方主题版本与资源；内置界面不依赖它 |
 | `UPTIME` | Analytics Engine，Worker 初始化必需 | 写入监控和 Agent 历史 |
 | `ANALYTICS_SQL` | Analytics SQL，随部署配置提供 | 读取 AE 历史和每日归档，无需另设账号 ID 或 API Token |
+| `CHECK_QUEUE` | Queue，可选 | 普通主动监控和 AI 模型的分批检查；另需添加当前 Worker 为消费者，在后台检查并启用 |
 
 手动部署的 CF CLI 读 `backends/worker/cloudflare.config.ts`，数据库 npm 脚本默认读 `backends/worker/wrangler.toml`。Fork 部署和按钮部署用根目录的 `wrangler.jsonc`，其中不声明 `DB`、`CONFIG`、`THEMES`、`UPTIME`，这些绑定在 Worker 的 **Settings → Bindings** 中添加。直接运行 Wrangler 时，JSONC 优先于 TOML；操作手动部署的数据库时，显式加 `--config backends/worker/wrangler.toml`，并核对账号和数据库。资源名称可以自己起，绑定名不要改。详细步骤见[部署指南](deployment.md)。
 
@@ -165,6 +170,10 @@ Go loads `.env` from the process working directory. Copy [`backends/go/.env.exam
 
 Protect `.env` and startup logs containing the generated key. A saved `database.json` still takes precedence over `POLARIS_DATABASE_URL` and `--database-url`.
 
+### AI channel credentials
+
+Worker encrypts AI keys using the existing `ADMIN_TOKEN`, with no additional secret. Go with SQLite creates `ai-credential.key` in the data directory on the first channel-key write. Go with PostgreSQL requires `POLARIS_AI_KEY_FILE` to point to a protected file containing 32 raw random bytes, identical across all instances. See [AI monitoring](ai-monitoring.md#protect-and-restore-keys) for backup and recovery. Deployments that do not use AI monitoring need no additional key configuration.
+
 ### Database selection during setup
 
 Worker setup has three steps: deployment check, database configuration, and administrator account. The check requires `ADMIN_TOKEN`, `UPTIME` and the `CONFIG` KV namespace; D1 and R2 remain optional. Configure and verify the database in the second step before creating an account in the last step. Go keeps its single setup form.
@@ -189,6 +198,7 @@ On Go, an explicit setup selection writes `database.json` in the data directory.
 | `THEMES` | R2, optional | Third-party theme versions and assets; not required for the built-in interface |
 | `UPTIME` | Analytics Engine, required for Worker setup | Writes monitor and Agent history |
 | `ANALYTICS_SQL` | Analytics SQL, included in deployment configuration | Reads AE history and daily archives without a separate account ID or API Token |
+| `CHECK_QUEUE` | Queue, optional | Batched active-monitor and AI checks; also add the current Worker as consumer, then verify and enable in the console |
 
 Manual deployment uses `backends/worker/cloudflare.config.ts`; database npm scripts default to `backends/worker/wrangler.toml`. Fork and button deployments use the root `wrangler.jsonc`, which declares no `DB`, `CONFIG`, `THEMES` or `UPTIME`; add those bindings under the Worker's **Settings → Bindings**. Direct Wrangler commands prefer JSONC when both formats exist. For a manual deployment, specify `--config backends/worker/wrangler.toml` for database operations and confirm the account and database first. Resource names can change; binding names must remain as shown. See [deployment](deployment.md#english).
 

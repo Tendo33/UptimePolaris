@@ -7,7 +7,7 @@ export interface ThemeOption {
   description?: string; min?: number; max?: number; step?: number;
 }
 export interface ThemeDefinition {
-  id: string; name: string; target: 'monitor' | 'agent'; entry: string;
+  id: string; name: string; target: 'monitor' | 'agent' | 'ai'; entry: string;
   capabilities: string[]; options: ThemeOption[]; available: boolean;
 }
 export interface ThemeManifest {

@@ -23,11 +23,13 @@ export function Toolbar({
   view,
   onView,
   matched,
+  aiOnly = false,
 }: {
   counts: MonitorStatusCounts;
   view: ViewMode;
   onView: (view: ViewMode) => void;
   matched: number;
+  aiOnly?: boolean;
 }) {
   const t = useTranslations();
   const { inputValue, setInputValue, clearSearch, isFiltering, filterStatus, setFilterStatus, searchInGroup, setSearchInGroup } =
@@ -62,8 +64,8 @@ export function Toolbar({
 
   const options: Array<{ value: MonitorFilterStatus; label: string; count?: number }> = [
     { value: 'all', label: t('node.allStatus'), count: counts.total },
-    { value: 'up', label: t('node.statusFilter.up'), count: counts.up },
-    { value: 'down', label: t('node.statusFilter.down'), count: counts.down },
+    { value: 'up', label: t(aiOnly ? 'ai.up' : 'node.statusFilter.up'), count: counts.up },
+    { value: 'down', label: t(aiOnly ? 'ai.down' : 'node.statusFilter.down'), count: counts.down },
     { value: 'warn', label: t('common.status.warn'), count: counts.warn },
     { value: 'pending', label: t('node.statusFilter.pending'), count: counts.pending },
   ];
@@ -86,8 +88,8 @@ export function Toolbar({
             type="search"
             value={inputValue}
             onChange={(event) => setInputValue(event.target.value)}
-            placeholder={t('node.search')}
-            aria-label={t('navbar.search')}
+            placeholder={t(aiOnly ? 'ai.search' : 'node.search')}
+            aria-label={t(aiOnly ? 'ai.search' : 'navbar.search')}
             className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--polaris-ink)] outline-none placeholder:text-[var(--polaris-ink-4)] [&::-webkit-search-cancel-button]:hidden"
           />
           {inputValue ? (
@@ -117,7 +119,7 @@ export function Toolbar({
         </div>
 
         <div className="ml-auto flex items-center gap-1.5">
-          <button
+          {!aiOnly ? <button
             type="button"
             aria-pressed={searchInGroup}
             onClick={() => setSearchInGroup(!searchInGroup)}
@@ -131,7 +133,7 @@ export function Toolbar({
           >
             <Folders size={14} />
             <span className="hidden sm:inline">{t('node.searchInGroups')}</span>
-          </button>
+          </button> : null}
 
           <div
             role="group"

@@ -159,7 +159,7 @@ func maintenance(s Object) Object {
 }
 
 func defaultPresentation() Object {
-	return Object{"agentEnabled": false, "workerService": "uptime-polaris", "domains": []any{}, "pages": Object{"monitor": Object{"theme": nil, "themeOptions": Object{}}, "agent": Object{"theme": nil, "themeOptions": Object{}}}}
+	return Object{"aiEnabled": false, "aiOnMonitorPage": true, "agentEnabled": false, "workerService": "uptime-polaris", "domains": []any{}, "pages": Object{"monitor": Object{"theme": nil, "themeOptions": Object{}}, "agent": Object{"theme": nil, "themeOptions": Object{}}, "ai": Object{"theme": nil, "themeOptions": Object{}}}}
 }
 func (a *App) presentation(ctx context.Context) (Object, error) {
 	o, e := a.store.get(ctx, "config", "presentation")
@@ -175,10 +175,16 @@ func (a *App) presentation(ctx context.Context) (Object, error) {
 	return o, nil
 }
 func validatePresentation(config Object) bool {
-	if config == nil || len(config) != 4 {
+	if config == nil || len(config) != 6 {
 		return false
 	}
 	if _, ok := config["agentEnabled"].(bool); !ok {
+		return false
+	}
+	if _, ok := config["aiEnabled"].(bool); !ok {
+		return false
+	}
+	if _, ok := config["aiOnMonitorPage"].(bool); !ok {
 		return false
 	}
 	if !themeIDPattern.MatchString(str(config, "workerService")) {
@@ -192,17 +198,17 @@ func validatePresentation(config Object) bool {
 	for _, entry := range domains {
 		row := object(entry)
 		host := strings.ToLower(strings.TrimSuffix(strings.TrimSpace(str(row, "hostname")), "."))
-		if len(row) != 2 || !hostnamePattern.MatchString(host) || len(host) > 253 || strings.ContainsAny(host, "/:@?#\\") || strings.Contains(host, "..") || seen[host] || !contains([]string{"monitor", "agent"}, str(row, "page")) {
+		if len(row) != 2 || !hostnamePattern.MatchString(host) || len(host) > 253 || strings.ContainsAny(host, "/:@?#\\") || strings.Contains(host, "..") || seen[host] || !contains([]string{"monitor", "agent", "ai"}, str(row, "page")) {
 			return false
 		}
 		seen[host] = true
 		row["hostname"] = host
 	}
 	pages := object(config["pages"])
-	if len(pages) != 2 {
+	if len(pages) != 3 {
 		return false
 	}
-	for _, kind := range []string{"monitor", "agent"} {
+	for _, kind := range []string{"monitor", "agent", "ai"} {
 		page := object(pages[kind])
 		if _, exists := page["theme"]; !exists {
 			return false
@@ -238,7 +244,7 @@ func (a *App) pageContext(r *http.Request) (string, bool, bool, Object, error) {
 	kind := "monitor"
 	enabled, configured := true, true
 	if preview := r.URL.Query().Get("preview"); preview != "" {
-		if !contains([]string{"monitor", "agent"}, preview) {
+		if !contains([]string{"monitor", "agent", "ai"}, preview) {
 			return "", false, false, nil, failure("invalid_request", 400)
 		}
 		if !a.authorized(r) {
@@ -246,7 +252,7 @@ func (a *App) pageContext(r *http.Request) (string, bool, bool, Object, error) {
 		}
 		kind = preview
 		enabled = true
-	} else if boolean(config["agentEnabled"]) {
+	} else if boolean(config["agentEnabled"]) || boolean(config["aiEnabled"]) {
 		configured = len(array(config["domains"])) == 0
 		host, _, e := netSplitHost(r.Host)
 		if e != nil {
@@ -260,6 +266,25 @@ func (a *App) pageContext(r *http.Request) (string, bool, bool, Object, error) {
 				break
 			}
 		}
+	}
+	if r.URL.Query().Get("preview") == "" {
+		path := strings.TrimSuffix(r.URL.Path, "/")
+		explicit := r.URL.Query().Get("view")
+		if path == "/ai" {
+			explicit = "ai"
+		}
+		if path == "/servers" || strings.HasPrefix(path, "/server/") && !strings.Contains(strings.TrimPrefix(path, "/server/"), "/") && len(path) > len("/server/") {
+			explicit = "agent"
+		}
+		if explicit == "ai" || explicit == "agent" {
+			kind, configured = explicit, true
+		}
+	}
+	if kind == "ai" {
+		enabled = boolean(config["aiEnabled"])
+	}
+	if kind == "agent" {
+		enabled = r.URL.Query().Get("preview") != "" || boolean(config["agentEnabled"])
 	}
 	return kind, enabled, configured, resolveBuiltinPageView(kind, object(object(config["pages"])[kind])), nil
 }
@@ -373,7 +398,7 @@ func (a *App) settingsRoutes() {
 		if len(b) != 2 || !validatePresentation(config) {
 			return failure("invalid_presentation", 400)
 		}
-		for _, kind := range []string{"monitor", "agent"} {
+		for _, kind := range []string{"monitor", "agent", "ai"} {
 			if e = a.validatePageTheme(r.Context(), kind, object(object(config["pages"])[kind])); e != nil {
 				return e
 			}
@@ -416,7 +441,7 @@ func (a *App) settingsRoutes() {
 			if stored != nil {
 				oldConfig = object(stored["config"])
 			}
-			for _, kind := range []string{"monitor", "agent"} {
+			for _, kind := range []string{"monitor", "agent", "ai"} {
 				page := object(object(config["pages"])[kind])
 				old := object(object(object(oldConfig["pages"])[kind])["theme"])
 				next := object(page["theme"])
@@ -529,6 +554,9 @@ func (a *App) rollupHistory(ctx context.Context, force bool) error {
 	}
 	today := now / 86400 * 86400
 	cutoff := today - int64(number(settings["retention.detailDays"]))*86400
+	if e = a.archiveAIHistory(ctx, now, int(number(settings["retention.availabilityDays"]))); e != nil {
+		return e
+	}
 	return a.store.mutate(ctx, func(t *transaction) error {
 		archive := func(day int64) error {
 			rows, e := t.tx.Query(t.store.query(`SELECT monitor_id,SUM(CASE WHEN rn=1 THEN 1 ELSE 0 END),SUM(CASE WHEN rn=1 AND status IN (1,4) THEN 1 ELSE 0 END),SUM(CASE WHEN rn=1 AND status=2 THEN 1 ELSE 0 END),AVG(value) FROM (SELECT monitor_id,status,value,ROW_NUMBER() OVER (PARTITION BY monitor_id,ts/60 ORDER BY seq DESC) AS rn FROM polaris_readings WHERE ts>=? AND ts<?) ranked GROUP BY monitor_id`), day, day+86400)

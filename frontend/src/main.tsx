@@ -1,6 +1,6 @@
 import { Component, StrictMode, type ReactNode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BrowserRouter } from 'react-router';
+import { createBrowserRouter, RouterProvider } from 'react-router';
 
 // Self-hosted fonts. Geist for Latin and figures, its mono for hosts and
 // versions; CJK falls through to the platform's own UI face (see the stack in
@@ -36,6 +36,8 @@ document.body.className = 'min-h-screen bg-background font-sans antialiased';
  */
 document.documentElement.classList.add('polaris-console');
 
+const router = createBrowserRouter([{ path: '*', element: <App httpStatus={Number(root.dataset.httpStatus) || undefined} /> }]);
+
 class RootErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() {
@@ -66,9 +68,7 @@ createRoot(root, {
   <StrictMode>
     <RootErrorBoundary>
       <div className="min-h-screen bg-background">
-        <BrowserRouter>
-          <App httpStatus={Number(root.dataset.httpStatus) || undefined} />
-        </BrowserRouter>
+        <RouterProvider router={router} />
       </div>
     </RootErrorBoundary>
   </StrictMode>,

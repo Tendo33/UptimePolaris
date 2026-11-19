@@ -1,7 +1,16 @@
 import { notificationCopy } from './locales';
+import type { NotificationRoutingEvent } from '../../../../../shared/notification-policy';
 
 /** What happened, for the message body. / 消息正文所需的事件信息。 */
-export interface NotifyEvent {
+export interface NotifyEvent extends NotificationRoutingEvent {
+  subscriptionLastSuccessAt?: number | null;
+  subscriptionAffectedItems?: number;
+  subscriptionItemId?: string;
+  syncRevision?: string;
+  aiModelId?: string;
+  aiRevision?: string;
+  aiChannelRevision?: string;
+  notificationChannelIds?: string[];
   monitorName: string;
   monitorTarget: string;
   monitorType: string;
@@ -42,6 +51,13 @@ function utcTimestamp(epochSeconds: number): string {
 /** Localize message fields; monitor values and diagnostics stay verbatim. / 翻译消息字段，监控信息和诊断保留原文。 */
 export function buildMessage(event: NotifyEvent, language?: string): string {
   const copy = notificationCopy(language);
+  if (event.eventKind === 'subscription_sync') return [buildTitle(event, language),
+    format(copy.syncLastSuccess, { value: event.subscriptionLastSuccessAt ? utcTimestamp(event.subscriptionLastSuccessAt) : '—' }),
+    format(copy.syncAffected, { value: String(event.subscriptionAffectedItems ?? 0) }),
+    ...(event.message ? [format(copy.detail, { value: event.message })] : []),
+    format(copy.action, { value: event.status === 1 ? copy.syncActionRecovered : copy.syncActionFailed }),
+    format(copy.time, { value: utcTimestamp(event.at) }),
+  ].join('\n');
   const states = [copy.down, copy.up, copy.warn];
   const state = states[event.status];
   const transition = event.prevStatus === undefined
@@ -72,6 +88,7 @@ export function buildMessage(event: NotifyEvent, language?: string): string {
 
 export function buildTitle(event: NotifyEvent, language?: string): string {
   const copy = notificationCopy(language);
+  if (event.eventKind === 'subscription_sync') return format(event.status === 1 ? copy.syncRecovered : copy.syncFailed, { name: event.monitorName });
   const state = [copy.down, copy.up, copy.warn][event.status];
   let template = copy.headline;
   if (event.prevStatus === undefined) template = copy.firstHeadline;

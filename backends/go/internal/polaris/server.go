@@ -21,14 +21,15 @@ import (
 )
 
 type Config struct {
-	Addr        string
-	DataDir     string
-	FrontendDir string
-	DatabaseURL string
-	AdminToken  string
-	SetupKey    string
-	Concurrency int
-	TrustProxy  bool
+	Addr                string
+	DataDir             string
+	FrontendDir         string
+	DatabaseURL         string
+	AdminToken          string
+	SetupKey            string
+	Concurrency         int
+	TrustProxy          bool
+	AICredentialKeyFile string
 }
 
 func DefaultConfig() Config {
@@ -36,19 +37,21 @@ func DefaultConfig() Config {
 }
 
 type App struct {
-	config        Config
-	store         *Store
-	mux           *http.ServeMux
-	ctx           context.Context
-	cancel        context.CancelFunc
-	wg            sync.WaitGroup
-	semaphore     chan struct{}
-	icmpAvailable bool
-	startedAt     time.Time
-	storeLock     sync.RWMutex
-	setupLock     sync.Mutex
-	setupReady    chan struct{}
-	readyOnce     sync.Once
+	config             Config
+	store              *Store
+	mux                *http.ServeMux
+	ctx                context.Context
+	cancel             context.CancelFunc
+	wg                 sync.WaitGroup
+	semaphore          chan struct{}
+	icmpAvailable      bool
+	startedAt          time.Time
+	storeLock          sync.RWMutex
+	setupLock          sync.Mutex
+	setupReady         chan struct{}
+	readyOnce          sync.Once
+	aiClient           *http.Client
+	subscriptionClient *http.Client
 }
 
 type apiError struct {
@@ -102,6 +105,7 @@ func newApp(ctx context.Context, c Config, offlineMigration bool) (*App, error) 
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	a := &App{config: c, store: s, mux: http.NewServeMux(), ctx: ctx, cancel: cancel, semaphore: make(chan struct{}, c.Concurrency), icmpAvailable: icmpPermission(), startedAt: time.Now(), setupReady: make(chan struct{})}
+	a.subscriptionClient = newSubscriptionClient()
 	if len(users) > 0 {
 		a.markSetupReady()
 	}
@@ -330,12 +334,14 @@ func (a *App) routes() {
 	a.agentRoutes()
 	a.themeRoutes()
 	a.notificationRoutes()
+	a.aiRoutes()
+	a.subscriptionRoutes()
 	a.route("GET /api/capabilities", true, func(w http.ResponseWriter, r *http.Request) error {
 		native := []string{"http", "tcp", "udp", "dns", "tls", "websocket"}
 		if a.icmpAvailable {
 			native = append(native[:3], append([]string{"icmp"}, native[3:]...)...)
 		}
-		respond(w, 200, Object{"runtime": "go", "apiVersion": 1, "probeSource": "server", "monitoring": Object{"types": []string{"http", "tcp", "udp", "icmp", "dns", "tls", "websocket", "push", "agent"}, "nativeTypes": native, "minimumIntervalSec": 5, "minimumTimeoutMs": 100, "maximumTimeoutMs": 120000, "sslMode": "tls-handshake"}, "themes": Object{"storage": "filesystem", "installationAvailable": true}})
+		respond(w, 200, Object{"runtime": "go", "checkQueue": Object{"supported": false}, "subscriptions": subscriptionCapabilities(), "apiVersion": 1, "probeSource": "server", "monitoring": Object{"types": []string{"http", "tcp", "udp", "icmp", "dns", "tls", "websocket", "push", "agent"}, "nativeTypes": native, "minimumIntervalSec": 5, "minimumTimeoutMs": 100, "maximumTimeoutMs": 120000, "sslMode": "tls-handshake"}, "themes": Object{"storage": "filesystem", "installationAvailable": true}})
 		return nil
 	})
 	a.mux.HandleFunc("/api/", func(w http.ResponseWriter, r *http.Request) { respond(w, 404, Object{"error": "not_found"}) })

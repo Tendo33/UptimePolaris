@@ -216,7 +216,7 @@ publicRoutes.get('/api/public/config', async (c) => {
     return [option.key, (option.type === 'agent' || option.type === 'monitor') && !visibleIds.has(String(value)) ? null : value];
   })) : null;
   return c.json({ ...body, maintenance: maintenanceState(settings.values['maintenance.scheduleEnabled'] ? settings.values['alerts.maintenanceWindows'] as MaintenanceWindow[] : [], new Date(), maintenanceOptions), config: { ...body.config, theme: page.colorMode, footerText: page.footer, showCertificateExpiry: page.showExpiry },
-    presentation: { kind: context.kind, enabled: context.enabled, configured: context.configured,
+    presentation: { aiEnabled: context.config.aiEnabled, aiOnMonitorPage: context.config.aiOnMonitorPage, kind: context.kind, enabled: context.enabled, configured: context.configured,
       layout: page.layout, density: page.density, columns: page.columns, width: page.width, radius: page.radius,
       accent: page.accent, colorMode: page.colorMode, showHistory: page.showHistory, showLatency: page.showLatency,
       showAvailability: page.showAvailability, showExpiry: page.showExpiry, showCountry: page.showCountry, locale: page.locale },

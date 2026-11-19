@@ -3,7 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 # postgres 驱动需要 nodejs_compat；连接只在请求/任务作用域内建立。
 # The Postgres driver requires nodejs_compat; connections live only within request or task scopes.
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags = ["nodejs_compat", "global_fetch_strictly_public"]
 
 [analytics]
 binding = "ANALYTICS_SQL"
@@ -24,7 +24,7 @@ binding = "ASSETS"
 run_worker_first = [
   "/api", "/api/*",
   "/", "/admin", "/admin/*", "/login", "/login/*", "/setup", "/setup/*",
-  "/monitor/*", "/status/*", "/server/*",
+  "/monitor/*", "/status/*", "/server/*", "/servers", "/servers/", "/ai", "/ai/",
   "/theme/*", "/polaris-maintenance.js", "/agent/*", "/__scheduled"
 ]
 not_found_handling = "single-page-application"

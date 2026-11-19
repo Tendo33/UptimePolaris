@@ -18,8 +18,8 @@ export function StatusPageRoute() {
     <PageConfigProvider key={key} initialConfig={config} configKey={key}>
       <PresentationViewContext.Provider value={data.presentation}>
         <StatusPageShell>
-          <MonitorDataPreload pageId={config.pageId} />
-          <StatusPage />
+          {data.presentation.kind !== 'ai' ? <MonitorDataPreload pageId={config.pageId} /> : null}
+          <StatusPage key={data.presentation.kind} aiOnly={data.presentation.kind === 'ai'} />
         </StatusPageShell>
       </PresentationViewContext.Provider>
     </PageConfigProvider>

@@ -81,11 +81,11 @@ export function PublicServersPage({ config, configError, configRefreshing, onRef
   }, [visible, pins, filters.sort]);
 
   const listQuery = useMemo(() => { const next = new URLSearchParams(params); ROUTE_KEYS.forEach(key => next.delete(key)); return next.toString(); }, [params]);
-  const href = useCallback((serverId?: string) => `${serverId ? `/server/${encodeURIComponent(serverId)}` : '/'}${listQuery ? `?${listQuery}` : ''}`, [listQuery]);
+  const href = useCallback((serverId?: string) => `${serverId ? `/server/${encodeURIComponent(serverId)}` : '/servers'}${listQuery ? `?${listQuery}` : ''}`, [listQuery]);
   const change = useCallback((key: string, value: string) => setParams(previous => { const next = new URLSearchParams(previous); if (value) next.set(key, value); else next.delete(key); return next; }, { replace: true }), [setParams]);
   const clear = useCallback(() => setParams(previous => { const next = new URLSearchParams(previous); ['q', 'status', 'group', 'tag', 'region', 'sort'].forEach(key => next.delete(key)); return next; }, { replace: true }), [setParams]);
   const toggleSelect = useCallback((serverId: string) => setSelection(current => current.includes(serverId) ? current.filter(item => item !== serverId) : current.length >= COMPARE_LIMIT ? current : [...current, serverId]), []);
-  const openCompare = useCallback(() => { if (selection.length >= 2) navigate(`/?${new URLSearchParams([...new URLSearchParams(listQuery), ['compare', selection.join(',')]]).toString()}`); }, [selection, listQuery, navigate]);
+  const openCompare = useCallback(() => { if (selection.length >= 2) navigate(`/servers?${new URLSearchParams([...new URLSearchParams(listQuery), ['compare', selection.join(',')]]).toString()}`); }, [selection, listQuery, navigate]);
   const removeCompared = (serverId: string) => {
     const rest = compare.filter(item => item !== serverId);
     setSelection(rest);
@@ -211,7 +211,7 @@ export function PublicServersPage({ config, configError, configRefreshing, onRef
             current ? <ServerDetail server={current} history={detail.data!.history} historyStatus={detail.error ? 'unavailable' : detail.data!.history_status} historySampled={detail.data!.history_sampled} onRetryHistory={() => void detail.refresh()} serverNow={detail.data!.now} now={now} samples={live[current.id]} showHistory={presentation.showHistory} accent={presentation.accent}
                 listHref={href()} prev={prev ? { href: href(prev.id), name: prev.name } : null} next={next ? { href: href(next.id), name: next.name } : null}
                 pinned={pins.includes(current.id)} onPin={() => togglePin(current.id)} selected={selection.includes(current.id)} selectionFull={selection.length >= COMPARE_LIMIT}
-                onSelect={() => toggleSelect(current.id)} onTag={tag => navigate(`/?${new URLSearchParams([...new URLSearchParams(listQuery), ['tag', tag]]).toString()}`)} />
+                onSelect={() => toggleSelect(current.id)} onTag={tag => navigate(`/servers?${new URLSearchParams([...new URLSearchParams(listQuery), ['tag', tag]]).toString()}`)} />
               : detail.error ? <RouteError code={detail.error instanceof ApiError && detail.error.status === 404 ? 'notFound' : 'render'} error={detail.error} onRetry={refresh} embedded />
               : <Skeleton detail />
           )

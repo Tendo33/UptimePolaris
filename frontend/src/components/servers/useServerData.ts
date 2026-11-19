@@ -1,4 +1,5 @@
 import { requestJson } from '@/api/client';
+import { publicApiUrl } from '@/api/public-url';
 import { ApiError } from '@/api/errors';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -20,7 +21,7 @@ export function useServerData<T>(path: string | null, interval: number, refreshK
     request.current = controller;
     setState(previous => ({ path, data: previous.path === path ? previous.data : null, error: previous.path === path ? previous.error : null, refreshing: true, updatedAt: previous.path === path ? previous.updatedAt : null }));
     try {
-      const data = await requestJson<T>(path, { signal: controller.signal });
+      const data = await requestJson<T>(publicApiUrl(path), { signal: controller.signal });
       if (!controller.signal.aborted && request.current === controller) setState({ path, data, error: null, refreshing: false, updatedAt: Date.now() });
     } catch (error) {
       if (!controller.signal.aborted && request.current === controller) setState(previous => ({ ...previous, path, error, refreshing: false,

@@ -1,9 +1,9 @@
-import { UnauthorizedError } from '@/api/errors';
+import { ApiError, UnauthorizedError } from '@/api/errors';
 import { useApiErrorMessage } from '@/api/useApiErrorMessage';
 import { getDesktopViewport, getServerDesktopViewport, getServerSuccessFeedback, getSuccessFeedback, subscribeDesktopViewport, subscribeSuccessFeedback } from '@/components/ui/success-feedback';
 import clsx from 'clsx';
 import { AnimatePresence, LayoutGroup, motion } from 'framer-motion';
-import { ArrowRight, Bell, BellOff, CheckCheck, ChevronDown, CircleCheck, Copy, Loader2, Pause, Pin, PinOff, Play, Plus, RefreshCw, Server, ShieldCheck, X } from 'lucide-react';
+import { ArrowRight, Bot, Bell, BellOff, CheckCheck, ChevronDown, CircleCheck, Copy, Loader2, Pause, Pin, PinOff, Play, Plus, RefreshCw, Server, ShieldCheck, X } from 'lucide-react';
 import { useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router';
@@ -14,9 +14,13 @@ import { useTimeAgo } from '../../hooks/useTimeAgo';
 import { joinEvents } from '../components/event-presentation';
 import { monitorsApi } from '../monitors/api';
 import type { OverviewMonitor } from '../monitors/types';
-import { OVERVIEW_KEY, useEvents, useFleet, useOverview } from '../useConsoleData';
+import { OVERVIEW_KEY, useConsoleRefreshInterval, useEvents, useFleet, useOverview } from '../useConsoleData';
 import { useConsoleNotifications } from './useConsoleNotifications';
 import { SuccessFeedbackCard } from './SuccessFeedbackCard';
+import { useAiData } from '../ai/api';
+import { aiBucket, bucketCounts } from '../ai/presentation';
+import { aiLiveLabelKey } from '@/components/ai/status';
+import { usePresentation } from '../settings/presentation-api';
 
 type Severity = 'down' | 'pending' | 'warn';
 type Worst = Severity | 'up' | 'idle';
@@ -46,11 +50,22 @@ const ICON_BUTTON =
 
 export function ConsoleStatus() {
   const t = useTranslations('admin');
+  const aiText = useTranslations('ai');
   const apiErrorMessage = useApiErrorMessage();
   const navigate = useNavigate();
   const ago = useTimeAgo();
   const overview = useOverview();
   const fleet = useFleet();
+  const presentation = usePresentation();
+  const aiEnabled = presentation.data?.config.aiEnabled === true;
+  const ai = useAiData(aiEnabled, useConsoleRefreshInterval());
+  const aiRevoked = ai.error instanceof ApiError && [401, 403, 404].includes(ai.error.status);
+  const aiModels = aiEnabled && !aiRevoked ? ai.data?.models ?? [] : [];
+  const aiCounts = bucketCounts(aiModels, Boolean(ai.error));
+  const aiIssues = aiModels.filter(model => ['down', 'unknown'].includes(aiBucket(model, Boolean(ai.error))))
+    .sort((a, b) => Number(aiBucket(b, Boolean(ai.error)) === 'down') - Number(aiBucket(a, Boolean(ai.error)) === 'down') || a.name.localeCompare(b.name));
+  const aiLoading = aiEnabled && !ai.data && !ai.error;
+  const aiReady = Boolean(presentation.data) && (!aiEnabled || Boolean(ai.data));
   const events = useEvents(30);
   const notifications = useConsoleNotifications();
   const desktop = useSyncExternalStore(subscribeDesktopViewport, getDesktopViewport, getServerDesktopViewport);
@@ -91,7 +106,7 @@ export function ConsoleStatus() {
     () => (fleet.data?.agents ?? []).filter((agent) => agent.active && agent.online === false),
     [fleet.data],
   );
-  const lastCheck = useMemo(() => monitors.reduce((max, m) => Math.max(max, m.checked_at || 0), 0), [monitors]);
+  const lastCheck = aiModels.reduce((max, model) => Math.max(max, model.live.checkedAt ?? 0), monitors.reduce((max, m) => Math.max(max, m.checked_at || 0), 0));
 
   const down = counts?.down ?? 0;
   const pending = counts?.pending ?? 0;
@@ -99,26 +114,26 @@ export function ConsoleStatus() {
   const up = counts?.up ?? 0;
   const paused = counts?.paused ?? 0;
   const active = counts ? counts.total - counts.paused : 0;
-  const empty = counts !== undefined && counts.total === 0;
-  const inactive = counts !== undefined && counts.total > 0 && active === 0;
-  const loadError = overview.error ?? fleet.error;
+  const empty = aiReady && counts !== undefined && counts.total === 0 && aiCounts.total === 0;
+  const inactive = aiReady && counts !== undefined && counts.total + aiCounts.total > 0 && active + aiCounts.total - aiCounts.paused === 0;
+  const loadError = overview.error ?? fleet.error ?? presentation.error ?? (aiEnabled ? ai.error : undefined);
   const activity = useMemo(() => joinEvents(events.data?.events ?? [], monitors), [events.data, monitors]);
   const newestEvent = activity.reduce((max, row) => Math.max(max, row.id), 0);
   const unread = activity.filter(row => row.id > notifications.seen).length;
   const shownEvents = unreadOnly ? activity.filter(row => row.id > notifications.seen) : activity;
   const markSeen = notifications.markSeen;
-  const worst: Worst = !counts || empty || inactive || loadError && down + pending + warn + offline.length === 0
+  const worst: Worst = !counts || !aiReady || empty || inactive || loadError && down + pending + warn + offline.length + aiCounts.down + aiCounts.unknown === 0
     ? 'idle'
-    : down > 0
+    : down + aiCounts.down > 0
       ? 'down'
-      : pending > 0
+      : pending + aiCounts.unknown > 0
         ? 'pending'
         : warn > 0 || offline.length > 0
           ? 'warn'
           : 'up';
 
   /** All clear can include paused monitors; pausing is deliberate. / 全部正常可以包含暂停监控；暂停是主动行为。 */
-  const allClear = Boolean(counts) && Boolean(fleet.data) && active > 0 && !loadError && down === 0 && pending === 0 && warn === 0 && offline.length === 0;
+  const allClear = Boolean(counts) && Boolean(fleet.data) && aiReady && active + aiCounts.total - aiCounts.paused > 0 && !loadError && down === 0 && pending === 0 && warn === 0 && offline.length === 0 && aiCounts.down === 0 && aiCounts.unknown === 0;
 
   const segments: Array<{ key: string; dot: string; text: string }> = [];
   if (counts) {
@@ -128,16 +143,22 @@ export function ConsoleStatus() {
     if (offline.length) segments.push({ key: 'offline', dot: DOT.down, text: t('island.offline', { n: offline.length }) });
   }
 
+  if (aiCounts.down) segments.push({ key: 'ai-down', dot: DOT.down, text: t('island.aiDown', { n: aiCounts.down }) });
+  if (aiCounts.unknown) segments.push({ key: 'ai-unknown', dot: DOT.pending, text: t('island.aiUnknown', { n: aiCounts.unknown }) });
+  const capsuleSegments = segments.length > 3
+    ? [{ key: 'issues', dot: DOT[worst], text: `${t('island.issues')} ${down + pending + warn + offline.length}` }, ...segments.filter(segment => segment.key.startsWith('ai-'))]
+    : segments;
+
   /** The whole state as one sentence, for the capsule's label and the clipboard. / 将整体状态整理成一句话，用于胶囊标签和剪贴板。 */
   const summaryText = !counts
     ? t(loadError ? 'island.loadFailed' : 'console.statusLoading')
-    : !fleet.data && !fleet.error ? t('console.statusLoading')
+    : (!fleet.data && !fleet.error) || aiLoading || !presentation.data && !presentation.error ? t('console.statusLoading')
     : empty ? t('island.noMonitorsTitle')
     : inactive ? t('island.inactiveTitle')
     : loadError && segments.length === 0 ? t('island.loadFailed')
     : segments.length === 0
-      ? `${t('island.allClear')} · ${t('island.monitors', { n: active })}`
-      : `${segments.map((segment) => segment.text).join(' · ')} · ${t('island.up', { n: up })}`;
+      ? `${t('island.allClear')} · ${t('island.monitors', { n: active })}${aiEnabled ? ` · ${t('island.aiUp', { n: aiCounts.up })}` : ''}`
+      : `${segments.map((segment) => segment.text).join(' · ')} · ${t('island.up', { n: up })}${aiEnabled ? ` · ${t('island.aiUp', { n: aiCounts.up })}` : ''}`;
 
   /**
    * Bounce only when the fleet gets worse.
@@ -146,17 +167,17 @@ export function ConsoleStatus() {
    * never matches, and a first load has no previous value so it must not animate.
    * 只在严重度变差时跳动；首次加载没有前次值，不能动。
    */
-  const anomalyTotal = down + pending + warn + offline.length;
+  const anomalyTotal = down + pending + warn + offline.length + aiCounts.down + aiCounts.unknown;
   const previous = useRef<{ order: number; total: number } | null>(null);
   useEffect(() => {
     // Wait for both counts and fleet; the first fleet response is not an incident. / 等计数和机器列表都完成；首次列表不是新事件。
-    if (!counts || (!fleet.data && !fleet.error)) return;
+    if (!counts || (!fleet.data && !fleet.error) || !aiReady) return;
     const order = SEVERITY_ORDER[worst];
     const prior = previous.current;
     previous.current = { order, total: anomalyTotal };
     if (!prior) return;
     if (worst !== 'up' && worst !== 'idle' && !notifications.muted && (order < prior.order || (prior.total === 0 && anomalyTotal > 0))) setBouncing(true);
-  }, [counts, fleet.data, fleet.error, worst, anomalyTotal, notifications.muted]);
+  }, [counts, fleet.data, fleet.error, aiReady, worst, anomalyTotal, notifications.muted]);
   const previousEvent = useRef<number | null>(null);
   useEffect(() => {
     if (!events.data) return;
@@ -309,6 +330,10 @@ export function ConsoleStatus() {
       }
       if (offline.length > 4) lines.push(`… +${offline.length - 4}`);
     }
+    if (aiEnabled) {
+      lines.push('', t('nav.ai'));
+      for (const model of aiIssues.slice(0, 6)) lines.push(`- ${model.channelName} / ${model.name}: ${aiText(aiLiveLabelKey(model.live, Boolean(ai.error)))}`);
+    }
     try {
       await navigator.clipboard.writeText(lines.join('\n'));
       toast.success(t('island.copied'));
@@ -321,7 +346,7 @@ export function ConsoleStatus() {
     if (refreshLock.current) return;
     refreshLock.current = true;
     setRefreshing(true);
-    try { await Promise.all([overview.mutate(), fleet.mutate(), events.mutate()]); }
+    try { await Promise.all([overview.mutate(), fleet.mutate(), events.mutate(), presentation.mutate(), ...(aiEnabled ? [ai.mutate()] : [])]); }
     catch (error) { toast.error(apiErrorMessage(error)); }
     finally { refreshLock.current = false; setRefreshing(false); }
   }
@@ -367,9 +392,8 @@ export function ConsoleStatus() {
         {allClear ? <CircleCheck size={13} className="shrink-0 text-emerald-400" /> : <span className={clsx('h-2 w-2 shrink-0 rounded-full', DOT[worst])} />}
         <span className="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
           {segments.length ? <>
-            {segments.map((segment, index) => <span key={segment.key} className="flex items-center gap-1.5">{index > 0 ? <span className={clsx('h-1 w-1 shrink-0 rounded-full', segment.dot)} /> : null}<span className="polaris-num">{segment.text}</span></span>)}
-            <span className="h-3 w-px shrink-0 bg-white/15" />
-            <span className="polaris-num text-zinc-400">{t('island.up', { n: up })}</span>
+            {capsuleSegments.map((segment, index) => <span key={segment.key} className="flex items-center gap-1.5">{index > 0 ? <span className={clsx('h-1 w-1 shrink-0 rounded-full', segment.dot)} /> : null}<span className="polaris-num">{segment.text}</span></span>)}
+            {capsuleSegments.length < 3 ? <><span className="h-3 w-px shrink-0 bg-white/15" /><span className="polaris-num text-zinc-400">{t('island.up', { n: up })}{aiEnabled ? ` · ${t('island.aiUp', { n: aiCounts.up })}` : ''}</span></> : null}
           </> : <span className="truncate">{summaryText}</span>}
         </span>
         {notifications.muted ? <BellOff size={12} className="shrink-0 text-zinc-400" /> : unread ? <span className="polaris-num flex h-5 min-w-5 shrink-0 items-center justify-center gap-1 rounded-full bg-white/12 px-1.5 text-[10.5px]"><Bell size={10} />{unread > 9 ? '9+' : unread}</span> : null}
@@ -428,6 +452,11 @@ export function ConsoleStatus() {
               </div>)}
             </motion.div> : null}
 
+            {aiEnabled ? <motion.div layout="position" variants={contentMotion} className="mx-4 mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-white/[0.07] pt-3 text-[12px]">
+              <button type="button" onClick={() => go('/admin/ai')} className="flex items-center gap-1.5 font-medium text-zinc-100 hover:underline"><Bot size={14} />{t('nav.ai')}<ArrowRight size={12} /></button>
+              {aiLoading ? <span role="status" className="text-zinc-400">{t('console.statusLoading')}</span> : (['up', 'down', 'unknown', 'paused'] as const).map(bucket => <span key={bucket} className="polaris-num flex items-center gap-1.5 text-zinc-300"><span className={clsx('h-1.5 w-1.5 rounded-full', DOT[bucket === 'unknown' ? 'pending' : bucket === 'paused' ? 'idle' : bucket])} />{t(`ai.bucket.${bucket}`)} {aiCounts[bucket]}</span>)}
+            </motion.div> : null}
+
             <motion.div layout="position" variants={contentMotion} role="tablist" aria-label={t('island.title')} className="mx-4 mt-3 flex gap-1 rounded-full bg-white/[0.04] p-0.5">
               {(['issues', 'activity'] as const).map(value => <button key={value} type="button" role="tab" aria-selected={tab === value} aria-controls={`island-${value}`} tabIndex={tab === value ? 0 : -1} onClick={() => setTab(value)} onKeyDown={event => {
                 if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -450,8 +479,17 @@ export function ConsoleStatus() {
               <motion.div key={tab} layout="position" initial={{ opacity: 0, x: tab === 'activity' ? 8 : -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: tab === 'activity' ? 8 : -8, transition: { duration: 0.1 } }} transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}>
                 {tab === 'issues' ? <>
                   {!counts ? <div role="status" className="flex items-center justify-center gap-2 py-10 text-[12px] text-zinc-400">{!loadError ? <Loader2 size={15} className="animate-spin" /> : null}{t(loadError ? 'island.loadFailed' : 'console.statusLoading')}</div> : null}
-                  {empty ? <IslandEmpty kind="monitors" onAdd={() => go('/admin')} /> : inactive ? <IslandEmpty kind="inactive" onAdd={() => go('/admin')} /> : counts && issues.length === 0 && offline.length === 0 && !loadError ? <IslandEmpty kind="healthy" /> : null}
+                  {empty ? <IslandEmpty kind="monitors" onAdd={() => go('/admin')} /> : inactive ? <IslandEmpty kind="inactive" onAdd={() => go('/admin')} /> : allClear && issues.length === 0 ? <IslandEmpty kind="healthy" /> : null}
                   <IssueList issues={issues} offline={offline} pendingAction={pendingAction} go={go} runAction={runAction} />
+                  {aiIssues.length > 0 ? <div className="mt-2 border-t border-white/[0.07] pt-2">
+                    <p className="px-3 py-1 text-[12px] font-medium text-zinc-400">{t('nav.ai')}</p>
+                    {aiIssues.slice(0, 6).map(model => <button key={model.id} type="button" onClick={() => go(`/admin/ai/${encodeURIComponent(model.channelId)}?model=${encodeURIComponent(model.id)}`)} className="flex w-full items-start gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-white/[0.055]">
+                      <span className={clsx('mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full', DOT[aiBucket(model, Boolean(ai.error)) === 'down' ? 'down' : 'pending'])} />
+                      <span className="min-w-0 flex-1"><span className="block truncate text-[13px] font-medium">{model.name}</span><span className="mt-0.5 block truncate text-[12px] text-zinc-400">{model.channelName} · {aiText(aiLiveLabelKey(model.live, Boolean(ai.error)))}</span></span>
+                      <ArrowRight size={13} className="mt-1 shrink-0 text-zinc-400" />
+                    </button>)}
+                    {aiIssues.length > 6 ? <button type="button" onClick={() => go('/admin/ai')} className="px-3 py-2 text-[12px] text-zinc-300 hover:underline">{t('island.openAi')}</button> : null}
+                  </div> : null}
                 </> : <>
                   <div className="flex flex-wrap items-center justify-between gap-2 px-3 pt-1 pb-2">
                     <button type="button" aria-pressed={unreadOnly} onClick={() => setUnreadOnly(value => !value)} className={clsx('rounded-full px-2.5 py-1 text-[11px] transition-colors', unreadOnly ? 'bg-white/12 text-white' : 'text-zinc-400 hover:bg-white/[0.06] hover:text-zinc-200')}>{t('island.unreadOnly')}</button>
@@ -466,7 +504,7 @@ export function ConsoleStatus() {
             </motion.div>
 
             <motion.div layout="position" variants={contentMotion} className="flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.07] px-4 py-2.5 text-[11.5px]">
-              <IslandFooter muted={notifications.muted} onMute={notifications.muted ? notifications.resume : notifications.snooze} onOpen={tab === 'activity' ? openEvents : () => go(down ? '/admin?state=down' : pending ? '/admin?state=pending' : warn ? '/admin?state=warn' : '/admin')} openLabel={t(tab === 'activity' ? 'island.viewEvents' : 'island.openMonitors')} />
+              <IslandFooter muted={notifications.muted} onMute={notifications.muted ? notifications.resume : notifications.snooze} onOpen={tab === 'activity' ? openEvents : () => go(down ? '/admin?state=down' : pending ? '/admin?state=pending' : warn ? '/admin?state=warn' : aiIssues.length ? '/admin/ai' : '/admin')} openLabel={t(tab === 'activity' ? 'island.viewEvents' : down + pending + warn === 0 && aiIssues.length > 0 ? 'island.openAi' : 'island.openMonitors')} />
             </motion.div>
             <p role="status" className="sr-only">{summaryText}{unread > 0 ? ` · ${t('island.unreadCount', { n: unread })}` : ''}</p>
           </motion.div>

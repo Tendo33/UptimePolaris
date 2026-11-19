@@ -1,0 +1,34 @@
+[
+  {
+    "protocol": "openai",
+    "path": "chat/completions",
+    "headers": { "authorization": "Bearer fixture-secret" },
+    "body": { "model": "fixture-model", "messages": [{ "role": "user", "content": "Reply OK." }], "max_tokens": 64, "stream": false },
+    "response": { "choices": [{ "message": { "content": "OK" } }] },
+    "models": { "data": [] }
+  },
+  {
+    "protocol": "openai_responses",
+    "path": "responses",
+    "headers": { "authorization": "Bearer fixture-secret" },
+    "body": { "model": "fixture-model", "input": "Reply OK.", "max_output_tokens": 64, "stream": false, "store": false },
+    "response": { "status": "completed", "output": [{ "type": "message", "role": "assistant", "content": [{ "type": "output_text", "text": "OK" }] }] },
+    "models": { "data": [] }
+  },
+  {
+    "protocol": "anthropic",
+    "path": "messages",
+    "headers": { "x-api-key": "fixture-secret", "anthropic-version": "2026-10-21" },
+    "body": { "model": "fixture-model", "messages": [{ "role": "user", "content": "Reply OK." }], "max_tokens": 64, "stream": false },
+    "response": { "type": "message", "role": "assistant", "content": [{ "type": "text", "text": "OK" }], "stop_reason": "end_turn" },
+    "models": { "data": [] }
+  },
+  {
+    "protocol": "gemini",
+    "path": "models/fixture-model:generateContent",
+    "headers": { "x-goog-api-key": "fixture-secret" },
+    "body": { "contents": [{ "role": "user", "parts": [{ "text": "Reply OK." }] }], "generationConfig": { "maxOutputTokens": 64 } },
+    "response": { "candidates": [{ "content": { "role": "model", "parts": [{ "text": "OK" }] }, "finishReason": "STOP" }] },
+    "models": { "models": [] }
+  }
+]

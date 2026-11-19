@@ -87,5 +87,41 @@ export const POSTGRES_MIGRATIONS: readonly { name: string; sql: string }[] = [
   {
     "name": "0025_agent_history_daily.postgres.sql",
     "sql": "CREATE TABLE IF NOT EXISTS agent_history_daily (\n  agent_id TEXT PRIMARY KEY REFERENCES agents(id) ON DELETE CASCADE,\n  days_json TEXT NOT NULL,\n  updated_at BIGINT NOT NULL\n);\n"
+  },
+  {
+    "name": "0026_ai_management.postgres.sql",
+    "sql": "CREATE TABLE IF NOT EXISTS ai_channels (\n  id TEXT PRIMARY KEY,\n  name TEXT NOT NULL UNIQUE,\n  base_url TEXT NOT NULL,\n  protocol TEXT NOT NULL CHECK (protocol = 'openai'),\n  credential_ciphertext TEXT NOT NULL,\n  revision TEXT NOT NULL,\n  created_at BIGINT NOT NULL,\n  updated_at BIGINT NOT NULL\n);\nCREATE TABLE IF NOT EXISTS ai_models (\n  id TEXT PRIMARY KEY,\n  channel_id TEXT NOT NULL REFERENCES ai_channels(id) ON DELETE CASCADE,\n  name TEXT NOT NULL,\n  model_id TEXT NOT NULL,\n  interval_sec INTEGER NOT NULL CHECK (interval_sec BETWEEN 60 AND 86400),\n  timeout_ms INTEGER NOT NULL CHECK (timeout_ms BETWEEN 1000 AND 60000 AND timeout_ms < interval_sec * 1000),\n  enabled INTEGER NOT NULL CHECK (enabled IN (0, 1)),\n  is_public INTEGER NOT NULL CHECK (is_public IN (0, 1)),\n  revision TEXT NOT NULL,\n  created_at BIGINT NOT NULL,\n  updated_at BIGINT NOT NULL,\n  UNIQUE (channel_id, model_id),\n  UNIQUE (channel_id, name)\n);\n"
+  },
+  {
+    "name": "0027_ai_runtime.postgres.sql",
+    "sql": "ALTER TABLE ai_models ADD COLUMN notification_channel_ids TEXT NOT NULL DEFAULT '[]';\nCREATE TABLE IF NOT EXISTS ai_runtime (id INTEGER PRIMARY KEY CHECK (id = 1), json TEXT NOT NULL, revision TEXT NOT NULL);\nINSERT INTO ai_runtime(id,json,revision) VALUES(1,'{\"models\":{},\"channels\":{}}','initial');\nCREATE TABLE IF NOT EXISTS ai_daily (model_id TEXT PRIMARY KEY REFERENCES ai_models(id) ON DELETE CASCADE, days_json TEXT NOT NULL);\n"
+  },
+  {
+    "name": "0028_check_queue.postgres.sql",
+    "sql": "CREATE TABLE IF NOT EXISTS check_queue_control (id INTEGER PRIMARY KEY CHECK(id=1),json TEXT NOT NULL,revision TEXT NOT NULL);\nINSERT INTO check_queue_control(id,json,revision) VALUES(1,'{\"enabled\":false,\"generation\":\"initial\",\"verification\":null,\"pending\":{},\"lastEnqueuedAt\":null,\"lastProcessedAt\":null,\"lastError\":null}','initial');\n"
+  },
+  {
+    "name": "0029_ai_protocols.postgres.sql",
+    "sql": "ALTER TABLE ai_channels DROP CONSTRAINT ai_channels_protocol_check;\nALTER TABLE ai_channels ADD CONSTRAINT ai_channels_protocol_check\n  CHECK (protocol IN ('openai', 'openai_responses', 'anthropic', 'gemini'));\n"
+  },
+  {
+    "name": "0030_ai_request_options.postgres.sql",
+    "sql": "ALTER TABLE ai_channels ADD COLUMN headers_ciphertext TEXT NOT NULL DEFAULT '';\nALTER TABLE ai_channels ADD COLUMN header_names_json TEXT NOT NULL DEFAULT '[]';\nALTER TABLE ai_models ADD COLUMN request_json TEXT NOT NULL DEFAULT '{\"prompt\":\"Reply OK.\",\"maxOutputTokens\":64,\"expectedText\":\"\"}';\n"
+  },
+  {
+    "name": "0031_ai_presentation.postgres.sql",
+    "sql": "UPDATE presentation_state SET config_json=(config_json::jsonb || jsonb_build_object(\n  'aiEnabled',EXISTS(SELECT 1 FROM ai_channels),\n  'aiOnMonitorPage',true,\n  'pages',(config_json::jsonb->'pages') || '{\"ai\":{\"theme\":null,\"themeOptions\":{}}}'::jsonb))::text,\n  revision='ai-pages-'||revision WHERE id='main';\nINSERT INTO presentation_state(id,config_json,revision,updated_at)\nSELECT 'main','{\"agentEnabled\":false,\"aiEnabled\":true,\"aiOnMonitorPage\":true,\"workerService\":\"uptime-polaris\",\"domains\":[],\"pages\":{\"monitor\":{\"theme\":null,\"themeOptions\":{}},\"agent\":{\"theme\":null,\"themeOptions\":{}},\"ai\":{\"theme\":null,\"themeOptions\":{}}}}','ai-pages-initial',0\nWHERE EXISTS(SELECT 1 FROM ai_channels) AND NOT EXISTS(SELECT 1 FROM presentation_state WHERE id='main');\n"
+  },
+  {
+    "name": "0032_ai_check_revisions.postgres.sql",
+    "sql": "ALTER TABLE ai_channels ADD COLUMN check_revision TEXT NOT NULL DEFAULT '';\nUPDATE ai_channels SET check_revision=revision;\nALTER TABLE ai_models ADD COLUMN check_revision TEXT NOT NULL DEFAULT '';\nUPDATE ai_models SET check_revision=revision;\n"
+  },
+  {
+    "name": "0033_notification_routing.postgres.sql",
+    "sql": "ALTER TABLE ai_channels ADD COLUMN notification_channel_ids TEXT NOT NULL DEFAULT '[]';\nALTER TABLE ai_models DROP COLUMN notification_channel_ids;\n"
+  },
+  {
+    "name": "0034_subscriptions.postgres.sql",
+    "sql": "CREATE TABLE IF NOT EXISTS subscriptions (\n  id TEXT PRIMARY KEY,\n  json TEXT NOT NULL,\n  revision TEXT NOT NULL,\n  sync_revision TEXT NOT NULL,\n  enabled INTEGER NOT NULL DEFAULT 1,\n  next_due BIGINT NOT NULL DEFAULT 0,\n  lease_token TEXT,\n  lease_until BIGINT NOT NULL DEFAULT 0\n);\nCREATE INDEX IF NOT EXISTS subscriptions_due ON subscriptions(enabled,next_due);\nCREATE TABLE IF NOT EXISTS subscription_items (\n  id TEXT PRIMARY KEY,\n  subscription_id TEXT NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,\n  source_id TEXT NOT NULL,\n  json TEXT NOT NULL,\n  revision TEXT NOT NULL,\n  selected INTEGER NOT NULL DEFAULT 0,\n  is_public INTEGER NOT NULL DEFAULT 0,\n  UNIQUE(subscription_id,source_id)\n);\nCREATE INDEX IF NOT EXISTS subscription_items_public ON subscription_items(is_public,subscription_id);\nCREATE TABLE IF NOT EXISTS subscription_documents (\n  kind TEXT NOT NULL,\n  id TEXT NOT NULL,\n  subscription_id TEXT,\n  json TEXT NOT NULL,\n  expires_at BIGINT NOT NULL DEFAULT 0,\n  PRIMARY KEY(kind,id)\n);\nCREATE INDEX IF NOT EXISTS subscription_documents_expiry ON subscription_documents(expires_at);\nCREATE INDEX IF NOT EXISTS subscription_documents_owner ON subscription_documents(subscription_id,kind);\nALTER TABLE ai_channels ADD COLUMN notification_enabled INTEGER NOT NULL DEFAULT 1;\nALTER TABLE notifications ADD COLUMN event_kinds TEXT NOT NULL DEFAULT '[\"monitor_state\",\"ai_state\",\"agent_resource\"]';\nALTER TABLE notifications ADD COLUMN source_types TEXT NOT NULL DEFAULT '[\"local\"]';\nALTER TABLE notifications ADD COLUMN ai_channel_ids TEXT NOT NULL DEFAULT '[]';\nALTER TABLE notifications ADD COLUMN subscription_ids TEXT NOT NULL DEFAULT '[]';\n"
   }
 ];

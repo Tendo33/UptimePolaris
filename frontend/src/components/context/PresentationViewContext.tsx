@@ -1,7 +1,8 @@
 ﻿import { createContext, useContext } from 'react';
 
 export interface PresentationView {
-  kind: 'monitor' | 'agent'; enabled: boolean; configured: boolean;
+  aiEnabled: boolean; aiOnMonitorPage: boolean;
+  kind: 'monitor' | 'agent' | 'ai'; enabled: boolean; configured: boolean;
   layout: 'cards' | 'list'; density: 'compact' | 'normal' | 'comfortable';
   columns: number; width: number; radius: number; accent: string; locale: string;
   colorMode: 'system' | 'light' | 'dark';

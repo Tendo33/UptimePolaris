@@ -1,4 +1,6 @@
 /** Notification channel configuration; provider fields are declared in CHANNEL_FIELDS. / 通知渠道配置；服务商字段在 CHANNEL_FIELDS 中声明。 */
+import type { ChannelScope } from './NotificationScope';
+
 export type NotificationType =
   | 'telegram'
   | 'feishu'
@@ -8,7 +10,7 @@ export type NotificationType =
   | 'apprise'
   | 'serverchan';
 
-export interface NotificationChannel {
+export interface NotificationChannel extends ChannelScope {
   id: string;
   name: string;
   type: NotificationType;
@@ -21,7 +23,7 @@ export interface NotificationChannel {
   updated_at: number;
 }
 
-export interface NotificationInput {
+export interface NotificationInput extends ChannelScope {
   name: string;
   type: NotificationType;
   config: Record<string, string>;

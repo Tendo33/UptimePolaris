@@ -23,6 +23,7 @@ import { dnsExpectedError } from '../../../../shared/dns-expected';
 import { groupsApi, tagsApi } from '../groups/api';
 import type { MonitorGroup, Tag } from '../groups/types';
 import { monitorsApi } from './api';
+import { NotificationPolicyControl } from '../notifications/NotificationPolicyControl';
 import { MonitorCheckFeedback } from './MonitorCheckFeedback';
 import { PushReportDetails } from './PushReportDetails';
 import { probeSourceReadiness } from './presentation';
@@ -76,7 +77,7 @@ const TYPE_META: Record<
  * as a selection (`A` fallback), not crash.
  * 表单选项字段的扁平视图；DNS 嵌套在 `dns` 下，存储的 `{}` 必须能回退到 A 而不是崩溃。
  */
-type FormOptions = Partial<HttpOptions> & Partial<TcpOptions> & { serverName?: string; check_source?: { type: 'worker' | 'server' } | { type: 'agent'; agent_id: string }; dns?: Partial<DnsOptions>; alerts?: Partial<Record<'cpu' | 'memory' | 'disk' | 'load', { enabled: boolean; threshold: number; duration_sec: number; recovery_pct: number }>> };
+type FormOptions = Partial<HttpOptions> & Partial<TcpOptions> & { notificationChannelIds?: string[]; notificationEnabled?: boolean; serverName?: string; check_source?: { type: 'worker' | 'server' } | { type: 'agent'; agent_id: string }; dns?: Partial<DnsOptions>; alerts?: Partial<Record<'cpu' | 'memory' | 'disk' | 'load', { enabled: boolean; threshold: number; duration_sec: number; recovery_pct: number }>> };
 
 /** The record types the Worker accepts, in the order a zone file lists them. / Worker 接受的记录类型，按区域文件中的顺序排列。 */
 const DNS_RECORD_TYPES: DnsOptions['recordType'][] = ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS'];
@@ -194,6 +195,7 @@ export function MonitorForm({ monitor, onSaved, onCancel, onVocabChanged, defaul
     return monitor || !initialType ? base : { ...base, type: initialType };
   });
   const [saving, setSaving] = useState(false);
+  const [notificationValid, setNotificationValid] = useState(true);
   const [savedPush, setSavedPush] = useState<{ id: string; token: string } | null>(null);
   const pushDraftKey = useId();
   const needsPushCredentials = form.type === 'push' && monitor?.type !== 'push';
@@ -437,7 +439,7 @@ export function MonitorForm({ monitor, onSaved, onCancel, onVocabChanged, defaul
     const out = addonsDisabled
       ? { ...input, check_ssl: 0, check_domain: 0, check_dns: 0 }
       : { ...input };
-    if (out.type === 'push') { out.target = ''; out.options_json = '{}'; }
+    if (out.type === 'push') { out.target = ''; const options = parseOptions<FormOptions>(out.options_json); out.options_json = JSON.stringify({ notificationChannelIds: options.notificationChannelIds ?? [], notificationEnabled: options.notificationEnabled !== false }); }
     if (isProbeMonitorType(out.type) && !selectedSource && backendSource) {
       out.options_json = JSON.stringify({ ...parseOptions<FormOptions>(out.options_json), check_source: { type: backendSource } });
     }
@@ -471,6 +473,7 @@ export function MonitorForm({ monitor, onSaved, onCancel, onVocabChanged, defaul
     }),
   ];
   const canSubmit =
+    notificationValid &&
     Boolean(capabilities?.monitoring.types.includes(form.type)) && Boolean(form.name.trim()) && (!needsTarget || Boolean(form.target.trim())) && !targetError && !invalidUdp && !dnsError && canCreateWithSource &&
     (form.type !== 'agent' || Boolean(form.agent_id) && validateAgentOptions(form.options_json ?? '{}')) &&
     (!needsPushCredentials || Boolean(pushCredentials)) && !saving;
@@ -562,7 +565,7 @@ export function MonitorForm({ monitor, onSaved, onCancel, onVocabChanged, defaul
   if (savedPush) {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="polaris-scroll-x flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pb-5">
+        <div className="polaris-scrollbar flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain pb-5">
           <div role="status">
             <h3 className="text-small font-medium">{t('form.pushReady')}</h3>
             <p className="mt-1 text-small text-default-500">{t('form.pushReadyHint')}</p>
@@ -591,7 +594,7 @@ export function MonitorForm({ monitor, onSaved, onCancel, onVocabChanged, defaul
     */
     <div className="flex min-h-0 flex-1 flex-col">
       {backend.error ? <div role="alert" className="flex items-center gap-2 text-small text-danger"><span>{apiErrorMessage(backend.error)}</span><Button variant="light" onPress={() => void backend.mutate()}>{t('action.retry')}</Button></div> : null}
-      <div className="polaris-scroll-x flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pb-5">
+      <div className="polaris-scrollbar flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto overscroll-contain pb-5">
       {meta.hintKey ? <p className="text-small text-default-500">{t(meta.hintKey)}</p> : null}
 
       <div ref={fields} className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -625,10 +628,10 @@ export function MonitorForm({ monitor, onSaved, onCancel, onVocabChanged, defaul
                 const selected = ready.find(agent => agent.id === selectedSource) ?? ready[0];
                 const check_source = selected ? { type: 'agent' as const, agent_id: selected.id } : undefined;
                 return { ...current, type, check_ssl: 0, check_domain: 0, check_dns: 0,
-                  options_json: JSON.stringify(type === 'udp' ? { check_source, send: options.send || 'ping', expect: options.expect ?? '', encoding: options.encoding ?? 'text' } : { check_source }) };
+                  options_json: JSON.stringify(type === 'udp' ? { notificationChannelIds: options.notificationChannelIds, notificationEnabled: options.notificationEnabled, check_source, send: options.send || 'ping', expect: options.expect ?? '', encoding: options.encoding ?? 'text' } : { notificationChannelIds: options.notificationChannelIds, notificationEnabled: options.notificationEnabled, check_source }) };
               }
               if (!isProbeMonitorType(type) || !isActiveProbeType(type)) delete options.check_source;
-              return { ...current, type, options_json: JSON.stringify(type === 'agent' ? { ...(options.alerts ? { alerts: options.alerts } : {}) } : options) };
+              return { ...current, type, options_json: JSON.stringify(type === 'agent' ? { notificationChannelIds: options.notificationChannelIds, notificationEnabled: options.notificationEnabled, ...(options.alerts ? { alerts: options.alerts } : {}) } : options) };
             });
           }}
         >
@@ -1373,6 +1376,8 @@ export function MonitorForm({ monitor, onSaved, onCancel, onVocabChanged, defaul
           </div>
         </>
       ) : null}
+
+      <NotificationPolicyControl enabled={options.notificationEnabled !== false} ids={options.notificationChannelIds ?? []} onChange={(notificationEnabled, notificationChannelIds) => patchOptions({ notificationEnabled, notificationChannelIds })} context={{ monitorType: form.type, groupId: form.group_id }} disabled={saving} onValidityChange={setNotificationValid} />
 
       {monitor ? (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-medium border border-divider bg-default-50 px-3 py-2.5">

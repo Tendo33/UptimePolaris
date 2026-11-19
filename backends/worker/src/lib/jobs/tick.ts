@@ -17,7 +17,9 @@ import {
 } from '../../types';
 import { latestAgentProbeObservation, loadProbeAgentStates, monitorProbeSource, probeAgentAvailable, pruneAgentProbeJobs, scheduleAgentProbeJobs } from '../agent/probes';
 import { rollupAgentMetrics } from '../agent/rollup';
-import { writeHeartbeat, writeHeartbeatBatch } from '../analytics-engine';
+import { beginAnalyticsBatch, writeHeartbeat, writeHeartbeatBatch } from '../analytics-engine';
+import { runAiTick } from '../ai/runtime';
+import { runDueSubscriptions } from '../subscriptions/runtime';
 import { checkPush } from '../check/push';
 import { runAddons, runCheck } from '../check/run';
 import type { CheckResult } from '../check/types';
@@ -45,10 +47,14 @@ import {
 import { commitMonitorWrites, MonitorChanged } from '../monitor/writes';
 import { prepareNotificationOutbox, retryPending } from '../notification/dispatch';
 import type { NotifyEvent } from '../notification/message';
+import { monitorNotificationIds } from '../../../../../shared/notification-routing';
+import { monitorNotificationEnabled } from '../../../../../shared/notification-policy';
 import { alertsSuppressed } from '../settings/maintenance';
 import { readAll } from '../settings/store';
 import { recordTickUsage } from '../settings/usage';
-import { commitTickWrites, TickLeaseLost } from './tick-commit';
+import { commitTickWrites, TickLeaseLost, type TickWriteBatch } from './tick-commit';
+import { queueRouting } from '../queue/control';
+import { enqueueDueChecks } from '../queue/producer';
 
 /** Must stay at or below the 6-connection cap for simultaneous egress. / 必须不超过同时外发连接的 6 条上限。 */
 const CONCURRENCY = 6;
@@ -129,6 +135,7 @@ async function runTickScoped(
   onBudget?: (budget: ExternalRequestBudget) => void,
 ): Promise<TickResult> {
   const externalBudget = new ExternalRequestBudget();
+  beginAnalyticsBatch(env);
   const owner = crypto.randomUUID();
   const minute = Math.floor(now / 60) * 60;
   if (!(await claimTickLease(env, owner, minute))) {
@@ -162,8 +169,15 @@ async function runTickScoped(
   let outcome: TickResult = { status: 'completed' };
   let failure: unknown;
   let failed = false;
+  let queued=false;
   try {
-    await runClaimedTick(env, now, owner, ensureOwned, externalBudget);
+    try{queued=await queueRouting(env);}catch{queued=true;console.warn(JSON.stringify({event:'queue_control_unavailable'}));}
+    await runClaimedTick(env, now, owner, ensureOwned, externalBudget,queued?{passiveOnly:true,deferNotifications:true}:{});
+    if(queued){try{await enqueueDueChecks(env,now,owner,ensureOwned,externalBudget);}catch(error){if(error instanceof TickLeaseLost)throw error;console.warn(JSON.stringify({event:'queue_enqueue_incomplete'}));}}
+    else {
+      await runAiTick(env, now, owner, ensureOwned, externalBudget);
+      await runDueSubscriptions(env, externalBudget);
+    }
     clearInterval(renewal);
     if (renewalInFlight) await renewalInFlight;
     completed = !ownershipLost && await renewTickLease(env, owner);
@@ -200,17 +214,20 @@ async function runTickScoped(
     }
   }
   if (failed) throw failure;
+  if(queued)await retryPending(env,Math.floor(Date.now()/1000),externalBudget,10);
+  onBudget?.(externalBudget);
   return outcome;
 }
 
-async function runClaimedTick(env: Env, now: number, tickOwner: string, ensureOwned: () => Promise<void>, externalBudget: ExternalRequestBudget): Promise<void> {
-  await retryPending(env, now, externalBudget, 10);
+export interface ClaimedTickOptions { ids?: Set<string>; passiveOnly?: boolean; batch?: TickWriteBatch; onProcessed?: (id:string)=>void; beforeCheck?: (monitor:Monitor)=>boolean|Promise<boolean>; deferNotifications?: boolean }
+export async function runClaimedTick(env: Env, now: number, tickOwner: string, ensureOwned: () => Promise<void>, externalBudget: ExternalRequestBudget, options:ClaimedTickOptions={}): Promise<void> {
+  if(!options.batch&&!options.deferNotifications)await retryPending(env, now, externalBudget, 10);
   await ensureOwned();
-  const monitors = await loadMonitors(env);
-  await pruneAgentProbeJobs(env, now);
+  const monitors = (await loadMonitors(env)).filter(m=>(options.ids?options.ids.has(m.id):options.passiveOnly?!isQueueMonitor(m):true)&&(!options.batch||isQueueMonitor(m)));
+  if(!options.batch)await pruneAgentProbeJobs(env, now);
   if (monitors.length === 0) return;
-  const probeAgents = await loadProbeAgentStates(env);
-  await scheduleAgentProbeJobs(env, monitors, now, probeAgents);
+  const probeAgents = options.batch?new Map():await loadProbeAgentStates(env);
+  if(!options.batch)await scheduleAgentProbeJobs(env, monitors, now, probeAgents);
   await ensureOwned();
 
   // Bypass the isolate cache: a stale `ts` makes a just-run monitor due again,
@@ -316,7 +333,7 @@ async function runClaimedTick(env: Env, now: number, tickOwner: string, ensureOw
     ];
     await commitTickWrites(getDB(env), tickOwner, Math.floor(Date.now() / 1000), writes, monitors);
     invalidateLive();
-    if (alertEvents.length) await retryPending(env, Math.floor(Date.now() / 1000), externalBudget, 10);
+    if (alertEvents.length&&!options.deferNotifications) await retryPending(env, Math.floor(Date.now() / 1000), externalBudget, 10);
     console.log(JSON.stringify({
       event: 'tick',
       checked: 0,
@@ -343,6 +360,7 @@ async function runClaimedTick(env: Env, now: number, tickOwner: string, ensureOw
    * Push is pure and takes the same downstream path. / 主检查与附加检查同批等待，保证三者属于同一分钟；Push 走相同下游路径。
    */
   const results = await mapConcurrent(probeDue, CONCURRENCY, async (m) => {
+    if(options.beforeCheck&&!await options.beforeCheck(m))throw new ExternalBudgetExceeded();
     /** Catch add-on failure on its own promise: `Promise.all` would reject the monitor and discard a successful primary. / 附加失败单独捕获，避免 Promise.all 丢弃已成功的主观测。 */
     const [primary, addons] = await Promise.all([
       monitorProbeSource(m).type === 'agent'
@@ -441,6 +459,7 @@ async function runClaimedTick(env: Env, now: number, tickOwner: string, ensureOw
     const m = probeDue[i];
     const r = results[i];
     if (r.status !== 'fulfilled') {
+      if(options.batch)continue;
       if (r.reason instanceof ExternalBudgetExceeded) {
         /**
          * No budget, not an outage: keep `st`, `ts`, `v` and `fails` whole so retry
@@ -469,6 +488,7 @@ async function runClaimedTick(env: Env, now: number, tickOwner: string, ensureOw
       if (!live[m.id]) next[m.id] = budgetSkippedEntry(m.id);
       continue;
     }
+    options.onProcessed?.(m.id);
     if (source.type === 'agent') {
       const observation = agentProbeResults.get(m.id);
       if (observation) consumedProbeRuns.push(observation.runId);
@@ -525,20 +545,21 @@ async function runClaimedTick(env: Env, now: number, tickOwner: string, ensureOw
     })),
     ...outbox,
   ];
-  await commitTickWrites(getDB(env), tickOwner, Math.floor(Date.now() / 1000), commitWrites, monitors);
-  invalidateLive();
-  if (!env.UPTIME && historyPoints.length > 0) {
+  const publish=()=>{invalidateLive();if (!env.UPTIME && historyPoints.length > 0) {
     console.log(JSON.stringify({
       event: 'history_disabled',
       reason: 'no Analytics Engine binding; live status still updates, history does not',
     }));
   } else {
     writeHeartbeatBatch(env, historyPoints, nowSec);
-  }
+  }};
+  if(options.batch){options.batch.writes.push(...commitWrites);options.batch.monitors.push(...monitors);options.batch.afterCommit.push(publish);return;}
+  await commitTickWrites(getDB(env), tickOwner, Math.floor(Date.now() / 1000), commitWrites, monitors);
+  publish();
 
   /** Send eligible outbox notifications after live state, history and transitions commit together. / 实时状态、历史和状态变化一起提交后，发送符合条件的发件箱通知。 */
   await ensureOwned();
-  if (notifyEvents.length > 0) await retryPending(env, nowSec, externalBudget, 10);
+  if (notifyEvents.length > 0&&!options.deferNotifications) await retryPending(env, nowSec, externalBudget, 10);
 
   console.log(
     JSON.stringify({
@@ -555,6 +576,8 @@ async function runClaimedTick(env: Env, now: number, tickOwner: string, ensureOw
     }),
   );
 }
+
+export function isQueueMonitor(monitor:Monitor):boolean{return (monitor.type==='http'||monitor.type==='tcp')&&monitorProbeSource(monitor).type==='worker';}
 
 export type MonitorCheckOutcome =
   | {
@@ -744,13 +767,14 @@ function transitionWrites(
           latencyMs: next.v,
           at: nowSec,
           groupId: monitor.group_id,
+          notificationChannelIds: monitorNotificationIds(monitor.options_json), notificationEnabled: monitorNotificationEnabled(monitor.options_json),
         }]
       : [],
   };
 }
 
 function agentAlertEvent(alert: Awaited<ReturnType<typeof rollupAgentMetrics>>['alerts'][number]): NotifyEvent {
-  return { monitorName: alert.monitor.name, monitorTarget: alert.monitor.target, monitorType: 'agent', monitorId: alert.monitor.id, eventKey: alert.phase === 'liveness' ? `${alert.prevStatus}->${alert.status}` : `resource:${alert.rule}:${alert.phase}`, status: alert.status, prevStatus: alert.prevStatus, message: alert.message, at: alert.at, groupId: alert.monitor.group_id };
+  return { monitorName: alert.monitor.name, monitorTarget: alert.monitor.target, monitorType: 'agent', monitorId: alert.monitor.id, eventKey: alert.phase === 'liveness' ? `${alert.prevStatus}->${alert.status}` : `resource:${alert.rule}:${alert.phase}`, status: alert.status, prevStatus: alert.prevStatus, message: alert.message, at: alert.at, groupId: alert.monitor.group_id, notificationChannelIds: monitorNotificationIds(alert.monitor.options_json), notificationEnabled: monitorNotificationEnabled(alert.monitor.options_json) };
 }
 
 function applyMaintenanceToAlerts(
@@ -789,6 +813,7 @@ function applyMaintenanceToAlerts(
         statusCode: entry.code,
         latencyMs: entry.v,
         groupId: monitor.group_id,
+        notificationChannelIds: monitorNotificationIds(monitor.options_json), notificationEnabled: monitorNotificationEnabled(monitor.options_json),
       });
     }
   }

@@ -8,7 +8,7 @@ import { LocaleSwitch } from '@/i18n/LocaleSwitch';
 import { buildIconProxyUrl } from '@/lib/icon-proxy';
 import { NAV_TRANSITION } from '@/lib/motion';
 import { PROJECT_NAME } from '@/lib/project';
-import { APP_VERSION } from '@/lib/version';
+import { VersionStatus } from './VersionStatus';
 import '@/styles/console.css';
 import '@fontsource-variable/geist';
 import '@fontsource-variable/geist-mono';
@@ -33,12 +33,15 @@ import { useTimeAgo } from '../../hooks/useTimeAgo';
 import { joinEvents } from '../components/event-presentation';
 import { EventList } from '../components/EventList';
 import { TimelineArt } from '../components/illustrations';
-import { useEvents, useFleet, useOverview } from '../useConsoleData';
+import { useConsoleRefreshInterval, useEvents, useFleet, useOverview } from '../useConsoleData';
 import { ADMIN_PAGE_LOADERS, prefetchAdminPage } from '../page-loaders';
 import { CommandPalette } from './CommandPalette';
 import { ConsoleStatus } from './ConsoleStatus';
 import { useConsoleNotifications } from './useConsoleNotifications';
-import { NAV, navFor, type NavEntry } from './nav';
+import { navFor, type NavEntry } from './nav';
+import { useNavigation } from './useNavigation';
+import { useAiData } from '../ai/api';
+import { bucketCounts } from '../ai/presentation';
 
 /** Brand mark URL, cropped to its ink - built through the shared, versioned helper. / 品牌标记 URL 裁去留白，由共享版本化辅助函数生成。 */
 const BRAND_ICON = buildIconProxyUrl(undefined, { tight: true });
@@ -60,7 +63,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
   useEffect(() => setPaletteOpen(false), [pathname]);
 
   const overview = useOverview();
+  const navigation = useNavigation();
   const fleet = useFleet();
+  const ai = useAiData(navigation.some((entry) => entry.href === '/admin/ai'), useConsoleRefreshInterval());
 
   /** A 401 from shared reads means the session ended; the guard only checks navigation. / 共享读取返回 401 表示会话结束；守卫只在导航时检查。 */
   useEffect(() => {
@@ -103,6 +108,12 @@ export function AdminShell({ children }: { children: ReactNode }) {
         ? { n: counts.down + counts.pending, alert: true }
         : { n: counts.total, alert: false }
       : undefined,
+    '/admin/ai': ai.data
+      ? (() => {
+          const aiCounts = bucketCounts(ai.data.models);
+          return aiCounts.down > 0 ? { n: aiCounts.down, alert: true } : { n: aiCounts.total, alert: false };
+        })()
+      : undefined,
     '/admin/agents': summary
       ? summary.offline > 0
         ? { n: summary.offline, alert: true }
@@ -129,8 +140,8 @@ export function AdminShell({ children }: { children: ReactNode }) {
 
       <nav aria-label={t('brand')} className="polaris-mobile-nav fixed inset-x-0 bottom-0 z-40 border-t border-[var(--polaris-line)] bg-[var(--polaris-canvas)]/95 px-2 pt-2 backdrop-blur-md lg:hidden">
         <LayoutGroup id="console-mobile-nav">
-        <ul className="mx-auto grid w-full max-w-screen-sm grid-cols-6 gap-1">
-          {NAV.map((entry) => {
+        <ul className="mx-auto grid w-full max-w-screen-sm gap-1" style={{ gridTemplateColumns: `repeat(${navigation.length}, minmax(0, 1fr))` }}>
+          {navigation.map((entry) => {
             const active = current?.href === entry.href;
             const Icon = entry.icon;
             const badge = meta[entry.href];
@@ -144,7 +155,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
                   onFocus={() => prefetchAdminPage(entry.href)}
                   onTouchStart={() => prefetchAdminPage(entry.href)}
                   className={clsx(
-                    'polaris-nav-link relative flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[10px] leading-4 transition-colors',
+                    'polaris-nav-link relative flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-[12px] leading-4 transition-colors',
                     active ? 'font-semibold text-[var(--polaris-ink)]' : 'text-[var(--polaris-ink-3)] hover:bg-[var(--polaris-hover)] hover:text-[var(--polaris-ink)]',
                   )}
                 >
@@ -159,7 +170,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
                   ) : null}
                   <span className="relative flex h-5 w-5 items-center justify-center">
                     <Icon size={19} strokeWidth={active ? 2.1 : 1.7} aria-hidden="true" />
-                    {badge?.alert ? <span className="polaris-num absolute -top-1 -right-2 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-danger px-0.5 text-[9px] leading-none font-semibold text-white">{badge.n > 99 ? '99+' : badge.n}</span> : null}
+                    {badge?.alert ? <span className="polaris-num absolute -top-1 -right-2 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-danger px-0.5 text-[12px] leading-none font-semibold text-white">{badge.n > 99 ? '99+' : badge.n}</span> : null}
                   </span>
                   <span className="relative w-full truncate text-center">{t(entry.labelKey)}</span>
                 </Link>
@@ -189,11 +200,13 @@ function TopBar({ onSearch }: { onSearch: () => void }) {
   */
   return (
     <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 bg-[var(--polaris-canvas)]/90 px-3 backdrop-blur-md sm:px-4 lg:static lg:grid lg:grid-cols-[1fr_auto_1fr] lg:gap-3 lg:bg-transparent lg:backdrop-blur-none">
-      <Link to="/admin" className="flex shrink-0 items-center gap-2.5 justify-self-start rounded-lg px-1.5 py-1 lg:w-[208px]">
-        <img src={BRAND_ICON} alt="" width={22} height={22} className="shrink-0" />
-        <span className="truncate text-[15px] font-semibold tracking-[-0.02em]">{PROJECT_NAME}</span>
-        <span className="hidden font-mono text-[10.5px] text-[var(--polaris-ink-4)] sm:inline">v{APP_VERSION}</span>
-      </Link>
+      <div className="flex min-w-0 shrink-0 items-center gap-1 justify-self-start">
+        <Link to="/admin" className="flex min-w-0 items-center gap-2.5 rounded-lg px-1.5 py-1">
+          <img src={BRAND_ICON} alt="" width={22} height={22} className="shrink-0" />
+          <span className="truncate text-[14px] font-semibold tracking-[-0.02em]">{PROJECT_NAME}</span>
+        </Link>
+        <VersionStatus />
+      </div>
 
       <div className="hidden min-w-0 justify-center lg:flex">
         <ConsoleStatus />
@@ -240,6 +253,7 @@ function RailLinks({
   current: NavEntry | undefined;
   meta: Record<string, { n: number; alert: boolean } | undefined>;
 }) {
+  const navigation = useNavigation();
   const t = useTranslations('admin');
   const sections: Array<NavEntry['section']> = ['monitor', 'configure'];
 
@@ -251,7 +265,7 @@ function RailLinks({
             {t(section === 'monitor' ? 'console.sectionMonitor' : 'console.sectionConfigure')}
           </p>
           <ul className="flex flex-col gap-px">
-            {NAV.filter((entry) => entry.section === section).map((entry) => {
+            {navigation.filter((entry) => entry.section === section).map((entry) => {
               const active = current?.href === entry.href;
               const Icon = entry.icon;
               const badge = meta[entry.href];

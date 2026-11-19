@@ -86,7 +86,7 @@ export function dayBounds(day: string): { start: number; end: number } {
 }
 
 const MONITOR_OBSERVED_AT = 'if(double4 > 0, double4, toUnixTimestamp(timestamp))';
-const MONITOR_POINTS = "blob3 NOT IN ('agent_report', 'agent_summary')";
+const MONITOR_POINTS = "blob3 NOT IN ('agent_report', 'agent_summary', 'ai_model')";
 
 export async function queryDaily(env: Env, day: string): Promise<Map<string, AeRow>> {
   const { start, end } = dayBounds(day);
@@ -127,14 +127,17 @@ export function queryMonitorHistory(env: Env, id: string, since: number, now: nu
   });
 }
 
+const batchBudgets = new WeakMap<Env, { written: number }>();
+export function beginAnalyticsBatch(env: Env): void { batchBudgets.set(env, { written: 0 }); }
+export function remainingAnalyticsPoints(env: Env): number { return AE_POINT_LIMIT - (batchBudgets.get(env)?.written ?? 0); }
 export class AnalyticsWriter {
-  private written = 0;
+  private budget: { written: number };
 
-  constructor(private env: Env) {}
+  constructor(private env: Env) { this.budget = batchBudgets.get(env) ?? { written: 0 }; }
 
   write(point: Parameters<AnalyticsEngineDataset['writeDataPoint']>[0]): boolean {
-    if (!this.env.UPTIME || this.written >= AE_POINT_LIMIT) return false;
-    this.written++;
+    if (!this.env.UPTIME || this.budget.written >= AE_POINT_LIMIT) return false;
+    this.budget.written++;
     this.env.UPTIME.writeDataPoint(point);
     return true;
   }

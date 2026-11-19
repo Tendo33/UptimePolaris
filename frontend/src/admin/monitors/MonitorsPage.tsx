@@ -60,6 +60,7 @@ import { formatAvailability } from '../format';
 import { groupsApi } from '../groups/api';
 import type { MonitorGroup } from '../groups/types';
 import { jobsApi } from '../jobs-api';
+import { MonitorSources } from '../subscriptions/MonitorSources';
 import { AdminPage } from '../layout/AdminPage';
 import { useConsoleRefreshInterval, useOverview } from '../useConsoleData';
 import { monitorsApi } from './api';
@@ -370,7 +371,7 @@ export function MonitorsPage() {
         </>
       }
     >
-      <div className="flex min-h-0 flex-1 flex-col gap-5">
+      <MonitorSources category="website" active="local" /><div className="flex min-h-0 flex-1 flex-col gap-5">
         {/*
           The getting-started card, above the figures.
 

@@ -77,6 +77,9 @@ const event = (over) => Object.assign({
 }, over || {});
 
 function reset() { sent.length = 0; failures.length = 0; }
+async function monitor(env, id) {
+  await env.DB.prepare('INSERT OR IGNORE INTO monitors(id,name,type,target,options_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?)').bind(id, 'Fixture monitor', 'http', 'https://example.com', '{}', clock/1000, clock/1000).run();
+}
 
 export default {
   async fetch(req, env) {
@@ -132,6 +135,7 @@ export default {
 
     if (p === '/language-retry') {
       reset(); await clean();
+      await monitor(env, 'localized-retry');
       await env.DB.prepare('DELETE FROM pending_notifications').run();
       const cn = await mk(env, 'webhook', { url: 'https://cn.fixture.test', language: 'zh-CN' });
       const en = await mk(env, 'webhook', { url: 'https://en.fixture.test', language: 'en-US' });
@@ -154,6 +158,7 @@ export default {
 
     if (p === '/retry-order') {
       reset(); await clean();
+      await monitor(env, 'ordered');
       await env.DB.prepare('DELETE FROM pending_notifications').run();
       await mk(env, 'webhook', { url: 'https://hook.fixture.test' });
       const delivered = [];
@@ -176,6 +181,7 @@ export default {
 
     if (p === '/retry-maintenance') {
       reset(); await clean();
+      await monitor(env, 'maintenance');
       await env.DB.prepare('DELETE FROM pending_notifications').run();
       await mk(env, 'webhook', { url: 'https://hook.fixture.test' });
       clock = Date.parse('2026-10-26T01:59:00Z');

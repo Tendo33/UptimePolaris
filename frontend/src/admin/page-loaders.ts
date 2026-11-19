@@ -3,6 +3,8 @@ import { navFor } from './layout/nav';
 export const ADMIN_PAGE_LOADERS = {
   monitors: () => import('./monitors/MonitorsPage').then((module) => ({ default: module.MonitorsPage })),
   agents: () => import('./agents/AgentsPage').then((module) => ({ default: module.AgentsPage })),
+  ai: () => import('./ai/AiPage').then((module) => ({ default: module.AiPage })),
+  subscriptions: () => import('./subscriptions/SubscriptionsPage').then(module => ({ default: module.SubscriptionsPage })),
   groups: () => import('./groups/GroupsPage').then((module) => ({ default: module.GroupsPage })),
   notifications: () => import('./notifications/NotificationsPage').then((module) => ({ default: module.NotificationsPage })),
   themes: () => import('./themes/ThemesPage').then((module) => ({ default: module.ThemesPage })),
@@ -12,6 +14,8 @@ export const ADMIN_PAGE_LOADERS = {
 const PAGE_BY_HREF: Record<string, keyof typeof ADMIN_PAGE_LOADERS> = {
   '/admin': 'monitors',
   '/admin/agents': 'agents',
+  '/admin/ai': 'ai',
+  '/admin/subscriptions': 'subscriptions',
   '/admin/groups': 'groups',
   '/admin/notifications': 'notifications',
   '/admin/themes': 'themes',

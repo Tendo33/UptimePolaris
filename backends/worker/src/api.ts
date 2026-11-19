@@ -1,4 +1,7 @@
 import { Hono } from 'hono';
+import { aiRoutes } from './lib/ai/routes';
+import { subscriptionRoutes } from './lib/subscriptions/routes';
+import { checkQueueRoutes } from './lib/queue/routes';
 import { HTTPException } from 'hono/http-exception';
 import { agentRoutes } from './lib/agent/routes';
 import { agentTransportRoutes } from './lib/agent/transport-routes';
@@ -23,6 +26,8 @@ import { presentationRoutes } from './lib/presentation/routes';
 import { agentTaxonomyRoutes } from './lib/presentation/taxonomy';
 import { serverRoutes } from './lib/presentation/servers';
 import type { BackendCapabilities } from '../../../shared/backend-capabilities';
+import { SUBSCRIPTION_LIMITS } from '../../../shared/subscriptions';
+import subscriptionSchema from '../../../shared/subscription.schema.json';
 
 /** 组装 API 路由、公共缓存和管理接口鉴权。 / Assemble API routes, public caching, and management authentication. */
 export const api = new Hono<{ Bindings: Env }>();
@@ -121,6 +126,8 @@ api.get('/api/capabilities', (c) => c.json({
     sslMode: 'certificate-records',
   },
   themes: { storage: 'r2', installationAvailable: Boolean(c.env.THEMES) },
+  checkQueue: { supported: true },
+  subscriptions: { supported: true, schemaVersion: 1, minimumIntervalSec: SUBSCRIPTION_LIMITS.minimumIntervalSec, capabilities: subscriptionSchema.properties.capabilities.items.enum, limits: SUBSCRIPTION_LIMITS },
 } satisfies BackendCapabilities));
 
 api.route('/', authRoutes);
@@ -149,8 +156,12 @@ api.use('/api/*', async (c, next) => {
     // 当前主题修订版本，可供匿名无缓存轮询。
     '/api/public/theme',
     '/api/public/servers',
+    '/api/public/ai/models',
+    '/api/public/subscriptions/items',
   ]);
   const PUBLIC_PREFIXES = [
+    '/api/public/subscriptions/items/',
+    '/api/public/ai/models/',
     '/api/public/agent/',
     '/api/public/servers/',
     '/api/public/push/',
@@ -190,6 +201,9 @@ api.use('/api/*', async (c, next) => {
 
 /** Hono applies middleware in registration order; management routes must follow the gate. / Hono 按注册顺序执行中间件；管理路由必须位于鉴权之后。 */
 api.route('/', notifyRoutes);
+api.route('/', aiRoutes);
+api.route('/', subscriptionRoutes);
+api.route('/', checkQueueRoutes);
 
 
 api.route('/', agentRoutes);

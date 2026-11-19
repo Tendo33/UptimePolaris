@@ -1,5 +1,5 @@
 import { UP, WARN } from '../../types';
-import { budgetedFetch, ExternalBudgetExceeded, type ExternalRequestBudget } from '../http/request-budget';
+import { budgetedFetch, ExternalBudgetExceeded, ExternalDeadlineExceeded, type ExternalRequestBudget } from '../http/request-budget';
 import { daysUntil, errMsg, hostOf } from '../util';
 import type { CheckResult } from './types';
 
@@ -110,6 +110,7 @@ export async function checkDomain(o: DomainCheckOptions): Promise<CheckResult> {
   const domain = o.domain;
   try {
     const base = await rdapBaseFor(domain, o.timeoutMs, o.budget);
+    o.budget?.ensureTime(o.timeoutMs);
     const res = await budgetedFetch(base + 'domain/' + encodeURIComponent(domain), {
       signal: AbortSignal.timeout(o.timeoutMs),
       headers: { accept: 'application/rdap+json, application/json' },
@@ -142,6 +143,7 @@ export async function checkDomain(o: DomainCheckOptions): Promise<CheckResult> {
       daysLeft: days,
     };
   } catch (e) {
+    if (e instanceof ExternalDeadlineExceeded) throw e;
     return { status: WARN, latencyMs: Date.now() - start, statusCode: 0, message: errMsg(e) };
   }
 }

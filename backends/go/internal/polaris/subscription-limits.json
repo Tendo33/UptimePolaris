@@ -1,0 +1,18 @@
+{
+  "descriptorBytes": 262144,
+  "responseBytes": 2097152,
+  "runBytes": 10485760,
+  "catalogBytes": 1048576,
+  "catalogEntries": 500,
+  "items": 1000,
+  "requests": 8,
+  "fetches": 10,
+  "redirects": 3,
+  "timeoutMs": 10000,
+  "runTimeoutMs": 30000,
+  "previewSec": 600,
+  "minimumIntervalSec": 60,
+  "maximumIntervalSec": 86400,
+  "recent": 60,
+  "historyDays": 90
+}

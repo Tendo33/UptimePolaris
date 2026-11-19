@@ -41,6 +41,7 @@ func main() {
 	flag.Lookup("database-url").DefValue = ""
 	c.AdminToken = env("POLARIS_ADMIN_TOKEN", "")
 	c.SetupKey = env("POLARIS_SETUP_KEY", "")
+	c.AICredentialKeyFile = env("POLARIS_AI_KEY_FILE", "")
 	flag.BoolVar(&c.TrustProxy, "trust-proxy", false, "Trust reverse-proxy HTTPS headers")
 	flag.IntVar(&c.Concurrency, "concurrency", c.Concurrency, "Maximum simultaneous probes")
 	migration := flag.String("migration", "", "Offline SQLite-to-PostgreSQL migration: preview or execute")

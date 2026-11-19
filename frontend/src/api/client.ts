@@ -5,7 +5,7 @@ export async function requestJson<T>(path: string, init: RequestInit = {}): Prom
   // 仅指定的读取接口继承当前预览目标，管理写请求不附加此参数。
   // Only the listed read endpoints inherit the preview target; management writes do not add this parameter.
   const preview = new URLSearchParams(window.location.search).get('preview');
-  if ((preview === 'monitor' || preview === 'agent') && /^\/api\/(?:public\/(?:config|theme|status|monitors|servers|agent\/detail|monitor-icon)|recent\/)/.test(path)) {
+  if ((preview === 'monitor' || preview === 'agent' || preview === 'ai') && /^\/api\/(?:public\/(?:config|theme|status|monitors|servers|agent\/detail|monitor-icon)|recent\/)/.test(path)) {
     const url = new URL(path, window.location.origin);
     url.searchParams.set('preview', preview);
     path = url.pathname + url.search;

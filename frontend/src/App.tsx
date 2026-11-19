@@ -21,6 +21,8 @@ const SetupPage = lazy(() => import('./auth/SetupPage').then((module) => ({ defa
 const AdminLayout = lazy(() => import('./admin/layout/AdminLayout').then((module) => ({ default: module.AdminLayout })));
 const MonitorsPage = lazy(ADMIN_PAGE_LOADERS.monitors);
 const AgentsPage = lazy(ADMIN_PAGE_LOADERS.agents);
+const AiPage = lazy(ADMIN_PAGE_LOADERS.ai);
+const SubscriptionsPage = lazy(ADMIN_PAGE_LOADERS.subscriptions);
 const GroupsPage = lazy(ADMIN_PAGE_LOADERS.groups);
 const NotificationsPage = lazy(ADMIN_PAGE_LOADERS.notifications);
 const ThemesPage = lazy(ADMIN_PAGE_LOADERS.themes);
@@ -57,6 +59,8 @@ export function App({ httpStatus }: { httpStatus?: number }) {
             {httpStatus === 404 ? <NotFoundRoute /> : httpStatus && httpStatus >= 500 ? <RouteError code="render" /> : <Routes>
               <Route element={<PublicMaintenance />}>
                 <Route path="/" element={<PublicPageRoute />} />
+                <Route path="/ai" element={<PublicPageRoute />} />
+                <Route path="/servers" element={<PublicPageRoute />} />
                 <Route path="/server/:id" element={<PublicPageRoute />} />
                 <Route path="/status/:pageId" element={<StatusPageRoute />} />
                 <Route path="/monitor/:id" element={<MonitorDetailRoute />} />
@@ -75,6 +79,13 @@ export function App({ httpStatus }: { httpStatus?: number }) {
                 <Route path="/admin" element={guarded(<AdminLayout />)}>
                   <Route index element={<MonitorsPage />} />
                   <Route path="agents" element={<AgentsPage />} />
+                  <Route path="ai/:channelId?" element={<AiPage />} />
+                  <Route path="subscriptions" element={<SubscriptionsPage />} />
+                  <Route path="subscriptions/new" element={<SubscriptionsPage />} />
+                  <Route path="subscriptions/library" element={<SubscriptionsPage />} />
+                  <Route path="subscriptions/library/:templateId" element={<SubscriptionsPage />} />
+                  <Route path="subscriptions/:id/config" element={<SubscriptionsPage />} />
+                  <Route path="subscriptions/:id" element={<SubscriptionsPage />} />
                   <Route path="groups" element={<GroupsPage />} />
                   <Route path="notifications" element={<NotificationsPage />} />
                   <Route path="themes" element={<ThemesPage />} />

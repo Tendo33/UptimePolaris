@@ -364,6 +364,7 @@ export interface Env {
    * PostgreSQL URL; use a deployment secret in production, or resolve it from the encrypted setup selection.
    */
   DATABASE_URL?: string;
+  CHECK_QUEUE?: Queue<import('../../../shared/check-queue').CheckQueueMessage>;
   /**
    * Which plan the usage panel compares against.
    *

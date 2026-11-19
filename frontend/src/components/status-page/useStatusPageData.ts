@@ -8,6 +8,7 @@ import { usePublicConfigResource } from '@/config/usePublicConfig';
 import type { MonitorResponse, MonitoringData } from '@/types/monitor';
 import type { SWRConfiguration } from 'swr';
 import useSWR, { mutate } from 'swr';
+import type { PublicAiModel } from '../../../../shared/ai-management';
 
 /**
  * swr 通用 fetcher / Shared SWR fetcher
@@ -26,8 +27,16 @@ const fetcher = async <T>(url: string): Promise<T> => {
  */
 export const SWR_KEYS = {
   MONITOR: (pageId: string) => publicApiUrl('/api/public/monitors', pageId),
+  AI: (pageId: string) => publicApiUrl('/api/public/ai/models', pageId),
   CONFIG: publicConfigKey,
 };
+
+export function usePublicAiModels(enabled = true) {
+  const { pageId } = usePageConfig();
+  return useSWR<{ models: PublicAiModel[] }>(enabled ? SWR_KEYS.AI(pageId) : null, fetcher, {
+    revalidateOnFocus: false, revalidateOnReconnect: false, shouldRetryOnError: false,
+  });
+}
 
 /**
  * 默认配置 / Default configuration
@@ -93,7 +102,7 @@ export async function prefetchSWRKey<T>(key: string, options: PrefetchOptions = 
  * @param config - SWR 配置 / SWR configuration
  * @returns 监控数据、加载状态和错误信息 / Monitor data, loading state, and error
  */
-export function useMonitorData(config?: SWRConfiguration) {
+export function useMonitorData(config?: SWRConfiguration, enabled = true) {
   const { pageId } = usePageConfig();
 
   const {
@@ -101,7 +110,7 @@ export function useMonitorData(config?: SWRConfiguration) {
     error,
     isLoading,
     mutate: revalidate,
-  } = useSWR<MonitorResponse & { receivedAt: number }>(SWR_KEYS.MONITOR(pageId), fetcher, {
+  } = useSWR<MonitorResponse & { receivedAt: number }>(enabled ? SWR_KEYS.MONITOR(pageId) : null, fetcher, {
     ...DEFAULT_SWR_CONFIG,
     refreshInterval: 0,
     revalidateOnReconnect: false,

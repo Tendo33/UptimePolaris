@@ -5,6 +5,7 @@ import { deliveriesSQL } from '../db/sql/deliveries';
 import { placeholderFor } from '../db/sql/dialect';
 import { notificationSQL } from '../db/sql/notifications';
 import { isNotificationLanguage } from '../../../../../shared/notification-language';
+import type { NotificationRoutingScope } from '../../../../../shared/notification-policy';
 
 /** Notification providers; keep validation, delivery and console fields aligned when adding one. / 通知提供商；新增时须保持验证、投递和控制台字段一致。 */
 export type NotificationType =
@@ -34,7 +35,7 @@ const _allTypesListed: MissingType extends never ? true : never = true;
 
 void _allTypesListed;
 
-export interface NotificationChannel {
+export interface NotificationChannel extends NotificationRoutingScope {
   id: string;
   name: string;
   type: NotificationType;
@@ -83,6 +84,10 @@ export async function loadChannels(
 }
 
 interface StoredChannel {
+  event_kinds?: string;
+  source_types?: string;
+  ai_channel_ids?: string;
+  subscription_ids?: string;
   id: string;
   name: string;
   type: NotificationType;
@@ -100,6 +105,10 @@ function toChannel(row: StoredChannel): NotificationChannel {
     config: parseConfig(row.config_json),
     // `groups` is loaded with the channel; empty means every group. / `groups` 随渠道加载；空表示全部。
     group_ids: [],
+    event_kinds: JSON.parse(row.event_kinds ?? '["monitor_state","ai_state","agent_resource"]'),
+    source_types: JSON.parse(row.source_types ?? '["local"]'),
+    ai_channel_ids: JSON.parse(row.ai_channel_ids ?? '[]'),
+    subscription_ids: JSON.parse(row.subscription_ids ?? '[]'),
     active: row.active,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -133,6 +142,10 @@ function parseConfig(json: string): Record<string, string> {
 export async function createChannel(
   env: Env,
   input: {
+    event_kinds?: NotificationRoutingScope['event_kinds'];
+    source_types?: NotificationRoutingScope['source_types'];
+    ai_channel_ids?: string[];
+    subscription_ids?: string[];
     name: string;
     type: NotificationType;
     config: Record<string, string>;
@@ -143,7 +156,9 @@ export async function createChannel(
   const id = crypto.randomUUID();
   const now = Math.floor(Date.now() / 1000);
   const db = getDB(env);
-  await db.execute(notificationSQL[db.type].insert, [
+  const scopeDefaults = { event_kinds: input.event_kinds ?? ['monitor_state', 'ai_state', 'agent_resource'], source_types: input.source_types ?? ['local'], ai_channel_ids: input.ai_channel_ids ?? [], subscription_ids: input.subscription_ids ?? [] };
+  const columns = ['id', 'name', 'type', 'config_json', 'active', 'created_at', 'updated_at', 'event_kinds', 'source_types', 'ai_channel_ids', 'subscription_ids'];
+  await db.execute(`INSERT INTO notifications (${columns.join(',')}) VALUES (${columns.map((_, index) => placeholderFor(db.type, index + 1)).join(',')})`, [
     id,
     input.name,
     input.type,
@@ -151,6 +166,7 @@ export async function createChannel(
     input.active ?? 1,
     now,
     now,
+    ...Object.values(scopeDefaults).map(value => JSON.stringify(value)),
   ]);
 
   if (input.group_ids !== undefined) await setChannelGroups(env, id, input.group_ids);
@@ -171,6 +187,10 @@ export async function updateChannel(
   env: Env,
   id: string,
   input: Partial<{
+    event_kinds: NotificationRoutingScope['event_kinds'];
+    source_types: NotificationRoutingScope['source_types'];
+    ai_channel_ids: string[];
+    subscription_ids: string[];
     name: string;
     type: NotificationType;
     config: Record<string, string>;
@@ -183,6 +203,9 @@ export async function updateChannel(
   const db = getDB(env);
   let position = 1;
   const token = () => placeholderFor(db.type, position++);
+  for (const field of ['event_kinds', 'source_types', 'ai_channel_ids', 'subscription_ids'] as const) {
+    if (input[field] !== undefined) { sets.push(`${field} = ${token()}`); values.push(JSON.stringify(input[field])); }
+  }
 
   if (input.name !== undefined) {
     sets.push(`name = ${token()}`);

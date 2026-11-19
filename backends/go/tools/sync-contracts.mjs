@@ -20,6 +20,7 @@ async function output(name, contents) {
   }
 }
 await output('agent-release-repository.json', await fs.readFile(path.join(root, 'shared/agent-release-repository.json'), 'utf8'));
+await output('subscription.schema.json', await fs.readFile(path.join(root, 'shared/subscription.schema.json'), 'utf8'));
 const sourceLanguages = (await fs.readdir(path.join(root, 'frontend/src/locales/admin')))
   .filter(name => name.endsWith('.json')).map(name => name.slice(0, -5)).sort();
 if (JSON.stringify(sourceLanguages) !== JSON.stringify([...languages].sort())) {
@@ -36,6 +37,10 @@ async function compile(source) {
   const built = await transform(source, { loader: 'ts', format: 'esm' });
   return import('data:text/javascript;base64,' + Buffer.from(built.code).toString('base64'));
 }
+const subscriptionTemplates = await compile(await fs.readFile(path.join(root, 'shared/subscription-templates.ts'), 'utf8'));
+const subscriptions = await compile(await fs.readFile(path.join(root, 'shared/subscriptions.ts'), 'utf8'));
+await output('subscription-limits.json', JSON.stringify(subscriptions.SUBSCRIPTION_LIMITS, null, 2) + '\n');
+await output('subscription-templates.json', JSON.stringify(subscriptionTemplates.SUBSCRIPTION_TEMPLATES, null, 2) + '\n');
 const brand = await compile(await fs.readFile(path.join(root, 'shared/brand-mark.ts'), 'utf8'));
 await output('brand-mark.json', JSON.stringify({ blue: brand.BRAND_BLUE, path: brand.BRAND_RING_PATH, ring: brand.RING, tightViewBox: brand.TIGHT_VIEWBOX }, null, 2) + '\n');
 

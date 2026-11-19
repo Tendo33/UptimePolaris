@@ -20,7 +20,13 @@
     "actionUpCurrent": "No action needed; the current status is normal.",
     "actionWarn": "Review the warning detail and monitor configuration.",
     "response": "Response code: {value}",
-    "latency": "Latency: {value}"
+    "latency": "Latency: {value}",
+    "syncFailed": "Subscription sync failed: {name}",
+    "syncRecovered": "Subscription sync recovered: {name}",
+    "syncLastSuccess": "Last successful sync: {value}",
+    "syncAffected": "Affected items: {value}",
+    "syncActionFailed": "Check the source connection and configuration.",
+    "syncActionRecovered": "Source synchronization has resumed."
   },
   "zh-CN": {
     "down": "故障",
@@ -43,7 +49,13 @@
     "actionUpCurrent": "无需处理，当前状态正常。",
     "actionWarn": "请根据警告详情检查监控配置。",
     "response": "响应码：{value}",
-    "latency": "耗时：{value}"
+    "latency": "耗时：{value}",
+    "syncFailed": "订阅同步异常：{name}",
+    "syncRecovered": "订阅同步恢复：{name}",
+    "syncLastSuccess": "最近成功同步：{value}",
+    "syncAffected": "受影响条目：{value}",
+    "syncActionFailed": "请检查来源连接与接口配置。",
+    "syncActionRecovered": "已恢复读取来源数据。"
   },
   "zh-TW": {
     "down": "故障",
@@ -66,7 +78,13 @@
     "actionUpCurrent": "無需處理，目前狀態正常。",
     "actionWarn": "請根據警告詳情檢查監控設定。",
     "response": "回應碼：{value}",
-    "latency": "延遲：{value}"
+    "latency": "延遲：{value}",
+    "syncFailed": "訂閱同步異常：{name}",
+    "syncRecovered": "訂閱同步恢復：{name}",
+    "syncLastSuccess": "最近成功同步：{value}",
+    "syncAffected": "受影響項目：{value}",
+    "syncActionFailed": "請檢查來源連線與介面設定。",
+    "syncActionRecovered": "已恢復讀取來源資料。"
   },
   "zh-HK": {
     "down": "故障",
@@ -89,7 +107,13 @@
     "actionUpCurrent": "無需處理，目前狀態正常。",
     "actionWarn": "請根據警告詳情檢查監控設定。",
     "response": "回應碼：{value}",
-    "latency": "延遲：{value}"
+    "latency": "延遲：{value}",
+    "syncFailed": "訂閱同步異常：{name}",
+    "syncRecovered": "訂閱同步恢復：{name}",
+    "syncLastSuccess": "最近成功同步：{value}",
+    "syncAffected": "受影響項目：{value}",
+    "syncActionFailed": "請檢查來源連線與介面設定。",
+    "syncActionRecovered": "已恢復讀取來源資料。"
   },
   "ja-JP": {
     "down": "障害",
@@ -112,7 +136,13 @@
     "actionUpCurrent": "現在の状態は正常です。対処は不要です。",
     "actionWarn": "警告の詳細と監視設定を確認してください。",
     "response": "応答コード：{value}",
-    "latency": "応答時間：{value}"
+    "latency": "応答時間：{value}",
+    "syncFailed": "購読の同期に失敗: {name}",
+    "syncRecovered": "購読の同期が復旧: {name}",
+    "syncLastSuccess": "最終同期成功: {value}",
+    "syncAffected": "影響する項目: {value}",
+    "syncActionFailed": "接続先とインターフェース設定を確認してください。",
+    "syncActionRecovered": "ソースの同期が再開しました。"
   },
   "ko-KR": {
     "down": "장애",
@@ -135,7 +165,13 @@
     "actionUpCurrent": "현재 상태가 정상입니다. 조치가 필요하지 않습니다.",
     "actionWarn": "경고 상세 내용과 모니터 설정을 확인하세요.",
     "response": "응답 코드: {value}",
-    "latency": "응답 시간: {value}"
+    "latency": "응답 시간: {value}",
+    "syncFailed": "구독 동기화 실패: {name}",
+    "syncRecovered": "구독 동기화 복구: {name}",
+    "syncLastSuccess": "마지막 동기화 성공: {value}",
+    "syncAffected": "영향받는 항목: {value}",
+    "syncActionFailed": "소스 연결과 인터페이스 설정을 확인하세요.",
+    "syncActionRecovered": "소스 동기화가 재개되었습니다."
   },
   "fr-FR": {
     "down": "EN PANNE",
@@ -158,7 +194,13 @@
     "actionUpCurrent": "Aucune action requise : l’état actuel est normal.",
     "actionWarn": "Vérifiez les détails de l’avertissement et la configuration du moniteur.",
     "response": "Code de réponse : {value}",
-    "latency": "Latence : {value}"
+    "latency": "Latence : {value}",
+    "syncFailed": "Échec de synchronisation : {name}",
+    "syncRecovered": "Synchronisation rétablie : {name}",
+    "syncLastSuccess": "Dernière synchronisation réussie : {value}",
+    "syncAffected": "Éléments concernés : {value}",
+    "syncActionFailed": "Vérifiez la connexion et la configuration de la source.",
+    "syncActionRecovered": "La synchronisation de la source a repris."
   },
   "pt-BR": {
     "down": "INDISPONÍVEL",
@@ -181,7 +223,13 @@
     "actionUpCurrent": "Nenhuma ação necessária: o estado atual está normal.",
     "actionWarn": "Verifique os detalhes do aviso e a configuração do monitor.",
     "response": "Código de resposta: {value}",
-    "latency": "Latência: {value}"
+    "latency": "Latência: {value}",
+    "syncFailed": "Falha na sincronização: {name}",
+    "syncRecovered": "Sincronização restabelecida: {name}",
+    "syncLastSuccess": "Última sincronização bem-sucedida: {value}",
+    "syncAffected": "Itens afetados: {value}",
+    "syncActionFailed": "Verifique a conexão e a configuração da origem.",
+    "syncActionRecovered": "A sincronização da origem foi retomada."
   },
   "ru-RU": {
     "down": "НЕДОСТУПЕН",
@@ -204,6 +252,12 @@
     "actionUpCurrent": "Действий не требуется: текущее состояние в норме.",
     "actionWarn": "Проверьте подробности предупреждения и настройки мониторинга.",
     "response": "Код ответа: {value}",
-    "latency": "Задержка: {value}"
+    "latency": "Задержка: {value}",
+    "syncFailed": "Ошибка синхронизации подписки: {name}",
+    "syncRecovered": "Синхронизация подписки восстановлена: {name}",
+    "syncLastSuccess": "Последняя успешная синхронизация: {value}",
+    "syncAffected": "Затронуто элементов: {value}",
+    "syncActionFailed": "Проверьте подключение и настройки источника.",
+    "syncActionRecovered": "Синхронизация источника возобновлена."
   }
 }

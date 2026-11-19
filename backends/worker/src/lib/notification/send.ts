@@ -416,6 +416,12 @@ async function sendWebhook(
     },
     body: JSON.stringify({
       event: event.status === 1 ? 'up' : event.status === 2 ? 'warn' : 'down',
+      eventKind: event.eventKind,
+      eventKey: event.eventKey,
+      sourceType: event.sourceType,
+      subscriptionId: event.subscriptionId,
+      subscriptionItemId: event.subscriptionItemId,
+      syncRevision: event.syncRevision,
       monitor: {
         name: event.monitorName,
         target: event.monitorTarget,

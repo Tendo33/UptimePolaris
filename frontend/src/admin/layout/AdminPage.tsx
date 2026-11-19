@@ -24,7 +24,7 @@ export function AdminPage({ title, description, actions, back, children }: Admin
         className="px-4 pt-6 pb-5 sm:px-6 lg:px-8 lg:pt-7"
       >
         <div className="mx-auto flex w-full max-w-[1360px] flex-wrap items-end gap-x-6 gap-y-3">
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 basis-full sm:flex-1 sm:basis-auto">
             {back ? (
               <Link
                 to={back.href}
@@ -34,7 +34,7 @@ export function AdminPage({ title, description, actions, back, children }: Admin
                 {back.label}
               </Link>
             ) : null}
-            <h1 className="truncate text-[22px] leading-8 font-semibold tracking-[-0.02em] text-[var(--polaris-ink)]">{title}</h1>
+            <h1 className="truncate text-[26px] leading-8 font-semibold tracking-[-0.02em] text-[var(--polaris-ink)]">{title}</h1>
             {description ? <p className="mt-0.5 text-[13px] text-[var(--polaris-ink-3)]">{description}</p> : null}
           </div>
           {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}

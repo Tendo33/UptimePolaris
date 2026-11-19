@@ -14,6 +14,7 @@ import { monitorSQL } from '../db/sql/monitors';
 import { closeEndedAvailabilityDays } from '../monitor/availability';
 import { loadUptime, upsertDay } from '../monitor/store';
 import { pruneDeliveries } from '../notification/delivery-history';
+import { archiveAiDays } from '../ai/runtime';
 import { readAll } from '../settings/store';
 
 /** Process bounded date batches with overlap so delayed Analytics Engine points can be read again. / 分批处理有限日期并保留重叠，使延迟到达的 Analytics Engine 数据可再次读取。 */
@@ -56,6 +57,8 @@ export function runSync(env: Env): Promise<SyncResult> {
 }
 
 async function runSyncScoped(env: Env): Promise<SyncResult> {
+  try { await archiveAiDays(env, Math.floor(Date.now()/1000)); }
+  catch { console.warn(JSON.stringify({ event: 'ai_archive_incomplete' })); }
   const db = getDB(env);
   const monitors = await db.query<{ id: string; type: string; active?: number }>(monitorSQL[db.type].listAll);
   const agents = await db.query<{ id: string }>('SELECT id FROM agents');

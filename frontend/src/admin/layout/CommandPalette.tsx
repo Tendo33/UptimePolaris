@@ -1,7 +1,7 @@
 import { Modal } from '@/components/ui/MotionOverlays';
 import { ModalContent } from '@heroui/react';
 import clsx from 'clsx';
-import { Activity, ArrowDown, ArrowUp, CornerDownLeft, Cpu, Globe, KeyRound, Network, Plus, RadioTower, Search, Server, Webhook } from 'lucide-react';
+import { Activity, ArrowDown, ArrowUp, Bot, CornerDownLeft, Cpu, Globe, KeyRound, Network, Plus, RadioTower, Search, Server, Webhook } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { useTranslations } from 'use-intl';
@@ -12,11 +12,13 @@ import { StatusPill } from '../monitors/MonitorIndicators';
 import { toneForStatus } from '../monitors/presentation';
 import type { MonitorType } from '../monitors/types';
 import { useFleet, useOverview } from '../useConsoleData';
-import { NAV } from './nav';
+import { useAiData } from '../ai/api';
+import { aiBucket, aiTone } from '../ai/presentation';
+import { useNavigation } from './useNavigation';
 
 interface Item {
   id: string;
-  group: 'pages' | 'actions' | 'monitors' | 'agents';
+  group: 'pages' | 'actions' | 'monitors' | 'ai' | 'agents';
   label: string;
   sub?: string;
   icon: ReactNode;
@@ -63,6 +65,8 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const listRef = useRef<HTMLDivElement>(null);
 
   const overview = useOverview(open);
+  const navigation = useNavigation();
+  const ai = useAiData(open && navigation.some((entry) => entry.href === '/admin/ai'));
   const fleet = useFleet(open);
 
   useEffect(() => {
@@ -73,7 +77,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   }, [open]);
 
   const items = useMemo<Item[]>(() => {
-    const pages: Item[] = NAV.map((entry) => {
+    const pages: Item[] = navigation.map((entry) => {
       const Icon = entry.icon;
       return {
         id: `page:${entry.href}`,
@@ -127,6 +131,21 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       to: `/admin/agents?agent=${encodeURIComponent(a.id)}`,
     }));
 
+    const aiRank = { down: 0, unknown: 1, up: 2, paused: 3 } as const;
+    const channelNames = new Map((ai.data?.channels ?? []).map((channel) => [channel.id, channel.name]));
+    const models: Item[] = [...(ai.data?.models ?? [])]
+      .sort((a, b) => aiRank[aiBucket(a)] - aiRank[aiBucket(b)])
+      .map((model) => ({
+        id: `ai:${model.id}`,
+        group: 'ai',
+        label: model.name,
+        sub: [channelNames.get(model.channelId), model.modelId].filter(Boolean).join(' · '),
+        icon: <Bot />,
+        hue: 'violet',
+        to: `/admin/ai/${encodeURIComponent(model.channelId)}?model=${encodeURIComponent(model.id)}`,
+        trailing: <StatusPill tone={aiTone(model)} label={t(`ai.bucket.${aiBucket(model)}`)} />,
+      }));
+
     const needle = query.trim().toLowerCase();
     const match = (item: Item) =>
       !needle || [item.label, item.sub, item.keywords].some((text) => text?.toLowerCase().includes(needle));
@@ -141,9 +160,10 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       ...pages.filter(match),
       ...actions.filter(match),
       ...monitors.filter(match).slice(0, needle ? 8 : 5),
+      ...models.filter(match).slice(0, needle ? 6 : 3),
       ...agents.filter(match).slice(0, needle ? 6 : 3),
     ];
-  }, [fleet.data, overview.data, query, t]);
+  }, [ai.data, fleet.data, navigation, overview.data, query, t]);
 
   useEffect(() => {
     setActive((index) => Math.min(index, Math.max(0, items.length - 1)));
@@ -164,6 +184,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     { key: 'pages', label: t('console.searchPages') },
     { key: 'actions', label: t('console.searchActions') },
     { key: 'monitors', label: t('console.searchMonitors') },
+    { key: 'ai', label: t('console.searchAi') },
     { key: 'agents', label: t('console.searchAgents') },
   ];
 

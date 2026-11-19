@@ -3,6 +3,13 @@ import type { DBAdapter } from '../db/adapter';
 import { lockMonitorSnapshots, MonitorChanged, guardMonitorWrites } from '../monitor/writes';
 
 export class TickLeaseLost extends Error {}
+export interface TickWriteBatch {
+  writes: { sql: string; params: unknown[] }[];
+  monitors: Monitor[];
+  checks: ((tx: DBAdapter) => Promise<void>)[];
+  afterCommit: (() => void | Promise<void>)[];
+}
+export const newTickWriteBatch=():TickWriteBatch=>({writes:[],monitors:[],checks:[],afterCommit:[]});
 
 export async function commitTickWrites(
   db: DBAdapter,
@@ -10,6 +17,7 @@ export async function commitTickWrites(
   now: number,
   writes: { sql: string; params: unknown[] }[],
   monitors: Monitor[] = [],
+  checks: ((tx: DBAdapter) => Promise<void>)[] = [],
 ): Promise<void> {
   if (db.type === 'd1') {
     try {
@@ -41,6 +49,7 @@ export async function commitTickWrites(
     );
     if (lease?.owner !== owner || Number(lease.lease_until) <= now) throw new TickLeaseLost();
     await lockMonitorSnapshots(tx, monitors);
+    for(const check of checks)await check(tx);
     for (const write of writes) await tx.execute(write.sql, write.params);
   });
 }

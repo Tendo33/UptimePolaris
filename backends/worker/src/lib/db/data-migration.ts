@@ -14,7 +14,7 @@ const MAX_TOTAL_ROWS = 10_000;
 const MAX_SNAPSHOT_BYTES = 8 * 1024 * 1024;
 // 平台元数据和 D1 选库控制记录不属于 PostgreSQL 业务表。
 // Platform metadata and D1 database-selection records are not PostgreSQL business tables.
-const METADATA_TABLES = new Set(['d1_migrations', '_cf_KV', '_polaris_database']);
+const METADATA_TABLES = new Set(['d1_migrations', '_cf_KV', '_cf_METADATA', '_polaris_database']);
 const IDENTIFIER = /^[a-z][a-z0-9_]{0,62}$/;
 
 export class MigrationError extends Error {
@@ -171,7 +171,9 @@ export async function migrateDataWithConnection(db: D1Database, sql: ReturnType<
       }
       if (execute) await tx.unsafe(`LOCK TABLE ${targetNames.map(identifier).join(', ')} IN ACCESS EXCLUSIVE MODE`);
       for (const name of targetNames) {
-        const condition = name === 'auth_setup_state' ? ' WHERE NOT (id = 1 AND completed = 0 AND claim_id IS NULL)' : '';
+        const condition = name === 'auth_setup_state' ? ' WHERE NOT (id = 1 AND completed = 0 AND claim_id IS NULL)'
+          : name === 'ai_runtime' ? ` WHERE NOT (id=1 AND revision='initial' AND json::jsonb='{"models":{},"channels":{}}'::jsonb)`
+          : name === 'check_queue_control' ? ` WHERE NOT (id=1 AND revision='initial' AND json::jsonb='{"enabled":false,"generation":"initial","verification":null,"pending":{},"lastEnqueuedAt":null,"lastProcessedAt":null,"lastError":null}'::jsonb)` : '';
         const existing = await tx.unsafe<{ populated: boolean }[]>(`SELECT EXISTS (SELECT 1 FROM ${identifier(name)}${condition}) AS populated`);
         if (existing[0].populated) throw new MigrationError('target_not_empty');
       }
@@ -179,6 +181,8 @@ export async function migrateDataWithConnection(db: D1Database, sql: ReturnType<
       const order = orderTables(targetNames, edges);
       if (execute) {
         await tx.unsafe('DELETE FROM auth_setup_state WHERE id = 1 AND completed = 0 AND claim_id IS NULL');
+        await tx.unsafe(`DELETE FROM ai_runtime WHERE id=1 AND revision='initial' AND json::jsonb='{"models":{},"channels":{}}'::jsonb`);
+        await tx.unsafe(`DELETE FROM check_queue_control WHERE id=1 AND revision='initial' AND json::jsonb='{"enabled":false,"generation":"initial","verification":null,"pending":{},"lastEnqueuedAt":null,"lastProcessedAt":null,"lastError":null}'::jsonb`);
         for (const name of order) {
           const table = tables.find((entry) => entry.name === name)!;
           const types = columns.filter((column) => column.table_name === name);

@@ -24,7 +24,7 @@ type Store struct {
 	queries  atomic.Uint64
 }
 
-type databaseOpenError struct { connection bool }
+type databaseOpenError struct{ connection bool }
 
 func (e *databaseOpenError) Error() string { return "database unavailable" }
 
@@ -63,17 +63,26 @@ func openStore(ctx context.Context, databaseURL string, newPostgres bool) (*Stor
 		db.Close()
 		return nil, &databaseOpenError{connection: true}
 	}
-	var executor interface { ExecContext(context.Context, string, ...any) (sql.Result, error) } = db
+	var executor interface {
+		ExecContext(context.Context, string, ...any) (sql.Result, error)
+	} = db
 	var schemaTx *sql.Tx
 	if newPostgres && pg {
 		schemaTx, err = db.BeginTx(ctx, nil)
-		if err != nil { db.Close(); return nil, &databaseOpenError{} }
+		if err != nil {
+			db.Close()
+			return nil, &databaseOpenError{}
+		}
 		defer schemaTx.Rollback()
 		if _, err = schemaTx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(751425306)`); err != nil {
-			schemaTx.Rollback(); db.Close(); return nil, &databaseOpenError{}
+			schemaTx.Rollback()
+			db.Close()
+			return nil, &databaseOpenError{}
 		}
 		if err = validateEmptyPostgres(ctx, schemaTx, false); err != nil {
-			schemaTx.Rollback(); db.Close(); return nil, &databaseOpenError{}
+			schemaTx.Rollback()
+			db.Close()
+			return nil, &databaseOpenError{}
 		}
 		executor = schemaTx
 	}
@@ -90,7 +99,9 @@ func openStore(ctx context.Context, databaseURL string, newPostgres bool) (*Stor
 		`CREATE TABLE IF NOT EXISTS polaris_sequences(name TEXT PRIMARY KEY,value BIGINT NOT NULL)`,
 	} {
 		if _, err = executor.ExecContext(ctx, stmt); err != nil {
-			if schemaTx != nil { schemaTx.Rollback() }
+			if schemaTx != nil {
+				schemaTx.Rollback()
+			}
 			db.Close()
 			return nil, &databaseOpenError{}
 		}
@@ -98,7 +109,9 @@ func openStore(ctx context.Context, databaseURL string, newPostgres bool) (*Stor
 	for _, field := range []string{"agent_id", "monitor_id"} {
 		stmt := `CREATE INDEX IF NOT EXISTS polaris_documents_` + field + `_state ON polaris_documents(kind,` + s.jsonField(field) + `,` + s.jsonField("state") + `)`
 		if _, err = executor.ExecContext(ctx, stmt); err != nil {
-			if schemaTx != nil { schemaTx.Rollback() }
+			if schemaTx != nil {
+				schemaTx.Rollback()
+			}
 			db.Close()
 			return nil, &databaseOpenError{}
 		}
@@ -106,13 +119,33 @@ func openStore(ctx context.Context, databaseURL string, newPostgres bool) (*Stor
 	for _, field := range []string{"scheduled_at", "queued_at"} {
 		stmt := `CREATE INDEX IF NOT EXISTS polaris_documents_` + field + `_time ON polaris_documents(kind,CAST(COALESCE(` + s.jsonField(field) + `,'0') AS BIGINT))`
 		if _, err = executor.ExecContext(ctx, stmt); err != nil {
-			if schemaTx != nil { schemaTx.Rollback() }
+			if schemaTx != nil {
+				schemaTx.Rollback()
+			}
 			db.Close()
 			return nil, &databaseOpenError{}
 		}
 	}
+	if _, err = executor.ExecContext(ctx, "CREATE INDEX IF NOT EXISTS polaris_subscription_owner ON polaris_documents(kind,"+s.jsonField("subscriptionId")+") WHERE kind IN ('subscription_item','subscription_run','subscription_config','subscription_checkpoint')"); err != nil {
+		if schemaTx != nil {
+			schemaTx.Rollback()
+		}
+		db.Close()
+		return nil, &databaseOpenError{}
+	}
 	if schemaTx != nil {
-		if err = schemaTx.Commit(); err != nil { db.Close(); return nil, &databaseOpenError{} }
+		if err = schemaTx.Commit(); err != nil {
+			db.Close()
+			return nil, &databaseOpenError{}
+		}
+	}
+	if err = s.upgradeAIPresentation(ctx); err != nil {
+		db.Close()
+		return nil, &databaseOpenError{}
+	}
+	if err = s.upgradeAICheckRevisions(ctx); err != nil {
+		db.Close()
+		return nil, &databaseOpenError{}
 	}
 	return s, nil
 }

@@ -640,7 +640,7 @@ function VersionRow({ theme, version, definition, storageReady, presentation, bu
     active.theme === definition.id;
   const canApply =
     definition.target === 'monitor' ||
-    presentation?.config.agentEnabled;
+    (definition.target === 'ai' ? presentation?.config.aiEnabled : presentation?.config.agentEnabled);
   return (
     <div
       key={`${version.versionKey}:${definition.id}`}

@@ -9,6 +9,11 @@ import { visibilityRevisionWrite } from '../public/cache';
 const CHECK_FIELDS = ['active', 'name', 'type', 'target', 'method', 'expected_status', 'keyword', 'timeout_ms', 'interval_sec', 'warn_days', 'check_ssl', 'check_domain', 'check_dns', 'options_json', 'group_id', 'agent_id', 'is_public', 'updated_at'] as const;
 
 export class MonitorChanged extends Error {}
+export async function monitorQueueVersion(monitor: Monitor): Promise<string> {
+  const input=JSON.stringify(CHECK_FIELDS.map(field=>monitor[field]??null));
+  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(input));
+  return [...new Uint8Array(digest)].map(value=>value.toString(16).padStart(2,'0')).join('');
+}
 
 export function monitorSnapshotGuard(monitors: Monitor[], now: number): { sql: string; params: unknown[] } {
   const mismatch = CHECK_FIELDS.map((field) => `m.${field} IS NOT json_extract(snapshot.value, '$.${field}')`).join(' OR ');

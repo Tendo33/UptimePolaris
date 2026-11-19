@@ -7,7 +7,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { parseAgentRuntimeConfig } from '../../shared/agent-runtime-config.ts';
 import { networkProbe, networkProbeCapabilities } from './probe-network.mjs';
-import { DEMO_AGENT_TOKEN, DEMO_PUSH_TOKEN, DEMO_RUNTIME_DEFAULTS, demoPorts, demoSkipReason } from './live-demo-data.mjs';
+import { DEMO_AGENT_TOKEN, DEMO_IDS, DEMO_PUSH_TOKEN, DEMO_RUNTIME_DEFAULTS, demoPorts, demoSkipReason } from './live-demo-data.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const seconds = () => Math.floor(Date.now() / 1000);
@@ -177,8 +177,8 @@ export async function startDevRuntime({ origin = process.env.UPTIME_DEV_WORKER_U
   const stopFixtures = demo ? await fixtures() : async () => {};
   const warned = new Map();
   const warn = (key, message) => { if (Date.now() - (warned.get(key) ?? 0) > 30000) { warned.set(key, Date.now()); console.error(`[dev-live] ${message}`); } };
-  const request = async (path, body, timeout = 15000) => {
-    const response = await fetch(new URL(path, origin), { method: body === undefined ? 'GET' : 'POST', headers: { accept: 'application/json', ...(body === undefined ? {} : { 'content-type': 'application/json' }) }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(timeout)]) });
+  const request = async (path, body, timeout = 15000, headers = {}) => {
+    const response = await fetch(new URL(path, origin), { method: body === undefined ? 'GET' : 'POST', headers: { accept: 'application/json', ...(body === undefined ? {} : { 'content-type': 'application/json' }), ...headers }, ...(body === undefined ? {} : { body: JSON.stringify(body) }), redirect: 'error', signal: AbortSignal.any([signal, AbortSignal.timeout(timeout)]) });
     const text = await readLimited(response, 128 * 1024);
     let result;
     try { result = JSON.parse(text); } catch { throw new Error('local Worker returned a non-JSON response'); }
@@ -295,7 +295,7 @@ export async function startDevRuntime({ origin = process.env.UPTIME_DEV_WORKER_U
       if (commandResults.size > 128) commandResults.delete(commandResults.keys().next().value);
       await uploadResults();
     });
-    run('Push heartbeat', 30000, () => request(`/api/public/push/${DEMO_PUSH_TOKEN}?status=1&msg=${encodeURIComponent('Local development timer heartbeat')}`, {}));
+    run('Push heartbeat', 30000, () => request(`/api/public/push/${DEMO_IDS.monitors.backup}`, { status: 1, message: 'Local development timer heartbeat' }, 15000, { authorization: `Bearer ${DEMO_PUSH_TOKEN}` }));
   }
   if (scheduled) run('Scheduled checks', () => 60000 - Date.now() % 60000 + 500, async () => {
     const url = new URL('/__scheduled', origin); url.searchParams.set('cron', '* * * * *');

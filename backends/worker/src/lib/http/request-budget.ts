@@ -5,11 +5,20 @@ export class ExternalBudgetExceeded extends Error {
   constructor() { super('Worker external request budget exhausted'); }
 }
 
+export class ExternalDeadlineExceeded extends ExternalBudgetExceeded {}
+
 /** 限制一次任务中的外部请求总数，重定向也各占一次。 / Limit external requests per job; each redirect also consumes one request. */
 export class ExternalRequestBudget {
   private used = 0;
 
+  constructor(private readonly deadlineMs?: number) {}
+
+  ensureTime(timeoutMs: number): void {
+    if (this.deadlineMs !== undefined && Date.now() + timeoutMs > this.deadlineMs) throw new ExternalDeadlineExceeded();
+  }
+
   reserve(): void {
+    this.ensureTime(0);
     if (this.used >= WORKER_SUBREQUEST_LIMIT) throw new ExternalBudgetExceeded();
     this.used++;
   }

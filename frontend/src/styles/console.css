@@ -348,7 +348,7 @@ html.polaris-console [data-slot='backdrop'][class*='bg-overlay'] {
   backdrop-filter: blur(3px);
 }
 html.polaris-console.dark [data-slot='backdrop'][class*='bg-overlay'] {
-  background-color: rgb(0 0 0 / 0.55);
+  background-color: color-mix(in srgb, var(--polaris-canvas) 55%, transparent);
 }
 html.polaris-console section[role='dialog'][data-slot='base'] {
   box-shadow: var(--polaris-shadow-float);
@@ -361,7 +361,7 @@ html.polaris-console [data-sonner-toaster] [data-sonner-toast][data-styled='true
   background: var(--polaris-card);
   border: 1px solid var(--polaris-line);
   color: var(--polaris-ink);
-  border-radius: 12px;
+  border-radius: 11px;
   box-shadow: var(--polaris-shadow-float);
   font-family: var(--font-sans);
   font-size: 13px;
@@ -414,7 +414,7 @@ html.polaris-console.dark * {
 .polaris [role='button']:focus-visible,
 .polaris [role='menuitem']:focus-visible,
 .polaris [role='option']:focus-visible {
-  outline: 2px solid rgb(59 130 246 / 0.5);
+  outline: 2px solid color-mix(in srgb, var(--polaris-accent) 50%, transparent);
   outline-offset: 2px;
 }
 /* Second line of defence. The real fix is excluding form controls from the
@@ -442,7 +442,7 @@ html.polaris-console.dark * {
 .polaris-card {
   background: var(--polaris-card);
   border: 1px solid var(--polaris-line);
-  border-radius: var(--polaris-page-radius, 12px);
+  border-radius: var(--polaris-page-radius, 11px);
   box-shadow: var(--polaris-shadow-card);
 }
 
@@ -506,12 +506,12 @@ html.polaris-console.dark * {
   min-width: 18px;
   justify-content: center;
   padding: 0 4px;
-  border-radius: 5px;
+  border-radius: 8px;
   border: 1px solid var(--polaris-line-strong);
   background: var(--polaris-card);
   box-shadow: 0 1px 0 var(--polaris-line);
   font-family: var(--font-sans);
-  font-size: 10.5px;
+  font-size: 12px;
   line-height: 1;
   color: var(--polaris-ink-3);
 }
@@ -923,41 +923,44 @@ html.polaris-console .polaris-chart[data-pointer-focus] :focus {
 
 /* ------------------------------------------------------------------- scroll / 滚动 */
 
-html.polaris-console .polaris-scrollbar {
+html.polaris-console :is(.polaris-scrollbar, .polaris-overlay, .polaris-overlay *) {
   scrollbar-width: thin;
   scrollbar-color: var(--polaris-scroll-thumb) transparent;
-  scrollbar-gutter: stable;
 }
-html.polaris-console .polaris-scrollbar:hover {
+html.polaris-console :is(.polaris-scrollbar, .polaris-overlay, .polaris-overlay *):hover {
   scrollbar-color: var(--polaris-scroll-thumb-hover) transparent;
 }
 @supports selector(::-webkit-scrollbar) {
-  html.polaris-console .polaris-scrollbar,
-  html.polaris-console .polaris-scrollbar:hover {
+  html.polaris-console :is(.polaris-scrollbar, .polaris-overlay, .polaris-overlay *),
+  html.polaris-console :is(.polaris-scrollbar, .polaris-overlay, .polaris-overlay *):hover {
     scrollbar-width: auto;
     scrollbar-color: auto;
   }
-  html.polaris-console .polaris-scrollbar::-webkit-scrollbar {
-    width: 10px;
-    height: 10px;
+  html.polaris-console :is(.polaris-scrollbar, .polaris-overlay, .polaris-overlay *)::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
   }
-  html.polaris-console .polaris-scrollbar::-webkit-scrollbar-track {
+  html.polaris-console :is(.polaris-scrollbar, .polaris-overlay, .polaris-overlay *)::-webkit-scrollbar-track {
     margin-block: 12px;
     background: transparent;
   }
-  html.polaris-console .polaris-scrollbar::-webkit-scrollbar-thumb {
+  html.polaris-console :is(.polaris-scrollbar, .polaris-overlay, .polaris-overlay *)::-webkit-scrollbar-thumb {
     min-height: 40px;
-    border: 3px solid transparent;
+    border: 2px solid transparent;
     border-radius: 999px;
     background-color: var(--polaris-scroll-thumb);
     background-clip: padding-box;
   }
-  html.polaris-console .polaris-scrollbar::-webkit-scrollbar-thumb:hover {
+  html.polaris-console :is(.polaris-scrollbar, .polaris-overlay, .polaris-overlay *)::-webkit-scrollbar-thumb:hover {
     background-color: var(--polaris-scroll-thumb-hover);
   }
-  html.polaris-console .polaris-scrollbar::-webkit-scrollbar-corner {
+  html.polaris-console :is(.polaris-scrollbar, .polaris-overlay, .polaris-overlay *)::-webkit-scrollbar-corner {
     background: transparent;
   }
+}
+
+html.polaris-console .polaris-scrollbar {
+  scrollbar-gutter: stable;
 }
 
 .polaris-mobile-nav {
@@ -972,11 +975,11 @@ html.polaris-console .polaris-scrollbar:hover {
   }
 }
 @media (forced-colors: active) {
-  html.polaris-console .polaris-scrollbar,
-  html.polaris-console .polaris-scrollbar:hover {
+  html.polaris-console :is(.polaris-scrollbar, .polaris-overlay, .polaris-overlay *),
+  html.polaris-console :is(.polaris-scrollbar, .polaris-overlay, .polaris-overlay *):hover {
     scrollbar-color: auto;
   }
-  html.polaris-console .polaris-scrollbar::-webkit-scrollbar-thumb {
+  html.polaris-console :is(.polaris-scrollbar, .polaris-overlay, .polaris-overlay *)::-webkit-scrollbar-thumb {
     background-color: CanvasText;
   }
 }

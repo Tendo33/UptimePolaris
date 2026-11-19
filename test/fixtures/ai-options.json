@@ -1,0 +1,16 @@
+{
+  "request": { "prompt": "Return READY in one word.", "maxOutputTokens": 128, "expectedText": "READY" },
+  "headers": { "X-Client-Name": "polaris-fixture", "CF-Access-Client-Secret": "private-header-fixture" },
+  "invalidHeaders": [
+    { "Authorization": "override" }, { "Host": "other.example" }, { "Content-Type": "text/plain" },
+    { "X-Token": "line1\r\nX-Injected: yes" }, { "X-Token": 1 }, { "X-Same": "first", "x-same": "second" },
+    { "Connection": "keep-alive" }, { "Cookie": "private" }, { "Sec-Fetch-Site": "same-origin" }
+  ],
+  "invalidRequests": [
+    { "prompt": "", "maxOutputTokens": 64, "expectedText": "" },
+    { "prompt": "hello", "maxOutputTokens": 0, "expectedText": "" },
+    { "prompt": "hello", "maxOutputTokens": 4097, "expectedText": "" },
+    { "prompt": "hello", "maxOutputTokens": "64", "expectedText": "" },
+    { "prompt": "hello", "maxOutputTokens": 64, "expectedText": "a\nb" }
+  ]
+}

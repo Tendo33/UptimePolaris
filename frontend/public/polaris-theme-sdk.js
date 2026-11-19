@@ -7,6 +7,9 @@
 
   function publicFetch(path, fresh = false) {
     if (!path.startsWith('/api/public/')) return Promise.reject(new Error('Invalid public path'));
+    const pathname = window.location.pathname.replace(/\/$/, '');
+    const view = pathname === '/ai' ? 'ai' : pathname === '/servers' || /^\/server\/[^/]+$/.test(pathname) ? 'agent' : null;
+    if (view) path += (path.includes('?') ? '&' : '?') + 'view=' + view;
     return fetch(path, { method: 'GET', credentials: 'omit', redirect: 'error', ...(fresh ? { cache: 'no-store' } : {}) }).then(async (response) => {
       if (!response.ok) throw new Error(`Public request failed (${response.status})`);
       return response.json();
@@ -28,6 +31,24 @@
   }
 
   async function restRead(method, params) {
+    if (method === 'subscriptions' && capabilities.has('public.subscriptions')) {
+      if (!params || Object.keys(params).some(key => !['category','offset','limit','pageId'].includes(key)) || !['website','model'].includes(params.category)) throw new Error('Invalid subscription category');
+      const offset = params.offset ?? 0, limit = params.limit ?? 50;
+      if (!Number.isInteger(offset) || offset < 0 || offset > 100000 || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new Error('Invalid pagination');
+      const page = query({ pageId: params.pageId });
+      return publicFetch(`/api/public/subscriptions/items?category=${params.category}&offset=${offset}&limit=${limit}${page ? '&' + page.slice(1) : ''}`, true);
+    }
+    if (method === 'subscription-history' && capabilities.has('public.subscription-history')) {
+      if (!params || Object.keys(params).some(key => !['id','pageId'].includes(key)) || typeof params.id !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(params.id)) throw new Error('Invalid subscription item id');
+      return publicFetch(`/api/public/subscriptions/items/${encodeURIComponent(params.id)}/history${query({pageId: params.pageId})}`, true);
+    }
+    if (method === 'ai-models' && capabilities.has('public.ai-models')) { noParams(params); return publicFetch('/api/public/ai/models'); }
+    if (method === 'ai-history' && capabilities.has('public.ai-history')) {
+      if (!params || typeof params !== 'object' || Array.isArray(params) || Object.keys(params).some(key => !['id','days'].includes(key)) || typeof params.id !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(params.id)) throw new Error('Invalid model id');
+      const days = params.days ?? 7;
+      if (!Number.isInteger(days) || days < 1 || days > 90) throw new Error('Invalid days');
+      return publicFetch(`/api/public/ai/models/${encodeURIComponent(params.id)}/history?days=${days}`);
+    }
     if (method === 'status' && capabilities.has('public.status')) {
       noParams(params);
       return publicFetch('/api/public/status');

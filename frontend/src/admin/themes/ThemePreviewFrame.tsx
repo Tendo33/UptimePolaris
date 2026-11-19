@@ -13,6 +13,10 @@ const capabilitiesByMethod: Record<string, string> = {
   'agent-detail': 'public.agent-detail',
   servers: 'public.servers',
   'server-detail': 'public.server-detail',
+  'ai-models': 'public.ai-models',
+  'ai-history': 'public.ai-history',
+  subscriptions: 'public.subscriptions',
+  'subscription-history': 'public.subscription-history',
 };
 
 export function ThemePreviewFrame({ preview, onClose }: { preview: ThemePreview; onClose: () => void }) {
@@ -86,11 +90,28 @@ export function ThemeSandbox({ preview, onReady, className }: { preview: ThemePr
       if (!Object.hasOwn(capabilitiesByMethod, method) || !current.definition.capabilities.includes(capabilitiesByMethod[method])) throw new Error('Method is not declared by this theme');
       if (params != null && (typeof params !== 'object' || Array.isArray(params))) throw new Error('Invalid parameters');
       const values = params && typeof params === 'object' && !Array.isArray(params) ? params as Record<string, unknown> : {};
-      const allowedParams = method === 'config' || method === 'monitors' ? ['pageId'] : method === 'monitor-detail' || method === 'agent-detail' ? ['id', 'minutes'] : method === 'server-detail' ? ['id'] : [];
+      const allowedParams = method === 'subscriptions' ? ['category','offset','limit','pageId'] : method === 'subscription-history' ? ['id','pageId'] : method === 'config' || method === 'monitors' ? ['pageId'] : method === 'ai-history' ? ['id','days'] : method === 'monitor-detail' || method === 'agent-detail' ? ['id', 'minutes'] : method === 'server-detail' ? ['id'] : [];
       if (Object.keys(values).some((key) => !allowedParams.includes(key))) throw new Error('Invalid parameters');
       const pageId = values.pageId;
       if (pageId !== undefined && (typeof pageId !== 'string' || !/^[a-zA-Z0-9_-]{1,64}$/.test(pageId))) throw new Error('Invalid page id');
       const query = pageId ? `?pageId=${encodeURIComponent(pageId)}` : '';
+      if (method === 'subscriptions') {
+        if (!['website','model'].includes(String(values.category))) throw new Error('Invalid subscription category');
+        const offset = values.offset ?? 0, limit = values.limit ?? 50;
+        if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < 0 || offset > 100000 || typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1 || limit > 200) throw new Error('Invalid pagination');
+        return publicFetch(`/api/public/subscriptions/items?category=${values.category}&offset=${offset}&limit=${limit}${query ? '&' + query.slice(1) : ''}`, signal);
+      }
+      if (method === 'subscription-history') {
+        if (typeof values.id !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(values.id)) throw new Error('Invalid subscription item id');
+        return publicFetch(`/api/public/subscriptions/items/${encodeURIComponent(values.id)}/history${query}`, signal);
+      }
+      if (method === 'ai-models') return publicFetch('/api/public/ai/models', signal);
+      if (method === 'ai-history') {
+        if (typeof values.id !== 'string' || !/^[a-zA-Z0-9_-]{1,128}$/.test(values.id)) throw new Error('Invalid model id');
+        const days = values.days ?? 7;
+        if (typeof days !== 'number' || !Number.isInteger(days) || days < 1 || days > 90) throw new Error('Invalid days');
+        return publicFetch(`/api/public/ai/models/${encodeURIComponent(values.id)}/history?days=${days}`, signal);
+      }
       if (method === 'status') return publicFetch('/api/public/status', signal);
       if (method === 'config') {
         const config = await publicFetch(`/api/public/config${query}`, signal) as Record<string, unknown>;

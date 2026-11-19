@@ -13,7 +13,7 @@ export type PreviewDraftView = Pick<PresentationView,
   | 'showHistory' | 'showLatency' | 'showAvailability' | 'showExpiry' | 'showCountry'>;
 
 export interface PreviewDraft {
-  kind: 'monitor' | 'agent';
+  kind: 'monitor' | 'agent' | 'ai';
   view: PreviewDraftView;
   headCode: string;
   contentHtml: string;
@@ -25,7 +25,7 @@ const listeners = new Set<() => void>();
 function previewKind() {
   if (typeof window === 'undefined' || window.parent === window) return null;
   const kind = new URLSearchParams(window.location.search).get('preview');
-  return kind === 'monitor' || kind === 'agent' ? kind : null;
+  return kind === 'monitor' || kind === 'agent' || kind === 'ai' ? kind : null;
 }
 
 const kind = previewKind();

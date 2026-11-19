@@ -44,6 +44,12 @@ Webhook 的 `secret` 非空时，发送 `Authorization: Bearer <secret>`。接�
 
 ## 分组范围
 
+普通监控和 AI 渠道提供“使用全局规则”“指定通知渠道”和“关闭通知”。关闭通知保留已选渠道。指定渠道至少选一项；无效或停用的渠道不会接收，也不会回退到全局。
+
+全局接收范围先匹配事件类别与来源，再匹配分组、AI 渠道或订阅。默认只接收本地的网站、模型和 Agent 资源事件；要接收外部订阅，需明确勾选该来源和所需事件。事件类别或来源显式为空时，全局规则不匹配任何消息。AI 和订阅同步没有普通分组，不能匹配限定了分组的渠道。
+
+已删除的 AI 渠道和订阅保留为无效引用，编辑时不会自动清空为全部。接收范围预览显示最终渠道及排除原因，不会外发。指定通知渠道绕过全局范围，但仍受通知开关、渠道状态和维护静默限制。订阅的监控告警、同步告警独立配置，详见[订阅指南](subscriptions.md)。
+
 - 范围为空：全部监控，包含未分组条目。
 - 选定分组：只匹配这些分组里的监控。
 - 渠道关闭：不接收正常的自动分发。
@@ -123,6 +129,12 @@ Telegram messages include the monitor name, target, type and state transition. T
 Channel credentials grant access to external services. Keep them out of public names, maintenance text and monitor messages. Management API responses can contain channel configuration, so restrict access to trusted administrators and automation. Do not print complete channel configurations when troubleshooting.
 
 ### Group scope
+
+Monitors and AI channels offer **Use global rules**, **Choose channels**, and **Off**. Turning notifications off preserves the selection. Explicit selection requires at least one channel. Invalid or inactive selections never fall back to global routing.
+
+Global rules intersect event types and source types, then apply groups, AI channels or subscription scope. Defaults accept local monitor, model and Agent-resource events only. Enable external subscriptions explicitly. Empty event or source selections match nothing. AI events and subscription-sync events have no monitor group and cannot match a group-restricted channel.
+
+Deleted AI-channel and subscription IDs remain invalid references rather than becoming unrestricted scope. Recipient previews explain exclusions without sending messages. Explicit channels bypass global scope while respecting enabled states, notification switches and maintenance. Subscriptions configure item and sync alerts separately; see the [subscription guide](subscriptions.md#english).
 
 An empty group scope matches all monitors, including ungrouped ones. A non-empty scope matches only monitors in the selected groups. A disabled channel does not receive normal automatic dispatch.
 

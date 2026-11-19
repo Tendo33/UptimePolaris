@@ -57,12 +57,15 @@ docker logs uptime-polaris
 | `POLARIS_TRUST_PROXY` | `--trust-proxy` | `false` |
 | `POLARIS_SETUP_KEY` | 无 | 初始化凭据；未设置时使用 `POLARIS_ADMIN_TOKEN` |
 | `POLARIS_ADMIN_TOKEN` | 无 | 可选的管理 API Bearer 凭据 |
+| `POLARIS_AI_KEY_FILE` | 无 | AI 渠道与订阅的加密密钥文件；PostgreSQL 使用 AI 监控或订阅时必填，SQLite 默认用数据目录的 `ai-credential.key` |
 
 PostgreSQL 连接串形如 `postgresql://user:password@host:5432/database?sslmode=verify-full`。启动时创建 Go 自己的表；SQLite 和 PostgreSQL 的数据含义一致。主题资产始终在数据目录里，不会存进 PostgreSQL。
 
 HTTPS 反向代理要保留 `Host`。只有可信代理隔离了后端直连入口，并且能可靠设置 `X-Forwarded-Proto` 时，才启用 `--trust-proxy`。这个设置会让 HTTPS 会话 Cookie 带上 `Secure`，并生成 HTTPS 的 Agent 安装地址。
 
 备份时先停服务，再备份整个数据目录。PostgreSQL 部署还要备份数据库。切换数据库后保留原数据和主题目录，检查新服务的登录、监控和主题，再结束旧服务。
+
+AI 密钥文件须为受保护的 32 字节原始随机数据，多实例共享相同内容，并与数据库配套备份。添加渠道、模型和恢复密钥的方法见 [AI 模型监控](../../docs/ai-monitoring.md)。不使用 AI 监控时无需配置此项。
 
 ## 原生探测与 API
 
@@ -154,6 +157,9 @@ Choose SQLite or PostgreSQL during first setup. An explicit selection is saved i
 | `POLARIS_TRUST_PROXY` | `--trust-proxy` | `false` |
 | `POLARIS_SETUP_KEY` | none | Setup credential; falls back to `POLARIS_ADMIN_TOKEN` |
 | `POLARIS_ADMIN_TOKEN` | none | Optional admin API bearer credential |
+| `POLARIS_AI_KEY_FILE` | none | Protected AI and subscription encryption key file; required for AI monitoring or subscriptions on PostgreSQL. SQLite defaults to `ai-credential.key` in the data directory |
+
+The AI key file contains 32 raw random bytes, identical across instances. Back it up with the matching database. See [AI monitoring](../../docs/ai-monitoring.md#english) for setup and recovery. It is not required when AI monitoring is unused.
 
 ### Docker
 

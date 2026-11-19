@@ -15,6 +15,8 @@ export interface BackendCapabilities {
     sslMode: 'certificate-records' | 'tls-handshake';
   };
   themes: { storage: 'r2' | 'filesystem'; installationAvailable: boolean };
+  checkQueue?: { supported: boolean };
+  subscriptions?: { supported: boolean; schemaVersion: 1; minimumIntervalSec: number; capabilities: string[]; limits: typeof import('./subscriptions').SUBSCRIPTION_LIMITS };
 }
 
 export function isProbeMonitorType(type: string): boolean {

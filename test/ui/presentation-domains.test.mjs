@@ -24,26 +24,27 @@ const panelSource = source('frontend/src/admin/settings/PresentationPanel.tsx').
 function fixture(initial = []) {
   let states = [], deps = [], cursor = 0, effects = [], failed = false;
   const writes = [];
-  let config = { agentEnabled: true, domains: structuredClone(initial) };
+  let config = { agentEnabled: true, aiEnabled: false, aiOnMonitorPage: false, pages: {monitor:{theme:null},agent:{theme:null},ai:{theme:null}}, domains: structuredClone(initial) };
   const useState = initial => { const i = cursor++; if (!(i in states)) states[i] = initial; return [states[i], value => { states[i] = typeof value === 'function' ? value(states[i]) : value; }]; };
   const useRef = initial => { const i = cursor++; return states[i] ??= { current: initial }; };
   const useEffect = (fn, next) => { const i = cursor++; if (!deps[i] || next.some((value, j) => value !== deps[i][j])) { deps[i] = next; effects.push(fn); } };
   const useCallback = fn => { cursor++; return fn; };
   const useAutoSave = compile(hook, 'useAutoSave', { useState, useRef, useEffect, useCallback });
-  const React = { createElement: (type, props, ...children) => ({ type, props: { ...props, children } }) };
+  const React = { createElement: (type, props, ...children) => typeof type === 'function' ? type({ ...props, children }) : ({ type, props: { ...props, children } }) };
   const updatePresentation = async edit => { const next = edit(structuredClone(config)); writes.push(next.domains); if (failed) throw Error('fixture failure'); config = next; };
   const env = { React, useState, useEffect, useAutoSave, updatePresentation, normalizeDomain, usePresentation: () => ({ data: { config } }), useTranslations: () => key => key, useApiErrorMessage: () => String };
-  for (const name of ['Button', 'Input', 'Skeleton', 'Switch', 'MotionDisclosure', 'AutoSaveStatus', 'Globe', 'Monitor', 'Plus', 'Server', 'Trash2']) env[name] = name;
+  Object.assign(env,{clsx:(...values)=>values.filter(Boolean).join(' '),ICON:{monitor:'Monitor',agent:'Server',ai:'Bot'},PATH:{monitor:'/',agent:'/servers',ai:'/ai'}});
+  for (const name of ['Button', 'Input', 'Skeleton', 'Switch', 'MotionDisclosure', 'AutoSaveStatus', 'Globe', 'Monitor', 'Plus', 'Server', 'Trash2','IconTile','Link','Palette','ExternalLink','Info','Bot','ArrowRight']) env[name] = name;
   const Panel = compile(panelSource, 'PresentationPanel', env);
   const render = () => { cursor = 0; effects = []; const result = Panel(); effects.forEach(fn => fn()); return result; };
   const findAll = (node, predicate) => !node || typeof node !== 'object' ? [] : [...(predicate(node) ? [node] : []), ...(node.props?.children ?? []).flat(Infinity).flatMap(child => findAll(child, predicate))];
-  const section = (tree, kind) => findAll(tree, node => node.type === 'section' && node.props['aria-label'] === kind)[0];
+  const section = (tree, kind) => findAll(tree, node => node.type === 'section' && node.props['aria-label'] === `${kind}Page`)[0];
   const add = (tree, kind) => findAll(section(tree, kind), node => node.type === 'Button').at(-1).props.onPress();
   const input = (tree, kind, index = 0) => findAll(section(tree, kind), node => node.type === 'Input')[index];
-  const remove = (tree, kind, index = 0) => findAll(section(tree, kind), node => node.type === 'Button')[index].props.onPress();
+  const remove = (tree, kind, index = 0) => findAll(section(tree, kind), node => node.type === 'Button' && node.props['aria-label']==='remove')[index].props.onPress();
   const status = tree => findAll(tree, node => node.type === 'AutoSaveStatus')[0].props;
   const toggle = tree => findAll(tree, node => node.type === 'Switch')[0].props;
-  const disclosure = tree => findAll(tree, node => node.type === 'MotionDisclosure')[0].props;
+  const disclosure = tree => findAll(section(tree,'agent'), node => node.type === 'MotionDisclosure')[0].props;
   render(); render();
   return { render, add, input, remove, status, toggle, disclosure, writes, get config() { return config; }, set failed(value) { failed = value; } };
 }

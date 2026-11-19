@@ -97,10 +97,11 @@ function useScrolled(threshold = 4): boolean {
 function SiteHeader() {
   const t = useTranslations();
   const pageConfig = usePageConfig();
-  const { search } = useLocation();
+  const { search, pathname } = useLocation();
   const { config: globalConfig } = useConfig();
   const title = globalConfig?.config.title || pageConfig.siteMeta.title;
-  const homeHref = statusPagePath(pageConfig.pageId, pageConfig.defaultPageId, search);
+  const presentation = usePresentationView();
+  const homeHref = presentation?.kind === 'ai' ? pathname === '/ai' ? '/ai' : '/' : statusPagePath(pageConfig.pageId, pageConfig.defaultPageId, search);
   /** Header mark: configured icon, else generated brand; `tight` only applies to the generated mark. / 页头图标：优先配置图标，否则内置品牌；`tight` 仅用于内置图标。 */
   const icon = resolveSiteIconUrl(
     { icon: globalConfig?.config.icon ?? pageConfig.siteMeta.icon, iconCandidates: pageConfig.siteMeta.iconCandidates },

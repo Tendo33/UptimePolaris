@@ -7,7 +7,7 @@ import { maintenancePage, maintenanceScript } from '../public/maintenance-page';
 import { currentUser } from '../auth/routes';
 import { safeEqual } from '../auth/service';
 
-const PUBLIC_SHELL = /^\/(?:|monitor\/[^/]+|server\/[^/]+|status\/[^/]+)\/?$/;
+const PUBLIC_SHELL = /^\/(?:|ai|servers|monitor\/[^/]+|server\/[^/]+|status\/[^/]+)\/?$/;
 /**
  * Paths that belong to the built-in SPA rather than to a theme.
  *
@@ -93,7 +93,7 @@ export async function handlePageRequest(request: Request, env: Env): Promise<Res
   if (url.pathname === '/theme') return null;
   if (/^\/(?:admin|login|setup)(?:\/|$)/.test(url.pathname)) return builtin(request, env);
   const preview = url.searchParams.get('preview');
-  if (shellPath(url.pathname) && (preview === 'monitor' || preview === 'agent')) {
+  if (shellPath(url.pathname) && (preview === 'monitor' || preview === 'agent' || preview === 'ai')) {
     const token = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? '';
     const authorized = Boolean(env.ADMIN_TOKEN && safeEqual(token, env.ADMIN_TOKEN)) ||
       Boolean((await currentUser({ env, req: { header: (name) => request.headers.get(name) ?? undefined } })).user);

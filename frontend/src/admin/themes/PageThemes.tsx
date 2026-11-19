@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, Skeleton } from '@heroui/react';
-import { Eye, Monitor, RotateCcw, Server, Settings2 } from 'lucide-react';
+import { Bot, Eye, Monitor, RotateCcw, Server, Settings2 } from 'lucide-react';
 import { useTranslations } from 'use-intl';
 import { useApiErrorMessage } from '@/api/useApiErrorMessage';
 import { builtinThemeOptions } from '../../../../shared/builtin-theme';
@@ -47,15 +47,15 @@ export function PageThemes({
       </Panel>
     );
   if (!data.data) return <Skeleton className="h-44 rounded-xl" />;
-  const kinds: PageKind[] = data.data.config.agentEnabled
-    ? ['monitor', 'agent']
-    : ['monitor'];
+  const kinds: PageKind[] = ['monitor', ...(data.data.config.agentEnabled ? ['agent' as const] : []), ...(data.data.config.aiEnabled ? ['ai' as const] : [])];
   return (
     <>
       <div
         className={
           'grid grid-cols-1 gap-4 ' +
-          (kinds.length === 2 ? 'lg:grid-cols-2' : '')
+          (kinds.length === 3
+            ? 'lg:grid-cols-2 xl:grid-cols-3'
+            : kinds.length === 2 ? 'lg:grid-cols-2' : '')
         }
       >
         {kinds.map((kind) => {
@@ -78,12 +78,12 @@ export function PageThemes({
               choiceLabels: option.choices ? Object.fromEntries(option.choices.map((choice) => [choice, t(`builtinChoices.${choice}`)])) : undefined,
             })),
           };
-          const Icon = kind === 'monitor' ? Monitor : Server;
+          const Icon = kind === 'monitor' ? Monitor : kind === 'ai' ? Bot : Server;
           return (
             <Panel key={kind}>
               <PanelHeader
                 icon={<Icon />}
-                title={t(kind === 'monitor' ? 'monitorBoard' : 'serverBoard')}
+                title={t(kind === 'monitor' ? 'monitorBoard' : kind === 'ai' ? 'aiBoard' : 'serverBoard')}
               />
               <div className="flex min-h-20 flex-col justify-center gap-1">
                 <h3 className="break-words text-lg font-semibold text-[var(--polaris-ink)]">

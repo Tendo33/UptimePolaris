@@ -118,9 +118,8 @@ function hasCorruptedText(value) {
 function hasMalformedAccent(value, source) {
   const withoutUrls = value.replace(/(?:https?:\/\/|www\.)[^\s]*/gi, '');
   if (!withoutUrls.includes('?')) return false;
-  if (source.trimEnd().endsWith('?') && withoutUrls.trimEnd().endsWith('?')) {
-    return withoutUrls.slice(0, -1).includes('?');
-  }
+  const sourceQuestions = source.replace(/(?:https?:\/\/|www\.)[^\s]*/gi, '').match(/\?/g)?.length ?? 0;
+  if ((withoutUrls.match(/\?/g)?.length ?? 0) === sourceQuestions && !/(?:^|\s)\?\p{L}|\p{L}\?\p{L}/u.test(withoutUrls) && [...withoutUrls.matchAll(/\?/g)].every(match => !withoutUrls.slice(match.index + 1).trim() || /^\s+\p{Lu}/u.test(withoutUrls.slice(match.index + 1)))) return false;
   return true;
 }
 
@@ -157,6 +156,7 @@ if (hasCorruptedText('l?aper?u') &&
     !hasCorruptedText('Disponible? Réessayez.') &&
     !hasMalformedAccent('Disponible?', 'Available?') &&
     !hasMalformedAccent('Êtes-vous prêt?', 'Are you ready?') &&
+    !hasMalformedAccent('Retirer le fichier ? Les abonnements restent.', 'Remove the file? Subscriptions remain.') &&
     hasMalformedAccent('?mettez', 'Create') &&
     hasMalformedAccent('est? indisponible', 'is unavailable') &&
     !hasMalformedAccent('Ready?', 'Ready?')) {

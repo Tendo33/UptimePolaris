@@ -7,7 +7,11 @@ import { useMonitorFilters } from '@/components/status-page/MonitorFilterContext
 import { StatusHero } from '@/components/status-page/StatusHero';
 import { Toolbar, type ViewMode } from '@/components/status-page/Toolbar';
 import { useRefreshTimer } from '@/components/status-page/useRefreshTimer';
-import { revalidateData, useConfig, useMonitorData } from '@/components/status-page/useStatusPageData';
+import { revalidateData, SWR_KEYS, useConfig, useMonitorData, usePublicAiModels } from '@/components/status-page/useStatusPageData';
+import { AiModels, filterAiModels } from './AiModels';
+import { aiStatusKey } from '@/components/ai/status';
+import { ApiError } from '@/api/errors';
+import { filterSubscriptions, PublicSubscriptions, subscriptionBucket, usePublicSubscriptions } from '../subscriptions/PublicSubscriptions';
 import { calculateMonitorStatusCounts, selectSystemStatus } from '@/lib/monitor-status';
 import { CONTENT_TRANSITION, MOTION_EASE } from '@/lib/motion';
 import type { Monitor } from '@/types/monitor';
@@ -29,17 +33,24 @@ const VIEW_KEY = 'uptime-polaris.status.view';
  * 公开状态页顶部用一句话概括系统，之后依次展示通知和监控分组；每组列出监控项、
  * 近期检查和当日可用率。搜索及状态筛选位于分组上方同一行，滚动时固定在页头下方。
  */
-export function StatusPage() {
+export function StatusPage({ aiOnly = false }: { aiOnly?: boolean }) {
   const t = useTranslations();
   const { config: globalConfig, isError: configError, revalidate: refreshConfig } = useConfig();
-  const { monitorGroups, monitoringData, isLoading, isError, receivedAt } = useMonitorData();
+  const presentation = usePresentationView();
+  const aiEnabled = presentation?.aiEnabled === true && (aiOnly || presentation.aiOnMonitorPage);
+  const { monitorGroups, monitoringData, isLoading, isError, receivedAt } = useMonitorData(undefined, !aiOnly);
+  const ai = usePublicAiModels(aiEnabled);
+  const websiteSubscriptions = usePublicSubscriptions('website', !aiOnly);
+  const modelSubscriptions = usePublicSubscriptions('model', aiEnabled);
+  const aiHidden = ai.error instanceof ApiError && [401, 403, 404].includes(ai.error.status);
+  const aiModels = !aiEnabled || aiHidden ? [] : ai.data?.models ?? [];
   const { searchTerm, isFiltering, clearSearch, filterStatus, searchInGroup } = useMonitorFilters();
   const { pageId } = usePageConfig();
-  const presentation = usePresentationView();
+  const viewKey = aiOnly ? 'uptime-polaris.ai.view' : VIEW_KEY;
 
   const [view, setView] = useState<ViewMode>(() => {
     try {
-      const saved = window.localStorage.getItem(VIEW_KEY);
+      const saved = window.localStorage.getItem(viewKey);
       return saved === 'grid' || !saved && presentation?.layout === 'cards' ? 'grid' : 'list';
     } catch {
       return 'list';
@@ -48,7 +59,7 @@ export function StatusPage() {
   const changeView = (next: ViewMode) => {
     setView(next);
     try {
-      window.localStorage.setItem(VIEW_KEY, next);
+      window.localStorage.setItem(viewKey, next);
     } catch {
       // Private browsing: the choice lasts for this visit only. / 隐私浏览模式下，选择仅在本次访问中保留。
     }
@@ -57,20 +68,30 @@ export function StatusPage() {
   const [refreshError, setRefreshError] = useState(false);
   const refresh = useCallback(async () => {
     try {
-      await revalidateData(pageId, undefined, refreshConfig);
+      await Promise.all([aiOnly ? refreshConfig() : revalidateData(pageId, undefined, refreshConfig), ...(aiEnabled ? [revalidateData(pageId, SWR_KEYS.AI(pageId))] : [])]);
+      await Promise.all([!aiOnly ? websiteSubscriptions.mutate() : undefined, aiEnabled ? modelSubscriptions.mutate() : undefined]);
       setRefreshError(false);
     } catch (error) {
       setRefreshError(true);
       throw error;
     }
-  }, [pageId, refreshConfig]);
+  }, [pageId, refreshConfig, aiOnly, aiEnabled, websiteSubscriptions.mutate, modelSubscriptions.mutate]);
   const timer = useRefreshTimer(refresh, 60_000, receivedAt);
 
-  const counts = useMemo(
-    () => calculateMonitorStatusCounts(monitorGroups, monitoringData.heartbeatList ?? {}),
-    [monitorGroups, monitoringData.heartbeatList],
-  );
-  const status = selectSystemStatus(counts);
+  const counts = useMemo(() => {
+    const result = calculateMonitorStatusCounts(monitorGroups, monitoringData.heartbeatList ?? {});
+    for (const model of aiModels) {
+      const state = ai.error ? 'unknown' : aiStatusKey(model.live);
+      result.total++; result[state]++; if (state !== 'up') result.abnormal++;
+    }
+    for (const item of [...websiteSubscriptions.items, ...modelSubscriptions.items]) {
+      const state = (item.category === 'website' ? websiteSubscriptions.error : modelSubscriptions.error) ? 'unknown' : subscriptionBucket(item);
+      result.total++; result[state]++; if (state !== 'up') result.abnormal++;
+    }
+    return result;
+  }, [monitorGroups, monitoringData.heartbeatList, aiModels, ai.error, websiteSubscriptions.items, modelSubscriptions.items, websiteSubscriptions.error, modelSubscriptions.error]);
+  const systemStatus = selectSystemStatus(counts);
+  const status = systemStatus === 'normal' && (ai.error || isError || websiteSubscriptions.error || modelSubscriptions.error) ? 'warning' : systemStatus;
 
   // The day's availability across every monitor that has a reading, for the hero. / 汇总有读数的监控项当日可用率，供概览使用。
   const uptime24h = useMemo(() => {
@@ -117,12 +138,15 @@ export function StatusPage() {
       .filter((group): group is PageGroup => group !== null && group.monitorList.length > 0);
   }, [filterStatus, isFiltering, monitorGroups, monitoringData.heartbeatList, searchInGroup, searchTerm]);
 
-  const matched = groups.reduce((sum, group) => sum + group.monitorList.length, 0);
+  const shownAi = filterAiModels(aiModels, searchTerm, filterStatus, Boolean(ai.error), aiOnly || searchInGroup);
+  const shownWebsites = filterSubscriptions(websiteSubscriptions.items, searchTerm, filterStatus);
+  const shownModels = filterSubscriptions(modelSubscriptions.items, searchTerm, filterStatus);
+  const matched = groups.reduce((sum, group) => sum + group.monitorList.length, 0) + shownAi.length + shownWebsites.length + shownModels.length;
 
   return (
     <div className="pb-6">
       {globalConfig?.config.description && <p className="pt-4 text-small text-[var(--polaris-ink-3)]">{globalConfig.config.description}</p>}
-      <StatusHero counts={counts} status={status} loading={isLoading} timer={timer} uptime24h={presentation?.showAvailability === false ? null : uptime24h} />
+      <StatusHero aiOnly={aiOnly} counts={counts} status={status} loading={isLoading || ai.isLoading} timer={timer} uptime24h={presentation?.showAvailability === false || aiModels.length > 0 || websiteSubscriptions.items.length > 0 || modelSubscriptions.items.length > 0 ? null : uptime24h} />
 
       {(isError || configError || refreshError) && receivedAt !== null ? (
         <p role="status" className="mb-5 flex items-center gap-2 text-[13px] text-[var(--polaris-ink-2)]">
@@ -132,7 +156,7 @@ export function StatusPage() {
       ) : null}
 
 
-      <Toolbar counts={counts} view={view} onView={changeView} matched={matched} />
+      <Toolbar aiOnly={aiOnly} counts={counts} view={view} onView={changeView} matched={matched} />
 
       {isLoading ? (
         <GroupSkeleton />
@@ -148,11 +172,11 @@ export function StatusPage() {
             {t('timer.refreshNow')}
           </button>
         </div>
-      ) : groups.length === 0 ? (
+      ) : groups.length === 0 && shownAi.length === 0 && !shownWebsites.length && !shownModels.length && !ai.isLoading && !websiteSubscriptions.isLoading && !modelSubscriptions.isLoading ? (
         <div className="polaris-card flex flex-col items-center px-6 py-14 text-center">
           <SearchX size={22} className="text-[var(--polaris-ink-4)]" aria-hidden="true" />
           <p className="mt-3 text-[14px] font-semibold">
-            {isFiltering ? t('node.noMatchingResults') : t('common.list.empty')}
+            {isFiltering ? t('node.noMatchingResults') : t(aiOnly ? 'ai.empty' : 'common.list.empty')}
           </p>
           {isFiltering ? (
             <button
@@ -178,6 +202,9 @@ export function StatusPage() {
           </motion.div>
         </AnimatePresence>
       )}
+      {aiEnabled && !aiHidden ? <AiModels models={shownAi} view={view} filtering={isFiltering} error={Boolean(ai.error)} loading={ai.isLoading} retry={() => { void ai.mutate().catch(() => undefined); }} /> : null}
+      {!aiOnly && !websiteSubscriptions.hidden ? <PublicSubscriptions category="website" items={shownWebsites} view={view} error={Boolean(websiteSubscriptions.error)} loading={websiteSubscriptions.isLoading} retry={() => void websiteSubscriptions.mutate()} /> : null}
+      {aiEnabled && !modelSubscriptions.hidden ? <PublicSubscriptions category="model" items={shownModels} view={view} error={Boolean(modelSubscriptions.error)} loading={modelSubscriptions.isLoading} retry={() => void modelSubscriptions.mutate()} /> : null}
     </div>
   );
 }

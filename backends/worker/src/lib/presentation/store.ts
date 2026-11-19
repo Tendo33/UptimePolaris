@@ -11,6 +11,7 @@ import { resolveBuiltinPageView } from '../../../../../shared/builtin-theme';
 import type { Env } from '../../types';
 import { getDB } from '../db/factory';
 import { visibilityRevisionWrite } from '../public/cache';
+import { publicPathKind } from '../../../../../shared/public-page-paths';
 
 export async function loadPresentation(env: Env): Promise<PresentationState> {
   const row = await getDB(env).queryOne<{
@@ -74,16 +75,18 @@ export async function resolvePage(
   preview?: PageKind,
 ): Promise<PageContext> {
   const { config, revision } = await loadPresentation(env);
-  const domains = config.agentEnabled ? config.domains : [];
+  const domains = config.agentEnabled || config.aiEnabled ? config.domains : [];
   const domain = domains.find(
     (entry) => entry.hostname === url.hostname.toLowerCase().replace(/\.$/, ''),
   );
-  const kind = preview ?? domain?.page ?? 'monitor';
+  const view = url.searchParams.get('view');
+  const explicit = publicPathKind(url.pathname) ?? (view === 'ai' || view === 'agent' ? view : null);
+  const kind = preview ?? explicit ?? domain?.page ?? 'monitor';
   return {
     kind,
     page: resolveBuiltinPageView(kind, config.pages[kind]),
-    enabled: !!preview || kind !== 'agent' || config.agentEnabled,
-    configured: !!preview || !domains.length || !!domain,
+    enabled: kind === 'ai' ? config.aiEnabled : !!preview || kind !== 'agent' || config.agentEnabled,
+    configured: !!preview || !!explicit || !domains.length || !!domain,
     config,
     revision,
     preview: !!preview,

@@ -13,6 +13,7 @@ export default defineConfig({
 		compatibilityDate: "2025-01-01",
 		compatibilityFlags: [
 			"nodejs_compat",
+			"global_fetch_strictly_public",
 		],
 		entrypoint: fileURLToPath(new URL("./src/index.ts", import.meta.url)),
 		observability: {
@@ -24,7 +25,7 @@ export default defineConfig({
 			runWorkerFirst: [
 				"/api", "/api/*",
 				"/", "/admin", "/admin/*", "/login", "/login/*", "/setup", "/setup/*",
-				"/monitor/*", "/status/*", "/server/*",
+				"/monitor/*", "/status/*", "/server/*", "/servers", "/servers/", "/ai", "/ai/",
 				"/theme/*", "/polaris-maintenance.js", "/agent/*", "/__scheduled"
 			],
 		},

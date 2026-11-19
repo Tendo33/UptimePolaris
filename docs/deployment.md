@@ -50,6 +50,8 @@ npm --prefix frontend ci
 
 `wrangler.jsonc` 启用了 `keep_vars`，在控制台添加的普通变量在重新部署后保留；Secret 不受部署影响。
 
+可选的 `CHECK_QUEUE` 及当前 Worker 的队列消费者配置也会保留。不需要分批检查时无需创建或绑定队列；启用步骤见 [Worker Queue](queue.md)。
+
 升级时，在 GitHub 上执行 Sync fork，Workers Builds 会自动重新部署。
 
 ## 通过 Cloudflare 按钮部署
@@ -256,6 +258,8 @@ Configure and verify the database in step two. Without D1, PostgreSQL is selecte
 The root `wrangler.jsonc` declares no D1, KV, R2 or Analytics Engine binding; bind these resources manually. `wrangler deploy` replaces the Worker's bindings with those in the configuration file. Under Workers Builds, `npm run deploy` therefore reads the Worker's existing `DB`, `CONFIG`, `THEMES` and `UPTIME` bindings through the Cloudflare API and deploys with them. If they cannot be read, the deploy stops instead of removing them. This uses the `CLOUDFLARE_API_TOKEN` that Workers Builds provides. If the build has no `CLOUDFLARE_ACCOUNT_ID` and the token can reach more than one account, set `CLOUDFLARE_ACCOUNT_ID` in the build variables.
 
 `wrangler.jsonc` enables `keep_vars`, so plain variables added in the dashboard survive redeploys. Secrets are not affected by deploys.
+
+The optional `CHECK_QUEUE` binding and the current Worker’s Queue consumer settings are also preserved. No Queue resource is required unless batching is enabled. See [Worker Queue](queue.md#english).
 
 To upgrade, select **Sync fork** on GitHub; Workers Builds redeploys automatically.
 

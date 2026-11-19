@@ -1,4 +1,4 @@
-import { Activity, BellRing, Folder, Palette, Server, Settings, type LucideIcon } from 'lucide-react';
+import { Activity, BellRing, Bot, Folder, Palette, Rss, Server, Settings, type LucideIcon } from 'lucide-react';
 import type { Hue } from '../../types/tone';
 
 export interface NavEntry {
@@ -35,6 +35,8 @@ export interface NavEntry {
  */
 export const NAV: NavEntry[] = [
   { href: '/admin', icon: Activity, labelKey: 'nav.monitors', section: 'monitor', hue: 'primary' },
+  { href: '/admin/ai', icon: Bot, labelKey: 'nav.ai', section: 'monitor', hue: 'violet' },
+  { href: '/admin/subscriptions', icon: Rss, labelKey: 'nav.subscriptions', section: 'monitor', hue: 'cyan' },
   {
     href: '/admin/agents',
     icon: Server,

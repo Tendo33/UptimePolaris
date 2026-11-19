@@ -15,6 +15,8 @@ import { handlePageRequest } from './lib/theme/page-handler';
 import type { Env } from './types';
 import { isSetupAsset, setupRequiredResponse } from '../../../shared/setup';
 import { brandIconSvg } from './lib/brand';
+import { consumeCheckQueue } from './lib/queue/consumer';
+import { queueRouting } from './lib/queue/control';
 
 /**
  * Same-isolate fast path; the database lease covers other isolates.
@@ -97,6 +99,7 @@ async function handleDatabaseRequest(request: Request, env: Env, ctx: ExecutionC
 }
 
 export default {
+  async queue(batch:MessageBatch<unknown>,env:Env,ctx:ExecutionContext){await consumeCheckQueue(batch,env,ctx);},
   /** 在请求数据库作用域内处理初始化和结构检查，再进入页面或 API 路由。 / Handle setup and schema checks in the request database scope before page or API routing. */
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     let response: Response;
@@ -128,7 +131,14 @@ export default {
             if (!databaseConfigured(scopedEnv)) return;
             await requireReadyDatabase(scopedEnv);
             const now = Math.floor(Date.now() / 1000);
-            const result = await runTick(scopedEnv, now);
+            let result = await runTick(scopedEnv, now);
+            let queueEnabled=false;
+            if(scopedEnv.CHECK_QUEUE)try{queueEnabled=await queueRouting(scopedEnv);}catch{}
+            const waitUntil=Math.floor(now/60)*60+50;
+            while(queueEnabled&&result.status==='skipped'&&result.reason==='leased'&&Date.now()/1000<waitUntil){
+              await new Promise(resolve=>setTimeout(resolve,2000));
+              result=await runTick(scopedEnv,Math.floor(Date.now()/1000));
+            }
             /** The tick lease serializes minutes, so the daily sync runs at most once. / tick 租约保证每分钟只有一个实例，每日同步不会重复。 */
             if (result.status === 'completed') {
               try {

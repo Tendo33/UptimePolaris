@@ -112,8 +112,29 @@ func (a *App) validateMonitor(t *transaction, input, stored Object) (Object, err
 	if o == nil || len(encode(o)) > 64000 {
 		return nil, failure("options_json_invalid", 400)
 	}
-	if kind == "agent" && !knownFields(o, []string{"alerts"}) || kind == "push" && len(o) > 0 {
+	if kind == "agent" && !knownFields(o, []string{"alerts", "notificationChannelIds", "notificationEnabled"}) || kind == "push" && !knownFields(o, []string{"notificationChannelIds", "notificationEnabled"}) {
 		return nil, failure("options_json_invalid", 400)
+	}
+	if raw, present := o["notificationChannelIds"]; present {
+		if !validNotificationIDs(raw) {
+			return nil, failure("options_json_invalid", 400)
+		}
+		if _, supplied := input["options_json"]; supplied || stored == nil {
+			for _, id := range stringsOf(raw) {
+				channel, err := t.get("notification", id)
+				if err != nil {
+					return nil, err
+				}
+				if channel == nil {
+					return nil, failure("notification_channel_not_found", 400)
+				}
+			}
+		}
+	}
+	if raw, present := o["notificationEnabled"]; present {
+		if _, ok := raw.(bool); !ok {
+			return nil, failure("options_json_invalid", 400)
+		}
 	}
 	for _, key := range []string{"active", "check_ssl", "check_domain", "check_dns"} {
 		if v, exists := input[key]; exists {
@@ -931,6 +952,8 @@ func (a *App) cycle(ctx context.Context, wait bool) {
 	if wait {
 		cycle.Wait()
 	}
+	a.aiCycle(ctx, wait)
+	a.subscriptionCycle(ctx, wait)
 	a.deliverPending()
 	if time.Now().Unix()%60 == 0 {
 		a.wg.Add(1)

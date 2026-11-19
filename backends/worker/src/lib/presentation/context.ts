@@ -21,18 +21,20 @@ export const presentationScope: MiddlewareHandler<{ Bindings: Env }> = async (c,
   const url = new URL(c.req.url), path = url.pathname;
   const monitor = /^\/api\/(?:public\/(?:status(?:\/detail)?|monitors(?:\/[^/]+)?|agent\/detail\/[^/]+|monitor-icon)|recent\/[^/]+)$/.test(path);
   const agent = /^\/api\/public\/servers(?:\/[^/]+)?$/.test(path);
+  const ai = path === '/api/public/ai/models' || path.startsWith('/api/public/ai/models/');
+  const subscriptions = path.startsWith('/api/public/subscriptions/');
   const config = path === '/api/public/config' || path === '/api/public/theme';
-  if (!monitor && !agent && !config) return next();
+  if (!monitor && !agent && !config && !ai && !subscriptions) return next();
   const preview = url.searchParams.get('preview');
   if (preview !== null) {
-    if (!['monitor','agent'].includes(preview)) return c.json({ error:'invalid_request' },400);
+    if (!['monitor','agent','ai'].includes(preview)) return c.json({ error:'invalid_request' },400);
     const token = c.req.header('authorization')?.replace(/^Bearer\s+/i,'') ?? '';
     if (!(c.env.ADMIN_TOKEN && safeEqual(token,c.env.ADMIN_TOKEN)) && !(await currentUser(c)).user) return c.json({ error:'unauthorized' },401);
     contexts.set(c.req.raw,resolvePage(c.env,url,preview as PageKind));
     c.header('cache-control','private, no-store');
   }
   const context = await requestPage(c.env,c.req.raw);
-  if (!config && (!context.enabled || !context.configured || agent && context.kind !== 'agent' || monitor && context.kind !== 'monitor')) return c.json({ error:'not_found' },404);
+  if (!config && (!context.enabled || !context.configured || agent && context.kind !== 'agent' || monitor && context.kind !== 'monitor' || ai && (!context.config.aiEnabled || context.kind !== 'ai' && (context.kind !== 'monitor' || !context.config.aiOnMonitorPage)))) return c.json({ error:'not_found' },404);
   if (monitor && path !== '/api/public/monitors' && path !== '/api/public/status') {
     const monitors = await pageMonitors(c.env,c.req.raw);
     if (path === '/api/public/monitor-icon') {

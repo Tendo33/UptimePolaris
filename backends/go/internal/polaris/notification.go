@@ -72,6 +72,7 @@ func notificationConfigError(kind string, config Object) string {
 }
 
 func (a *App) notificationRoutes() {
+	a.route("POST /api/notifications/resolve", false, a.notificationResolve)
 	a.route("GET /api/notifications", false, func(w http.ResponseWriter, r *http.Request) error {
 		rows, e := a.store.list(r.Context(), "notification")
 		if e != nil {
@@ -143,12 +144,45 @@ func deleteNotification(t *transaction, id string) error {
 }
 
 func writeNotification(t *transaction, id string, row, input Object) error {
+	previous := clone(row)
 	if row == nil {
 		row = Object{"id": id, "name": "", "type": "", "config": Object{}, "group_ids": []string{}, "active": 1, "created_at": time.Now().Unix()}
 	}
-	for _, key := range []string{"name", "type", "config", "group_ids", "active"} {
+	for _, key := range []string{"name", "type", "config", "group_ids", "active", "event_kinds", "source_types", "ai_channel_ids", "subscription_ids"} {
 		if v, exists := input[key]; exists {
 			row[key] = v
+		}
+	}
+	for _, key := range []string{"event_kinds", "source_types", "ai_channel_ids", "subscription_ids"} {
+		if raw, exists := input[key]; exists {
+			values, ok := raw.([]any)
+			if !ok || len(values) > 100 {
+				return failure("notification_scope_invalid", 400)
+			}
+			seen := map[string]bool{}
+			for _, raw := range values {
+				value, ok := raw.(string)
+				if !ok || value == "" || len(value) > 64 || seen[value] {
+					return failure("notification_scope_invalid", 400)
+				}
+				seen[value] = true
+				if key == "event_kinds" && !contains([]string{"monitor_state", "ai_state", "agent_resource", "subscription_sync"}, value) || key == "source_types" && !contains([]string{"local", "subscription"}, value) {
+					return failure("notification_scope_invalid", 400)
+				}
+				if key == "ai_channel_ids" || key == "subscription_ids" {
+					kind := "ai_channel"
+					if key == "subscription_ids" {
+						kind = "subscription"
+					}
+					reference, err := t.get(kind, value)
+					if err != nil {
+						return err
+					}
+					if reference == nil && !contains(stringsOf(previous[key]), value) {
+						return failure("notification_scope_invalid", 400)
+					}
+				}
+			}
 		}
 	}
 	if strings.TrimSpace(str(row, "name")) == "" || len(str(row, "name")) > 120 {
@@ -243,6 +277,23 @@ func notificationMessage(event, config Object) (string, string) {
 	copy := notificationCopy[str(config, "language")]
 	if copy == nil {
 		copy = notificationCopy["en-US"]
+	}
+	if event["eventKind"] == "subscription_sync" {
+		titleKey, actionKey := "syncFailed", "syncActionFailed"
+		if integer(event, "status") == 1 {
+			titleKey, actionKey = "syncRecovered", "syncActionRecovered"
+		}
+		title := formatCopy(str(copy, titleKey), map[string]string{"name": str(event, "monitorName")})
+		last := "—"
+		if integer(event, "subscriptionLastSuccessAt") > 0 {
+			last = time.Unix(integer(event, "subscriptionLastSuccessAt"), 0).UTC().Format("2006-01-02 15:04:05 UTC")
+		}
+		lines := []string{title, formatCopy(str(copy, "syncLastSuccess"), map[string]string{"value": last}), formatCopy(str(copy, "syncAffected"), map[string]string{"value": fmt.Sprint(integer(event, "subscriptionAffectedItems"))})}
+		if str(event, "message") != "" {
+			lines = append(lines, formatCopy(str(copy, "detail"), map[string]string{"value": str(event, "message")}))
+		}
+		lines = append(lines, formatCopy(str(copy, "action"), map[string]string{"value": str(copy, actionKey)}), formatCopy(str(copy, "time"), map[string]string{"value": time.Unix(integer(event, "at"), 0).UTC().Format("2006-01-02 15:04:05 UTC")}))
+		return title, strings.Join(lines, "\n")
 	}
 	states := []string{str(copy, "down"), str(copy, "up"), str(copy, "warn")}
 	status := int(integer(event, "status"))
@@ -453,6 +504,11 @@ func (a *App) sendNotification(ctx context.Context, channel, event Object) Objec
 			transition = map[int64]string{0: "DOWN", 1: "UP", 2: "WARN"}[integer(event, "prevStatus")] + " -> " + strings.ToUpper(state)
 		}
 		payload = Object{"event": state, "monitor": Object{"name": event["monitorName"], "target": event["monitorTarget"], "type": event["monitorType"]}, "status": event["status"], "prevStatus": event["prevStatus"], "transition": transition, "recovered": integer(event, "status") == 1 && event["prevStatus"] != nil && integer(event, "prevStatus") == 0, "message": event["message"], "time": iso(integer(event, "at")), "text": message}
+		for _, key := range []string{"eventKind", "eventKey", "sourceType", "subscriptionId", "subscriptionItemId", "syncRevision"} {
+			if event[key] != nil {
+				payload[key] = event[key]
+			}
+		}
 	}
 	if raw == nil {
 		raw = []byte(encode(payload))
@@ -512,14 +568,31 @@ func (a *App) queueNotifications(t *transaction, m, live Object) (bool, error) {
 	if e != nil {
 		return false, e
 	}
+	ids := stringsOf(options(m)["notificationChannelIds"])
+	if str(m, "_aiModelId") != "" {
+		ids = stringsOf(m["notificationChannelIds"])
+	}
 	queued := false
 	for _, channel := range channels {
-		scope := stringsOf(channel["group_ids"])
-		if !boolean(channel["active"]) || len(scope) > 0 && !contains(scope, str(m, "group_id")) {
+		ai := str(m, "_aiModelId") != ""
+		routing := Object{"notificationChannelIds": ids, "notificationEnabled": options(m)["notificationEnabled"] != false, "monitorType": m["type"], "groupId": m["group_id"]}
+		if ai {
+			routing["notificationEnabled"], routing["aiChannelId"] = m["notificationEnabled"] != false, m["aiChannelId"]
+		}
+		if !boolean(channel["active"]) || notificationRoutingReason(channel, routing) != "" {
 			continue
 		}
 		id := uuid()
 		event := Object{"monitorId": m["id"], "monitorName": m["name"], "monitorTarget": m["target"], "monitorType": m["type"], "status": live["st"], "prevStatus": live["prev_st"], "message": live["msg"], "statusCode": live["code"], "latencyMs": live["v"], "at": live["ts"]}
+		if ai {
+			event["aiModelId"], event["aiRevision"], event["aiChannelRevision"] = m["_aiModelId"], m["revision"], m["_aiChannelRevision"]
+			id = "ai:" + str(m, "_aiModelId") + ":" + str(live, "runId") + ":" + str(channel, "id")
+			if existing, err := t.get("outbox", id); err != nil {
+				return false, err
+			} else if existing != nil {
+				continue
+			}
+		}
 		sequence, e := t.next("outbox")
 		if e != nil {
 			return false, e
@@ -606,7 +679,27 @@ func (a *App) deliverPending() {
 				if err != nil {
 					return
 				}
+				aiCurrent, err := a.aiNotificationCurrent(a.ctx, object(latest["event"]), str(channel, "id"))
+				if err != nil {
+					return
+				}
+				event := object(latest["event"])
+				if str(event, "subscriptionId") != "" {
+					aiCurrent, err = a.subscriptionNotificationCurrent(a.ctx, event, channel)
+					if err != nil {
+						return
+					}
+				} else if str(event, "aiModelId") == "" && str(event, "monitorId") != "" {
+					monitor, err := a.store.get(a.ctx, "monitor", str(event, "monitorId"))
+					if err != nil {
+						return
+					}
+					event["notificationEnabled"], event["notificationChannelIds"], event["groupId"] = options(monitor)["notificationEnabled"] != false, options(monitor)["notificationChannelIds"], monitor["group_id"]
+					aiCurrent = monitor != nil && boolean(monitor["active"]) && notificationRoutingReason(channel, event) == ""
+				}
 				if channel == nil || !boolean(channel["active"]) {
+					latest["state"] = "cancelled"
+				} else if !aiCurrent {
 					latest["state"] = "cancelled"
 				} else if boolean(maintenance(settings)["active"]) {
 					latest["next_at"] = now + 30

@@ -23,7 +23,7 @@ export default { async fetch(request,env) {
  if(u.pathname==='/install') return Response.json(await installPackage(env,new Uint8Array(await request.arrayBuffer())));
  if(u.pathname==='/select') {
   const selection=await request.json(), config=defaultPresentation();
-  for(const [kind,page] of Object.entries(config.pages)) { page.theme={...selection,theme:kind}; page.themeOptions={headline:'chosen',obsolete:'old'};page.headCode='<meta name=preview>';page.contentHtml='<aside>Custom</aside>'; }
+  for(const [kind,page] of Object.entries(config.pages)) { if(!['monitor','agent'].includes(kind)) continue; page.theme={...selection,theme:kind}; page.themeOptions={headline:'chosen',obsolete:'old'};page.headCode='<meta name=preview>';page.contentHtml='<aside>Custom</aside>'; }
   await env.DB.prepare("INSERT INTO presentation_state VALUES('main',?,?,?) ON CONFLICT(id) DO UPDATE SET config_json=excluded.config_json,revision=excluded.revision").bind(JSON.stringify(config),'rev',0).run();
   return Response.json({ok:true});
  }
@@ -58,6 +58,7 @@ try {
  assert.equal(upgraded.ok,true,JSON.stringify(upgraded));
  let upgradedState=await db.prepare('SELECT * FROM presentation_state').first();
  for(const [kind,page] of Object.entries(JSON.parse(upgradedState.config_json).pages)) {
+  if(kind==='ai') { assert.equal(page.theme,null); continue; }
   assert.deepEqual(page.theme,{short:'sample',version:upgraded.versionKey,theme:kind});
   assert.deepEqual(page.themeOptions,{headline:'chosen'});
   assert.equal(page.headCode,'<meta name=preview>'); assert.equal(page.contentHtml,'<aside>Custom</aside>');

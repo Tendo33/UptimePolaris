@@ -13,13 +13,14 @@ import {
   type AutocompleteProps,
 } from '@heroui/react';
 import { useReducedMotion } from '@/lib/useReducedMotion';
+import clsx from 'clsx';
 import { EXIT_TRANSITION, FEEDBACK_TRANSITION, NAV_TRANSITION, PANEL_TRANSITION } from '@/lib/motion';
 
 const DRAWER_REM = { xs: 20, sm: 24, md: 28, lg: 32, xl: 36, '2xl': 42, '3xl': 48, '4xl': 56, '5xl': 64, full: Infinity };
 
-export function Modal({ motionProps, ...props }: ModalProps) {
+export function Modal({ motionProps, classNames, ...props }: ModalProps) {
   const reduced = useReducedMotion();
-  return <HeroModal {...props} motionProps={motionProps ?? {
+  return <HeroModal {...props} classNames={{ ...classNames, base: clsx('polaris-overlay', classNames?.base), body: clsx('polaris-scrollbar overscroll-contain', classNames?.body), wrapper: clsx('polaris-scrollbar', classNames?.wrapper) }} motionProps={motionProps ?? {
     variants: {
       enter: { opacity: 1, scale: 1, y: 0, transition: { ...PANEL_TRANSITION, opacity: FEEDBACK_TRANSITION } },
       exit: { opacity: 0, scale: reduced ? 1 : 0.975, y: reduced ? 0 : 10, transition: EXIT_TRANSITION },
@@ -27,7 +28,7 @@ export function Modal({ motionProps, ...props }: ModalProps) {
   }} />;
 }
 
-export function Drawer({ motionProps, placement = 'right', size = 'md', ...props }: DrawerProps) {
+export function Drawer({ motionProps, placement = 'right', size = 'md', classNames, ...props }: DrawerProps) {
   const reduced = useReducedMotion();
   const axis = placement === 'left' || placement === 'right' ? 'x' : 'y';
   // HeroUI moves a viewport-wide wrapper, not the sheet. / HeroUI 移动的是全屏包装器，而非面板。
@@ -35,7 +36,7 @@ export function Drawer({ motionProps, placement = 'right', size = 'md', ...props
   const rem = Number.parseFloat(getComputedStyle(document.documentElement).fontSize);
   const distance = Math.min(viewport, DRAWER_REM[size] * rem);
   const offset = reduced ? 0 : (placement === 'left' || placement === 'top' ? -distance : distance);
-  return <HeroDrawer {...props} size={size} placement={placement} motionProps={motionProps ?? {
+  return <HeroDrawer {...props} classNames={{ ...classNames, base: clsx('polaris-overlay', classNames?.base), body: clsx('polaris-scrollbar overscroll-contain', classNames?.body), wrapper: clsx('polaris-scrollbar', classNames?.wrapper) }} size={size} placement={placement} motionProps={motionProps ?? {
     variants: {
       enter: { transform: `translate${axis.toUpperCase()}(0px)`, opacity: 1, transition: { ...PANEL_TRANSITION, opacity: FEEDBACK_TRANSITION } },
       exit: { transform: `translate${axis.toUpperCase()}(${offset}px)`, opacity: reduced ? 0 : 1, transition: EXIT_TRANSITION },

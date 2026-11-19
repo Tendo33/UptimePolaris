@@ -25,6 +25,8 @@ Worker 的默认调度在部署配置里保持一致：
 
 监控自己的间隔决定什么时候到期，不是每次 Cron 都会对所有监控发请求。实际吞吐还受请求预算、并发、超时和目标响应影响。
 
+需要将更多主动检查拆到多次 Worker 调用时，可绑定并启用 [Worker Queue](queue.md)。producer 和 consumer 都要配置，并在后台完成往返检查；不启用时保留原调度。Queue 不改变单次调用限制，会增加队列和消费调用用量，积压不代表目标故障。
+
 Worker 生产环境由 Cloudflare 调度。
 
 Go 不依赖 Cloudflare Cron：进程每秒检查到期任务，启动时和每分钟尝试增量历史汇总与分批清理，实际执行时机由任务租约决定。服务必须一直运行，停进程也就停了后台调度。两种后端都要检查最近检查时间和任务日志，不能只看 HTTP 是否可以访问。
@@ -72,6 +74,7 @@ AE 单次调用最多写入 250 个点。一次 tick 超过上限时，历史写
 | Worker 密钥 | `ADMIN_TOKEN`、数据库 URL 和其他已配置的密钥；用独立的受保护渠道保存 |
 | Worker 初始化选库记录 | `CONFIG` KV 中的 `database` 键，以及所选数据库里的 `_polaris_database` 控制记录；只有选择 D1 时才需要备份 `DB` 绑定 |
 | Go 数据与配置 | 停止服务后备份整个数据目录、主题、`POLARIS_*` 配置；PostgreSQL 另备份数据库 |
+| AI 渠道密钥 | Worker 保留对应 `ADMIN_TOKEN`；Go 备份 `ai-credential.key` 或 `POLARIS_AI_KEY_FILE` 指定的文件，数据库和加密材料必须配套恢复 |
 | 部署配置 | 实际使用的配置、域名设置和服务版本 |
 | Agent | 重要机器的配置与安装元数据，按敏感文件保存 |
 
@@ -165,6 +168,8 @@ A Worker invocation can write at most 250 AE points. When a tick exceeds that li
 
 Go runs scheduling inside its process, checks for due work each second, and attempts incremental aggregation and cleanup at startup and every minute. Stopping the process also stops scheduling. For either backend, inspect recent check times and job logs as well as HTTP health.
 
+For more active checks across separate Worker invocations, optionally configure and enable [Worker Queue](queue.md#english). Both producer and consumer must be configured and the round-trip check must pass. Without enablement the original scheduler continues. Queue usage and consumer invocations add cost; backlog is not a target failure.
+
 ### Upgrade
 
 1. Record the running service and deployment versions, backend, database, bindings and Agent versions. Back up the database, theme files, credentials and configuration.
@@ -188,6 +193,8 @@ npx wrangler d1 export DATABASE_NAME --remote --output .secrets/d1-backup.sql --
 ```
 
 Fork and button deployments keep no database ID in `wrangler.jsonc`; confirm which database `DB` points to under the Worker's **Settings → Bindings** before operating on it. Restore first to a separate empty database and temporary entry point, restore matching theme files, the `CONFIG` KV namespace (console settings and setup selection) and secrets, then check accounts, monitors, history and Agent reports before switching production. A complete schema export should not be repeatedly imported into an initialized database.
+
+AI channel keys also require their encryption material: preserve the Worker’s matching `ADMIN_TOKEN`, or the Go `ai-credential.key` / explicit `POLARIS_AI_KEY_FILE`. Restore it with the matching database. PostgreSQL instances must share the same Go key material. See [AI key recovery](ai-monitoring.md#protect-and-restore-keys).
 
 ### Database migration and retention
 

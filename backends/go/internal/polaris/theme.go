@@ -89,8 +89,14 @@ func builtinThemeOptions(kind string) []Object {
 		{"key": "columns", "label": "columns", "type": "number", "min": 1, "max": 4, "step": 1, "default": 3},
 	}
 	keys := []string{"showHistory", "showLatency", "showAvailability", "showExpiry"}
+	if kind == "ai" {
+		options = append([]Object{{"key": "title", "label": "title", "type": "string", "default": ""}, {"key": "description", "label": "description", "type": "string", "default": ""}}, options...)
+	}
 	if kind == "agent" {
 		keys = []string{"showHistory", "showCountry"}
+	}
+	if kind == "ai" {
+		keys = []string{"showHistory", "showLatency", "showAvailability"}
 	}
 	for _, key := range keys {
 		options = append(options, Object{"key": key, "label": key, "type": "boolean", "default": true})
@@ -107,6 +113,16 @@ func validateBuiltinThemeOptions(kind string, values Object) bool {
 		specs[str(option, "key")] = option
 	}
 	for key, value := range values {
+		if kind == "ai" && (key == "title" || key == "description") {
+			s, ok := value.(string)
+			limit := 1000
+			if key == "title" {
+				limit = 200
+			}
+			if !ok || len([]rune(s)) > limit {
+				return false
+			}
+		}
 		option := specs[key]
 		if option == nil || !validThemeOption(option, value) {
 			return false
@@ -177,7 +193,7 @@ func validateManifest(m Object) error {
 			return fail("manifest_theme_id_invalid")
 		}
 		seen[id] = true
-		if strings.TrimSpace(str(d, "name")) == "" || len(str(d, "name")) > 120 || !contains([]string{"monitor", "agent"}, str(d, "target")) {
+		if strings.TrimSpace(str(d, "name")) == "" || len(str(d, "name")) > 120 || !contains([]string{"monitor", "agent", "ai"}, str(d, "target")) {
 			return fail("manifest_theme_invalid")
 		}
 		if !safeThemePath(str(d, "entry")) || !regexp.MustCompile(`(?i)\.html?$`).MatchString(str(d, "entry")) {
@@ -187,9 +203,12 @@ func validateManifest(m Object) error {
 		if !ok {
 			return fail("manifest_capability_invalid")
 		}
-		allowed := []string{"public.config", "public.status", "public.monitors", "public.monitor-detail", "public.agent-detail"}
+		allowed := []string{"public.config", "public.status", "public.monitors", "public.monitor-detail", "public.agent-detail", "public.subscriptions", "public.subscription-history"}
 		if str(d, "target") == "agent" {
 			allowed = []string{"public.config", "public.servers", "public.server-detail"}
+		}
+		if str(d, "target") == "ai" {
+			allowed = []string{"public.config", "public.ai-models", "public.ai-history", "public.subscriptions", "public.subscription-history"}
 		}
 		for _, cap := range capabilities {
 			if !contains(allowed, fmt.Sprint(cap)) {
@@ -881,7 +900,7 @@ func (a *App) serveThemeAsset(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, asset)
 }
 func (a *App) serveThemePage(w http.ResponseWriter, r *http.Request) bool {
-	if r.Method != "GET" && r.Method != "HEAD" || !regexp.MustCompile(`^/(?:|monitor/[^/]+|server/[^/]+|status/[^/]+)/?$`).MatchString(r.URL.Path) || r.URL.Query().Get("preview") != "" {
+	if r.Method != "GET" && r.Method != "HEAD" || !regexp.MustCompile(`^/(?:|ai|servers|monitor/[^/]+|server/[^/]+|status/[^/]+)/?$`).MatchString(r.URL.Path) || r.URL.Query().Get("preview") != "" {
 		return false
 	}
 	settings, e := a.settings(r.Context())

@@ -487,18 +487,30 @@ func (a *App) publicConfig(w http.ResponseWriter, r *http.Request) error {
 		return e
 	}
 	meta := Object{"title": s["site.title"], "description": s["site.description"], "icon": s["site.icon"], "iconCandidates": []any{s["site.icon"]}}
+	for _, field := range []string{"title", "description"} {
+		if value := str(page, field); value != "" {
+			meta[field] = value
+		}
+	}
 	pageID := r.URL.Query().Get("pageId")
 	if pageID == "" {
 		pageID = "default"
 	}
 	maintenance := maintenance(s)
 	notices := maintenanceNotices(s)
-	view := Object{"kind": kind, "enabled": enabled, "configured": configured}
+	state, e := a.presentation(r.Context())
+	if e != nil {
+		return e
+	}
+	presentation := object(state["config"])
+	view := Object{"aiEnabled": presentation["aiEnabled"], "aiOnMonitorPage": presentation["aiOnMonitorPage"], "kind": kind, "enabled": enabled, "configured": configured}
 	for _, key := range []string{"layout", "density", "columns", "width", "radius", "accent", "colorMode", "showHistory", "showLatency", "showAvailability", "showExpiry", "showCountry", "locale"} {
 		view[key] = page[key]
 	}
 	result := Object{"pageId": pageID, "pageIds": []string{pageID}, "defaultPageId": pageID, "siteMeta": meta, "pages": []Object{{"id": pageID, "siteMeta": meta}}, "isPlaceholder": false, "isEditThisPage": false, "isShowStarButton": false, "config": Object{"slug": pageID, "title": s["site.title"], "description": s["site.description"], "icon": s["site.icon"], "theme": "system", "published": true, "showTags": true, "customCSS": "", "footerText": "", "showPoweredBy": false, "googleAnalyticsId": nil, "showCertificateExpiry": page["showExpiry"]}, "publicGroupList": []any{}, "maintenanceList": notices, "maintenance": maintenance, "incidents": []any{}, "success": true, "status": "ok", "pageTabs": []any{}, "matrixStatus": "ok", "timestamp": time.Now().UnixMilli(), "presentation": view}
 	result["theme"] = nil
+	object(result["config"])["title"] = meta["title"]
+	object(result["config"])["description"] = meta["description"]
 	result["theme_settings"] = nil
 	result["theme_content_html"] = nil
 	result["theme_head_code"] = nil

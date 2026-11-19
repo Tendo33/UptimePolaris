@@ -66,12 +66,14 @@ export function StatusHero({
   loading,
   timer,
   uptime24h,
+  aiOnly = false,
 }: {
   counts: MonitorStatusCounts;
   status: SystemStatus;
   loading: boolean;
   timer: RefreshTimer;
   uptime24h: number | null;
+  aiOnly?: boolean;
 }) {
   const t = useTranslations();
   const format = useFormatter();
@@ -81,11 +83,11 @@ export function StatusHero({
 
   const parts: Array<{ key: string; dot: string; label: string; n: number }> = [];
   if (!loading) {
-    if (counts.down) parts.push({ key: 'down', dot: 'bg-danger', label: t('node.offline'), n: counts.down });
+    if (counts.down) parts.push({ key: 'down', dot: 'bg-danger', label: t(aiOnly ? 'ai.down' : 'node.offline'), n: counts.down });
     if (counts.warn) parts.push({ key: 'warn', dot: 'bg-warning', label: t('common.status.warn'), n: counts.warn });
     if (counts.pending) parts.push({ key: 'pending', dot: 'bg-warning', label: t('node.pending'), n: counts.pending });
     if (counts.unknown) parts.push({ key: 'unknown', dot: 'bg-default-300', label: t('common.status.unknown'), n: counts.unknown });
-    parts.push({ key: 'up', dot: 'bg-success', label: t('node.online'), n: counts.up });
+    parts.push({ key: 'up', dot: 'bg-success', label: t(aiOnly ? 'ai.up' : 'node.online'), n: counts.up });
   }
 
   return (
@@ -115,7 +117,7 @@ export function StatusHero({
                   transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
                   className="text-[24px] leading-tight font-semibold tracking-[-0.025em] text-[var(--polaris-ink)] sm:text-[30px]"
                 >
-                  {loading ? t('status.loading') : t(HEADLINE[status])}
+                  {loading ? t('status.loading') : aiOnly ? t(`ai.system.${status}`) : t(HEADLINE[status])}
                 </motion.h1>
               </AnimatePresence>
             </div>
@@ -124,7 +126,7 @@ export function StatusHero({
                 <span className="polaris-shimmer h-4 w-48 rounded" />
               ) : (
                 <>
-                  <span className="polaris-num">{t('common.island.monitors', { n: counts.total })}</span>
+                  <span className="polaris-num">{t(aiOnly ? 'ai.modelCount' : 'common.island.monitors', { n: counts.total })}</span>
                   {parts.map((part) => (
                     <span key={part.key} className="polaris-num flex items-center gap-1.5">
                       <span className={clsx('h-1.5 w-1.5 rounded-full', part.dot, part.key === 'down' && 'polaris-halo')} />

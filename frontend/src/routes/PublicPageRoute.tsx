@@ -15,7 +15,7 @@ export function PublicPageRoute() {
   const { setTheme } = useTheme();
   const { applyDefaultLocale } = useLocale();
   useEffect(() => {
-    if (!config || config.presentation.kind !== 'agent') return;
+    if (!config || config.presentation.kind === 'monitor') return;
     applyDefaultTheme(config.presentation.colorMode, setTheme);
     const controller = new AbortController();
     void applyDefaultLocale(config.presentation.locale, controller.signal).catch(() => undefined);
