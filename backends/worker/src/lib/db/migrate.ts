@@ -34,6 +34,15 @@ const EXPECTED_PG_MIGRATIONS = [
   '0023_settings_visibility.postgres.sql',
   '0024_presentation_refinements.postgres.sql',
   '0025_agent_history_daily.postgres.sql',
+  '0026_ai_management.postgres.sql',
+  '0027_ai_runtime.postgres.sql',
+  '0028_check_queue.postgres.sql',
+  '0029_ai_protocols.postgres.sql',
+  '0030_ai_request_options.postgres.sql',
+  '0031_ai_presentation.postgres.sql',
+  '0032_ai_check_revisions.postgres.sql',
+  '0033_notification_routing.postgres.sql',
+  '0034_subscriptions.postgres.sql',
 ] as const;
 
 export interface MigrateProbeResult {

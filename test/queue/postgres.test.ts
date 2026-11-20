@@ -3,6 +3,7 @@ import postgres from 'postgres';
 import { Miniflare } from 'miniflare';
 import { readFileSync, readdirSync } from 'node:fs';
 import { PostgresAdapter } from '../../backends/worker/src/lib/db/postgres';
+import { withDBScope } from '../../backends/worker/src/lib/db/factory';
 import { queueScenario, queueEdgeScenario } from './runtime.test';
 import { migrateDataWithConnection } from '../../backends/worker/src/lib/db/data-migration';
 import { BOOTSTRAP_FILES } from '../../backends/worker/src/lib/db/schema-bootstrap';
@@ -28,8 +29,8 @@ try {
     try {
       const env = { DATABASE_TYPE: 'postgres', DATABASE_URL: url, CONFIG: await mf.getKVNamespace('CONFIG'), ADMIN_TOKEN: 'fixture-queue-material' } as Env;
       if (!process.env.QUEUE_EDGES_ONLY)
-        await queueScenario(env, db);
-      await queueEdgeScenario(env, db);
+        await withDBScope(env, scoped => queueScenario(scoped, db));
+      await withDBScope(env, scoped => queueEdgeScenario(scoped, db));
     }
     finally {
       await db.close();

@@ -98,13 +98,14 @@ try {
 
   /* 移除迁移记录，验证即使表仍存在也会拒绝结构检查。
    * Remove a migration record to check rejection even when its tables still exist. */
-  await db.execute('DELETE FROM schema_migrations WHERE name = $1', ['0013_usage_daily.postgres.sql']);
+  const missingMigrations = ['0013_usage_daily.postgres.sql', '0034_subscriptions.postgres.sql'];
+  for (const name of missingMigrations) await db.execute('DELETE FROM schema_migrations WHERE name = $1', [name]);
   resetSchemaGuardCache();
   const behind = await guard();
   assert.equal(behind.ok, false, 'a ledger missing a migration must fail the guard');
   assert.equal(behind.error, 'schema_behind');
   assert.ok(
-    behind.missing.some((entry) => entry.includes('0013_usage_daily')),
+    missingMigrations.every((name) => behind.missing.includes(name)),
     `the missing migration must be named: ${behind.missing.join(', ')}`,
   );
   assert.match(behind.message, /db-migrate-postgres\.mjs/, 'the message must name the command that fixes it');
@@ -119,7 +120,7 @@ try {
    * 探测带缓存，恢复迁移记录要等 TTL 到期才可见。显式断言此行为：没有缓存会使每次请求查询
    * 三张系统目录表；永不过期则会让已修复的数据库永远失败。失败 TTL 为 30 秒，测试通过移动时钟避免实际等待。
    */
-  await db.execute('INSERT INTO schema_migrations (name, applied_at) VALUES ($1, $2)', ['0013_usage_daily.postgres.sql', Math.floor(Date.now() / 1000)]);
+  for (const name of missingMigrations) await db.execute('INSERT INTO schema_migrations (name, applied_at) VALUES ($1, $2)', [name, Math.floor(Date.now() / 1000)]);
   assert.equal((await guard()).ok, false, 'the failing result is cached for its short TTL');
 
   const realNow = Date.now;
