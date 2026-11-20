@@ -68,7 +68,13 @@ func TestDockerEngineRecreateAndRollback(t *testing.T) {
 				_ = exec.Command("docker", "network", "rm", network).Run()
 				_ = exec.Command("docker", "volume", "rm", volume).Run()
 			}()
-			args := []string{"run", "-d", "--name", name, "--network", network, "--network-alias", "polaris", "--restart", "unless-stopped", "-p", "127.0.0.1::8080", "-v", volume + ":/data", "-e", "UPDATE_TEST_ADDR=0.0.0.0:8080", "-e", "KEEP=retained", "--label", "custom=retained"}
+			listener, e := net.Listen("tcp", "127.0.0.1:0")
+			if e != nil {
+				t.Fatal(e)
+			}
+			binding := listener.Addr().String()
+			listener.Close()
+			args := []string{"run", "-d", "--name", name, "--network", network, "--network-alias", "polaris", "--restart", "unless-stopped", "-p", binding + ":8080", "-v", volume + ":/data", "-e", "UPDATE_TEST_ADDR=0.0.0.0:8080", "-e", "KEEP=retained", "--label", "custom=retained"}
 			if fail {
 				args = append(args, "-e", "UPDATE_TEST_FAIL=1.1.0")
 			}
@@ -103,6 +109,7 @@ func TestDockerEngineRecreateAndRollback(t *testing.T) {
 			if fail {
 				want = "1.0.0"
 				if e == nil || e.Error() != "update_rolled_back" {
+					t.Log("remaining container:", run("inspect", name))
 					t.Fatal(e)
 				}
 			} else if e != nil {

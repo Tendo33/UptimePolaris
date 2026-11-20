@@ -196,3 +196,18 @@ func TestDockerInterruptedReplacementRecovery(t *testing.T) {
 		t.Fatal("interrupted operation not restored")
 	}
 }
+
+func TestDockerRandomPortRequiresManualDeploymentBeforeStopping(t *testing.T) {
+	d, f := newDockerFixture(t, "")
+	f.old.HostConfig["PortBindings"] = map[string]any{"8080/tcp": []any{map[string]any{"HostIp": "127.0.0.1", "HostPort": "0"}}}
+	if e := d.Negotiate(context.Background()); e != nil {
+		t.Fatal(e)
+	}
+	e := d.Apply(context.Background(), Release{Tag: "v1.1.0"}, func(string) {})
+	if e == nil || e.Error() != "update_manual_required" {
+		t.Fatalf("error=%v", e)
+	}
+	if !f.old.State.Running || f.old.Name != "/uptime-polaris" || f.next != nil {
+		t.Fatal("unsupported deployment was stopped")
+	}
+}

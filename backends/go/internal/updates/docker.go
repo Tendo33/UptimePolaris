@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -287,7 +288,22 @@ func (d *Docker) Apply(ctx context.Context, release Release, phase func(string))
 		return errors.New("update_container_stopped")
 	}
 	if old.HostConfig["AutoRemove"] == true {
-		return errors.New("update_container_autoremove")
+		return errors.New("update_manual_required")
+	}
+	if ports, ok := old.HostConfig["PortBindings"].(map[string]any); ok {
+		for _, value := range ports {
+			bindings, _ := value.([]any)
+			for _, value := range bindings {
+				binding, _ := value.(map[string]any)
+				port, _ := binding["HostPort"].(string)
+				if port == "" || port == "0" {
+					return errors.New("update_manual_required")
+				}
+			}
+		}
+	}
+	if old.HostConfig["PublishAllPorts"] == true {
+		return errors.New("update_manual_required")
 	}
 	j := dockerJournal{Old: old, Backup: d.Container + "-backup-" + time.Now().UTC().Format("20060102T150405"), Pending: true}
 	if e = WriteJSON(filepath.Join(d.Dir, "docker.json"), j); e != nil {
@@ -296,11 +312,13 @@ func (d *Docker) Apply(ctx context.Context, release Release, phase func(string))
 	rollback := func() error {
 		recoveryCtx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 		defer cancel()
-		if d.restore(recoveryCtx, j) != nil {
+		if err := d.restore(recoveryCtx, j); err != nil {
+			slog.Error("container recovery failed", "error", err)
 			return errors.New("update_recovery_failed")
 		}
 		current, _, e := d.Current(recoveryCtx)
 		if e != nil || waitHealth(recoveryCtx, d.Health, current, 30*time.Second) != nil {
+			slog.Error("restored container health check failed")
 			return errors.New("update_recovery_failed")
 		}
 		return errors.New("update_rolled_back")

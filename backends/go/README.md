@@ -88,6 +88,8 @@ Linux 上由 `0700` 的父目录限制宿主机访问；文件自身允许容器
 
 手动更新 Compose 部署前，将 `POLARIS_TAG` 调整到目标版本，并保留更新后的配置，避免下次 `docker compose up` 切回旧标签。更新服务自身通过 `docker compose pull updater` 和 `docker compose up -d --no-deps updater` 升级。确认无需回退后，可清理已停止的备份容器，保留数据卷。原生部署只清理 `updates/native.json` 中 `active` 和 `previous` 均未引用的版本目录。
 
+Docker 托管更新要求固定宿主机端口，并关闭容器自动删除。使用 `-P`、随机端口或 `--rm` 的容器需先调整部署配置，再接入更新服务。
+
 ## 部署配置
 
 程序读取进程当前工作目录里的 `.env`。优先级从高到低：命令行参数 > 进程环境变量 > `.env` > 默认值。服务管理器或容器仍可以直接传环境变量。
@@ -238,6 +240,8 @@ For Docker, use [compose.yaml](compose.yaml) and the commands above to create `.
 Only the updater mounts the Docker socket, which grants control over host containers. Keep its network trusted, do not publish port 8091, and protect the token file. The application connects using `POLARIS_UPDATER_URL` and `POLARIS_UPDATER_TOKEN_FILE`. The updater preserves environment variables, ports, volumes and networks; stopped containers named `uptime-polaris-backup-*` provide a recovery path. Failed health checks restore the old container without replacing its data volumes. The optional updater settings and defaults are listed above.
 
 Before a manual Compose redeployment, set `POLARIS_TAG` to the intended version and retain that configuration, so `docker compose up` does not restore an old tag. Upgrade the updater itself using `docker compose pull updater` and `docker compose up -d --no-deps updater`. Once rollback is no longer needed, remove stopped backup containers while preserving volumes. For native installs, clean only version directories referenced by neither `active` nor `previous` in `updates/native.json`.
+
+Managed Docker updates require fixed host ports and disabled automatic container removal. Reconfigure containers using `-P`, random ports or `--rm` before connecting the updater.
 
 ### Deployment and operation
 

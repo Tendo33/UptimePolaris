@@ -154,7 +154,9 @@ export async function runRuntimeD1(){
   try{
     const binding=await mf.getD1Database('DB'),db=new D1Adapter(binding),env={DB:binding,CONFIG:await mf.getKVNamespace('CONFIG'),ADMIN_TOKEN:'fixture-runtime-material',DATABASE_TYPE:'d1'} as Env;
     for(const migration of BOOTSTRAP_FILES){if(migration.name.startsWith('0045')){
-      const publicResponse=await api.fetch(new Request('https://fixture.test/api/public/ai/models'),env,{waitUntil(){}} as ExecutionContext);assert.equal(publicResponse.status,200);assert.deepEqual(await publicResponse.json(),{models:[]});
+      const publicResponse=await api.fetch(new Request('https://fixture.test/api/public/ai/models'),env,{waitUntil(){}} as ExecutionContext);assert.equal(publicResponse.status,404);assert.deepEqual(await publicResponse.json(),{error:'not_found'});
+      const feature=await loadPresentation(env);assert.equal(await savePresentation(env,{...feature.config,aiEnabled:true},feature.revision),true);
+      const enabledResponse=await api.fetch(new Request('https://fixture.test/api/public/ai/models'),env,{waitUntil(){}} as ExecutionContext);assert.equal(enabledResponse.status,200);assert.deepEqual(await enabledResponse.json(),{models:[]});
     }if(migration.statements.length)await binding.batch(migration.statements.map(statement=>binding.prepare(statement)));}
     await runtimeScenario(env,db);
   }finally{await mf.dispose();}

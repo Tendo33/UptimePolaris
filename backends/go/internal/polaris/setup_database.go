@@ -74,6 +74,7 @@ func validateEmptyPostgres(ctx context.Context, db *sql.Tx, allowLoginLimits boo
 	tables := map[string]bool{}
 	allowed := map[string]bool{"polaris_documents": true, "polaris_readings": true, "polaris_leases": true, "polaris_sequences": true}
 	indexes := map[string]bool{"polaris_documents_pkey": true, "polaris_readings_pkey": true, "polaris_leases_pkey": true, "polaris_sequences_pkey": true, "polaris_readings_monitor_time": true, "polaris_readings_time": true, "polaris_documents_agent_id_state": true, "polaris_documents_monitor_id_state": true, "polaris_documents_scheduled_at_time": true, "polaris_documents_queued_at_time": true}
+	indexes["polaris_subscription_owner"] = true
 	for rows.Next() {
 		var name, kind string
 		if err := rows.Scan(&name, &kind); err != nil {
