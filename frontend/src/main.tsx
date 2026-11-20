@@ -36,7 +36,22 @@ document.body.className = 'min-h-screen bg-background font-sans antialiased';
  */
 document.documentElement.classList.add('polaris-console');
 
-const router = createBrowserRouter([{ path: '*', element: <App httpStatus={Number(root.dataset.httpStatus) || undefined} /> }]);
+function RootErrorView() {
+  const copy = getRootErrorCopy();
+  return (
+    <main className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
+      <h1 className="text-xl font-semibold">{copy.title}</h1>
+      <p className="text-sm text-default-500">{copy.description}</p>
+      <button className="rounded-lg bg-primary px-4 py-2 text-white" onClick={() => window.location.reload()}>
+        {copy.reload}
+      </button>
+    </main>
+  );
+}
+
+const router = createBrowserRouter([{
+  path: '*', element: <App httpStatus={Number(root.dataset.httpStatus) || undefined} />, errorElement: <RootErrorView />,
+}]);
 
 class RootErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   state = { failed: false };
@@ -45,16 +60,7 @@ class RootErrorBoundary extends Component<{ children: ReactNode }, { failed: boo
   }
   render() {
     if (this.state.failed) {
-      const copy = getRootErrorCopy();
-      return (
-        <main className="flex min-h-screen flex-col items-center justify-center gap-4 px-6 text-center">
-          <h1 className="text-xl font-semibold">{copy.title}</h1>
-          <p className="text-sm text-default-500">{copy.description}</p>
-          <button className="rounded-lg bg-primary px-4 py-2 text-white" onClick={() => window.location.reload()}>
-            {copy.reload}
-          </button>
-        </main>
-      );
+      return <RootErrorView />;
     }
     return this.props.children;
   }
