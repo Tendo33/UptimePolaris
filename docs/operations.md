@@ -55,9 +55,13 @@ AE 单次调用最多写入 250 个点。一次 tick 超过上限时，历史写
 
 ### Go
 
+官方程序可在后台顶部的版本浮层中点击“立即更新”，或开启默认关闭的“自动更新”。原生部署覆盖 Linux、Windows、macOS 的 amd64 和 arm64；Docker 更新需要先配置独立更新服务，见 [Go 更新说明](../backends/go/README.md#在后台更新)。自动检查间隔为 6 小时；同一版本失败后需手动重试。更新期间服务会短暂重启，数据库和主题继续使用原位置。
+
+新版本健康检查失败时恢复上一程序或容器。更新服务只接受数据兼容声明相同的版本，数据库写入保持原样。请保留近期备份；手动升级和数据格式变化按以下步骤处理：
+
 1. 停止 Go 后端和自动重启器，备份整个数据目录（包括 SQLite、主题）和原配置；PostgreSQL 部署还要备份对应数据库。
 2. 在隔离环境用目标版本和备份副本验证启动、账号、历史和主题。Go 使用独立的 `polaris_*` 表，**不要运行 Worker 的 `npm run db:migrate:postgres`**。
-3. 准备新版本的 Go 程序或验证过的镜像；替换程序时保留数据目录和配置。Go 启动时会维护自己的表结构。
+3. 准备新版本的 Go 程序或验证过的镜像；替换程序时保留数据目录和配置。曾使用后台更新的原生部署，将 `updates/native.json` 改名保留后再启动指定程序，避免继续选择已有版本目录。Docker 部署同步调整 Compose 的版本标签。Go 启动时会维护自己的表结构。
 4. 用原数据目录和正确的数据库配置启动，检查登录、监控、Push、Agent 上报和通知，再恢复入口和自动重启器。
 
 需要回退时，按实际数据库结构和备份选择恢复方式；只换回旧二进制，不保证能读新结构。完整启动和备份路径见 [Go 后端说明](../backends/go/README.md)。
@@ -172,6 +176,8 @@ For more active checks across separate Worker invocations, optionally configure 
 
 ### Upgrade
 
+Official Go binaries support **Update now** and opt-in automatic updates from the version popover on Linux, Windows and macOS, on amd64 and arm64. Docker requires the separate updater described in the [Go guide](../backends/go/README.md#updates-from-the-console). Stable releases are checked every 6 hours; failed versions require a manual retry. Updates briefly restart the service. Failed health checks restore the previous program or container while retaining database writes. Managed updates require matching data compatibility declarations and do not replace regular backups.
+
 1. Record the running service and deployment versions, backend, database, bindings and Agent versions. Back up the database, theme files, credentials and configuration.
 2. Review migrations against a backup in an isolated environment. Worker D1 and PostgreSQL migrations are different from Go's own `polaris_*` tables; never run the Worker PostgreSQL migration for Go.
 3. For manual Worker D1 deployments, confirm `backends/worker/wrangler.toml` and use `npm run db:init`; for Worker PostgreSQL use `npm run db:migrate:postgres`. Fork and button deployments apply D1 migrations on request; see [deployment](deployment.md#database-setup-and-initialization). Worker requests can apply outstanding D1 migrations when a migration ledger already exists, so back up and review before deploying.
@@ -179,6 +185,8 @@ For more active checks across separate Worker invocations, optionally configure 
 5. Deploy the intended Worker or replace the Go binary or image while preserving its data directory. Check setup, login, monitoring, notification delivery and Agent reports. Roll out Agent upgrades gradually.
 
 Rolling back an executable or Worker version does not automatically reverse database migrations. Choose recovery using the actual schema and backup. For Go, stop the service and its restarter before backing up or replacing persistent data; see the [Go guide](../backends/go/README.md).
+
+When manually replacing a native installation that has used managed updates, rename and retain `updates/native.json` before starting the chosen executable. This makes the launcher use that executable instead of an existing version directory. For Docker, also update the version tag in Compose before redeploying.
 
 ### Backup and restore
 

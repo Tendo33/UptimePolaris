@@ -1,0 +1,41 @@
+services:
+  polaris:
+    image: ${POLARIS_IMAGE:-ghcr.io/xinglingqaq/uptimepolaris}:${POLARIS_TAG:-latest}
+    container_name: uptime-polaris
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - polaris-data:/data
+    secrets:
+      - updater-token
+    environment:
+      POLARIS_UPDATER_URL: http://updater:8091
+      POLARIS_UPDATER_TOKEN_FILE: /run/secrets/updater-token
+    networks:
+      default:
+        aliases: [uptime-polaris]
+
+  updater:
+    image: ${POLARIS_IMAGE:-ghcr.io/xinglingqaq/uptimepolaris}:${POLARIS_TAG:-latest}
+    entrypoint: [/polaris-updater]
+    user: "0:0"
+    restart: unless-stopped
+    depends_on: [polaris]
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - polaris-updates:/updates
+    secrets:
+      - updater-token
+    environment:
+      POLARIS_UPDATE_CONTAINER: uptime-polaris
+      POLARIS_UPDATE_IMAGE: ${POLARIS_IMAGE:-ghcr.io/xinglingqaq/uptimepolaris}
+      POLARIS_UPDATE_HEALTH_URL: http://uptime-polaris:8080/api/public/health
+
+secrets:
+  updater-token:
+    file: ./.secrets/updater-token.txt
+
+volumes:
+  polaris-data:
+  polaris-updates:

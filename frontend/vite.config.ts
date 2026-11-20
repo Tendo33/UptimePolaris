@@ -30,6 +30,7 @@ const backendProxy: ProxyOptions = {
 };
 
 export default defineConfig({
+  root: realpathSync(fileURLToPath(new URL('.', import.meta.url))),
   // Served from the site root. A sub-path base would force the router, every
   // asset URL and every favicon reference to carry a prefix for no benefit -
   // the app owns the whole origin.

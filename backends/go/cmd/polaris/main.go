@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -16,9 +17,18 @@ import (
 	"time"
 
 	"github.com/XingLingQAQ/uptime/backends/go/internal/polaris"
+	"github.com/XingLingQAQ/uptime/backends/go/internal/updates"
 )
 
 func main() {
+	if len(os.Args) == 2 && os.Args[1] == "--update-info" {
+		_ = json.NewEncoder(os.Stdout).Encode(updates.BuildInfo())
+		return
+	}
+	if len(os.Args) == 2 && os.Args[1] == "--version" {
+		fmt.Println(updates.Version)
+		return
+	}
 	values, err := loadEnvFile(".env")
 	if err != nil {
 		slog.Error("cannot load .env", "error", err)
@@ -42,6 +52,17 @@ func main() {
 	c.AdminToken = env("POLARIS_ADMIN_TOKEN", "")
 	c.SetupKey = env("POLARIS_SETUP_KEY", "")
 	c.AICredentialKeyFile = env("POLARIS_AI_KEY_FILE", "")
+	c.UpdaterURL = env("POLARIS_UPDATER_URL", "")
+	c.UpdaterToken = env("POLARIS_UPDATER_TOKEN", "")
+	c.Deployment = env("POLARIS_DEPLOYMENT", "native")
+	if tokenFile := env("POLARIS_UPDATER_TOKEN_FILE", ""); tokenFile != "" && !updates.Managed() {
+		raw, e := os.ReadFile(tokenFile)
+		if e != nil {
+			slog.Error("cannot read updater token file")
+			os.Exit(1)
+		}
+		c.UpdaterToken = strings.TrimSpace(string(raw))
+	}
 	flag.BoolVar(&c.TrustProxy, "trust-proxy", false, "Trust reverse-proxy HTTPS headers")
 	flag.IntVar(&c.Concurrency, "concurrency", c.Concurrency, "Maximum simultaneous probes")
 	migration := flag.String("migration", "", "Offline SQLite-to-PostgreSQL migration: preview or execute")
@@ -85,6 +106,20 @@ func main() {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+	if *migration == "" && !updates.Managed() && c.Deployment != "docker" && updates.Version != "dev" {
+		if err = updates.RunNative(ctx, c.DataDir, os.Args[1:]); err != nil {
+			slog.Error("server stopped", "error", err)
+			os.Exit(1)
+		}
+		return
+	}
+	updates.WatchParent(stop)
+	unlock, err := updates.LockManagedData(ctx, c.DataDir)
+	if err != nil {
+		slog.Error("data directory unavailable", "error", err)
+		os.Exit(1)
+	}
+	defer unlock()
 	var app *polaris.App
 	if *migration != "" {
 		app, err = polaris.NewForOfflineMigration(ctx, c)
@@ -136,6 +171,7 @@ func main() {
 		_ = server.Shutdown(shutdown)
 	}()
 	slog.Info("Uptime Polaris Go listening", "address", listener.Addr().String())
+	updates.ChildReady(listener.Addr().String())
 	serveErr := server.Serve(listener)
 	if serveErr != nil && serveErr != http.ErrServerClosed {
 		slog.Error("HTTP server stopped", "error", serveErr)

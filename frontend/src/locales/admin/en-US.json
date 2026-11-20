@@ -1906,7 +1906,39 @@
     "dismissed": "This version is ignored",
     "undo": "Undo",
     "checkedAt": "Checked {time}",
-    "notChecked": "Not checked yet"
+    "notChecked": "Not checked yet",
+    "update": {
+      "automatic": "Automatic updates",
+      "automaticHint": "Check stable releases every 6 hours. Failed versions require a manual retry.",
+      "install": "Update now",
+      "restartHint": "The service will restart briefly. Keep a current database backup.",
+      "reload": "Updated · Reload page",
+      "loading": "Loading update status…",
+      "unreachable": "Cannot reach the update service. Check the deployment and try again.",
+      "dockerSetup": "Connect the Docker updater to enable updates here. See the upgrade guide.",
+      "unavailable": "Install an official release to enable managed updates.",
+      "reconnecting": "Restarting the service. Reconnecting…",
+      "phases": {
+        "idle": "Ready",
+        "checking": "Checking releases…",
+        "downloading": "Downloading and verifying…",
+        "restarting": "Restarting the service…",
+        "verifying": "Checking service health…",
+        "complete": "Update complete",
+        "rolled_back": "Previous version restored",
+        "failed": "Update failed"
+      },
+      "errors": {
+        "network": "Cannot reach the update service or release server. Check the connection and try again.",
+        "storage": "Cannot save the update. Check disk space and directory permissions.",
+        "verification": "The update could not be verified. The installed version was kept.",
+        "manual": "This version requires a manual upgrade. Follow the upgrade guide.",
+        "rolledBack": "The new version failed its health check. The previous version is running again.",
+        "recovery": "Automatic recovery failed. Check the service logs and restore the retained version.",
+        "versionChanged": "A different version is now available. Check the version and retry.",
+        "failed": "Update failed. Check the updater logs before retrying."
+      }
+    }
   },
   "subscriptions": {
     "title": "Subscriptions",

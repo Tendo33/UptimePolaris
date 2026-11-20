@@ -53,8 +53,9 @@ jobs:
           for target in linux/amd64 linux/arm64 windows/amd64 windows/arm64 darwin/amd64 darwin/arm64; do
             os="${target%/*}"; arch="${target#*/}"; ext=''
             [[ "$os" != windows ]] || ext='.exe'
-            GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go -C backends/go build -tags release -trimpath -o "$GITHUB_WORKSPACE/release/polaris-${version}-${os}-${arch}${ext}" ./cmd/polaris
+            GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go -C backends/go build -tags release -trimpath -ldflags="-X github.com/XingLingQAQ/uptime/backends/go/internal/updates.Version=$version -X github.com/XingLingQAQ/uptime/backends/go/internal/updates.Repository=$GITHUB_REPOSITORY" -o "$GITHUB_WORKSPACE/release/polaris-${version}-${os}-${arch}${ext}" ./cmd/polaris
           done
+          "release/polaris-${version}-linux-amd64" --update-info > release/polaris-update.json
           (cd release && sha256sum polaris-* > SHA256SUMS.txt)
       - name: Prepare container image name
         id: image
@@ -74,6 +75,9 @@ jobs:
           context: .
           file: backends/go/Dockerfile
           platforms: linux/amd64,linux/arm64
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            RELEASE_REPOSITORY=${{ github.repository }}
           push: true
           tags: |
             ${{ steps.image.outputs.name }}:${{ github.ref_name }}

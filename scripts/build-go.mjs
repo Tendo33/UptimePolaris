@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readdirSync, realpathSync, rmSync, rmdirSync, symlinkSync, unlinkSync } from 'node:fs';
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, rmdirSync, symlinkSync, unlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -90,7 +90,9 @@ try {
     mkdirSync(join(root, 'backends/go/dist'), { recursive: true });
     const targetOs = process.env.GOOS || (process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'darwin' : process.platform);
     const output = join(root, 'backends/go/dist', targetOs === 'windows' ? 'polaris.exe' : 'polaris');
-    run('go', ['-C', 'backends/go', 'build', '-tags', 'release', '-trimpath', '-o', output, './cmd/polaris']);
+    const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
+    if (!/^\d+\.\d+\.\d+(?:-[\w.-]+)?$/.test(version)) throw new Error('Invalid package version');
+    run('go', ['-C', 'backends/go', 'build', '-tags', 'release', '-trimpath', '-ldflags', `-X github.com/XingLingQAQ/uptime/backends/go/internal/updates.Version=${version}`, '-o', output, './cmd/polaris']);
     console.log(`Built ${output}`);
   }
 } finally {

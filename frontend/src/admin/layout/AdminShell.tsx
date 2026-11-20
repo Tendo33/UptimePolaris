@@ -200,7 +200,7 @@ function TopBar({ onSearch }: { onSearch: () => void }) {
   */
   return (
     <header className="sticky top-0 z-40 flex h-14 shrink-0 items-center gap-2 bg-[var(--polaris-canvas)]/90 px-3 backdrop-blur-md sm:px-4 lg:static lg:grid lg:grid-cols-[1fr_auto_1fr] lg:gap-3 lg:bg-transparent lg:backdrop-blur-none">
-      <div className="flex min-w-0 shrink-0 items-center gap-1 justify-self-start">
+      <div className="flex min-w-0 items-center gap-1 justify-self-start sm:shrink-0">
         <Link to="/admin" className="flex min-w-0 items-center gap-2.5 rounded-lg px-1.5 py-1">
           <img src={BRAND_ICON} alt="" width={22} height={22} className="shrink-0" />
           <span className="truncate text-[14px] font-semibold tracking-[-0.02em]">{PROJECT_NAME}</span>
@@ -212,7 +212,7 @@ function TopBar({ onSearch }: { onSearch: () => void }) {
         <ConsoleStatus />
       </div>
 
-      <div className="ml-auto flex items-center justify-self-end gap-1 lg:ml-0">
+      <div className="ml-auto flex shrink-0 items-center justify-self-end gap-1 lg:ml-0">
         <button
           type="button"
           onClick={onSearch}

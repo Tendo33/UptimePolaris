@@ -1906,7 +1906,39 @@
     "dismissed": "Version ignorée",
     "undo": "Annuler",
     "checkedAt": "Vérifié {time}",
-    "notChecked": "Pas encore vérifié"
+    "notChecked": "Pas encore vérifié",
+    "update": {
+      "automatic": "Mises à jour automatiques",
+      "automaticHint": "Vérification des versions stables toutes les 6 heures. Réessayez manuellement après un échec.",
+      "install": "Mettre à jour",
+      "restartHint": "Le service redémarrera brièvement. Conservez une sauvegarde récente de la base de données.",
+      "reload": "Mise à jour terminée · Recharger",
+      "loading": "Chargement de l’état…",
+      "unreachable": "Service de mise à jour inaccessible. Vérifiez le déploiement, puis réessayez.",
+      "dockerSetup": "Connectez le service de mise à jour Docker pour mettre à jour ici. Consultez le guide.",
+      "unavailable": "Installez une version officielle pour activer les mises à jour gérées.",
+      "reconnecting": "Redémarrage du service. Reconnexion…",
+      "phases": {
+        "idle": "Prêt",
+        "checking": "Recherche de versions…",
+        "downloading": "Téléchargement et vérification…",
+        "restarting": "Redémarrage du service…",
+        "verifying": "Vérification du service…",
+        "complete": "Mise à jour terminée",
+        "rolled_back": "Version précédente restaurée",
+        "failed": "Échec de la mise à jour"
+      },
+      "errors": {
+        "network": "Service de mise à jour ou serveur de versions inaccessible. Vérifiez la connexion, puis réessayez.",
+        "storage": "Enregistrement impossible. Vérifiez l’espace disque et les droits du dossier.",
+        "verification": "Vérification de la mise à jour impossible. La version installée est conservée.",
+        "manual": "Cette version nécessite une mise à niveau manuelle. Suivez le guide.",
+        "rolledBack": "La nouvelle version ne fonctionne pas. La version précédente a été remise en service.",
+        "recovery": "Échec de la restauration automatique. Consultez les journaux et restaurez la version conservée.",
+        "versionChanged": "La version disponible a changé. Vérifiez-la, puis réessayez.",
+        "failed": "Échec de la mise à jour. Consultez les journaux du service avant de réessayer."
+      }
+    }
   },
   "subscriptions": {
     "title": "Abonnements",

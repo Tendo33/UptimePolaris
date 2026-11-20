@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/XingLingQAQ/uptime/backends/go/internal/updates"
 )
 
 type reading struct {
@@ -432,7 +434,7 @@ func (a *App) publicRoutes() {
 		if e := a.store.db.PingContext(r.Context()); e != nil {
 			return e
 		}
-		respond(w, 200, Object{"ok": true, "ts": time.Now().UnixMilli()})
+		respond(w, 200, Object{"ok": true, "ts": time.Now().UnixMilli(), "version": updates.Version})
 		return nil
 	})
 	a.route("GET /api/public/maintenance", true, func(w http.ResponseWriter, r *http.Request) error {

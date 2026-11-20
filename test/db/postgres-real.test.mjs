@@ -27,6 +27,7 @@ import { testDataMigration } from './data-migration-real.test.mjs';
 import { removeTheme } from '../../backends/worker/src/lib/theme/registry.ts';
 import { submitCommandResult } from '../../backends/worker/src/lib/agent/commands.ts';
 import { commandsSQL } from '../../backends/worker/src/lib/db/sql/commands.ts';
+import { defaultPresentation } from '../../shared/presentation.ts';
 
 const url = process.env.TEST_DATABASE_URL;
 const owner = process.env.UPTIME_PG_OWNER;
@@ -260,10 +261,9 @@ try {
     VALUES ('removal-fixture', 'removal-fixture', 'Removal fixture', '1.0.0', '{}', 0, 0)`);
   await db.execute(`INSERT INTO theme_versions (id, version, digest, prefix, manifest_json, installed_at)
     VALUES ('removal-fixture', '1.0.0', 'digest', 'unused-fixture-prefix', '{}', 0)`);
-  const removalPresentation = { agentEnabled: false, workerService: 'uptime-polaris', domains: [], pages: {
-    monitor: { theme: { short: 'removal-fixture', version: '1.0.0', theme: 'main' }, themeOptions: { headline: 'saved' } },
-    agent: { theme: null, themeOptions: {} },
-  } };
+  const removalPresentation = defaultPresentation();
+  removalPresentation.pages.monitor.theme = { short: 'removal-fixture', version: '1.0.0', theme: 'main' };
+  removalPresentation.pages.monitor.themeOptions = { headline: 'saved' };
   await db.execute("INSERT INTO presentation_state(id, config_json, revision, updated_at) VALUES ('main', $1, 'removal-fixture', 0)", [JSON.stringify(removalPresentation)]);
   const removed = await withDBScope({ DATABASE_TYPE: 'postgres', DATABASE_URL: url, THEMES: {
     async list({ prefix }) { assert.equal(prefix, 'themes/removal-fixture/'); return { objects: [], truncated: false }; },

@@ -30,6 +30,9 @@ type Config struct {
 	Concurrency         int
 	TrustProxy          bool
 	AICredentialKeyFile string
+	UpdaterURL          string
+	UpdaterToken        string
+	Deployment          string
 }
 
 func DefaultConfig() Config {
@@ -110,6 +113,7 @@ func newApp(ctx context.Context, c Config, offlineMigration bool) (*App, error) 
 		a.markSetupReady()
 	}
 	a.routes()
+	a.updateRoutes()
 	return a, nil
 }
 
@@ -269,7 +273,7 @@ func (a *App) requireSetup(w http.ResponseWriter, r *http.Request) bool {
 	if r.Method == http.MethodPost && path == "/api/auth/setup" {
 		return false
 	}
-	if read && (path == "/api/auth/session" || path == "/api/capabilities" || path == "/api/public/icon" || path == "/setup" || path == "/setup/" || strings.HasPrefix(path, "/assets/") || path == "/favicon.ico") {
+	if read && (path == "/api/auth/session" || path == "/api/capabilities" || path == "/api/public/health" || path == "/api/public/icon" || path == "/setup" || path == "/setup/" || strings.HasPrefix(path, "/assets/") || path == "/favicon.ico") {
 		return false
 	}
 	w.Header().Set("Cache-Control", "private, no-store")

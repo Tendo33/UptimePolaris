@@ -41,6 +41,53 @@ docker logs uptime-polaris
 
 数据和主题保存在 `/data`，请备份数据卷。如果使用宿主机目录挂载，确保目录可供 UID 和 GID `65532` 写入。
 
+## 在后台更新
+
+官方程序支持 Linux、Windows 和 macOS，均包含 amd64 与 arm64。启动命令保持不变；在后台顶部打开版本浮层，点击“立即更新”。程序会校验下载文件，短暂重启服务，并检查新版本和数据库连接。更新完成后点击“刷新页面”加载新界面。
+
+“自动更新”默认关闭。开启后每 6 小时检查正式版本；同一版本失败后需要手动重试。原生部署把新程序存入数据目录的 `updates` 子目录，Windows 也无需覆盖运行中的 exe。请保留原始启动程序、数据目录和原启动参数；服务管理器继续启动原始程序。该目录需要可写且允许执行程序。
+
+新版本启动失败时会恢复上一程序。自动更新只接受声明了相同数据兼容要求的版本；需要更改数据格式的版本按[运维指南](../../docs/operations.md#升级流程)手动升级。程序恢复不会撤销数据库写入，仍需定期备份 SQLite 或 PostgreSQL。自定义 `--frontend-dir` 的界面文件需自行同步更新。
+
+Docker 需要独立更新服务。下载 [compose.yaml](compose.yaml)，在同一目录创建受保护的密钥目录，然后启动：
+
+```sh
+mkdir -p .secrets
+chmod 700 .secrets
+openssl rand -hex 32 > .secrets/updater-token.txt
+chmod 644 .secrets/updater-token.txt
+docker compose up -d
+```
+
+Windows PowerShell 可用以下命令创建密钥，再执行 `docker compose up -d`：
+
+```powershell
+$bytes = New-Object byte[] 32
+$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes)
+$rng.Dispose()
+New-Item -ItemType Directory -Force .secrets | Out-Null
+[IO.File]::WriteAllText((Join-Path (Get-Location) '.secrets/updater-token.txt'), ([BitConverter]::ToString($bytes)).Replace('-', '').ToLowerInvariant())
+```
+
+Linux 上由 `0700` 的父目录限制宿主机访问；文件自身允许容器里的非 root 应用读取。为 Windows 的 `.secrets` 目录限制 ACL，只允许部署管理员和 Docker 读取。Docker Desktop 使用 Linux 容器；镜像支持 linux/amd64 和 linux/arm64。已有容器接入时，先停止旧服务，核对 Compose 的数据卷映射，使用原数据卷；不要启动一套空的数据卷代替现有数据。可通过 `POLARIS_IMAGE` 和 `POLARIS_TAG` 指定镜像仓库和起始版本。
+
+只有更新服务挂载 Docker socket；该权限可以管理宿主机容器。将它与应用放在可信网络内，保持 8091 端口不对外发布，并保护 `updater-token.txt`。应用通过 `POLARIS_UPDATER_URL` 和 `POLARIS_UPDATER_TOKEN_FILE` 连接更新服务。自动更新会保留环境变量、端口、数据卷和网络配置，停止的旧容器以 `uptime-polaris-backup-*` 保留。新容器健康检查失败时恢复旧容器，期间数据卷保持原样。
+
+更新服务的可选环境变量：
+
+| 变量 | 默认值 |
+| --- | --- |
+| `POLARIS_UPDATE_CONTAINER` | `uptime-polaris` |
+| `POLARIS_UPDATE_IMAGE` | `ghcr.io/xinglingqaq/uptimepolaris` |
+| `POLARIS_UPDATE_HEALTH_URL` | `http://uptime-polaris:8080/api/public/health` |
+| `POLARIS_UPDATE_DATA_DIR` | `/updates` |
+| `POLARIS_UPDATER_ADDR` | `0.0.0.0:8091` |
+| `POLARIS_UPDATER_TOKEN_FILE` | `/run/secrets/updater-token` |
+| `POLARIS_DOCKER_SOCKET` | `/var/run/docker.sock` |
+
+手动更新 Compose 部署前，将 `POLARIS_TAG` 调整到目标版本，并保留更新后的配置，避免下次 `docker compose up` 切回旧标签。更新服务自身通过 `docker compose pull updater` 和 `docker compose up -d --no-deps updater` 升级。确认无需回退后，可清理已停止的备份容器，保留数据卷。原生部署只清理 `updates/native.json` 中 `active` 和 `previous` 均未引用的版本目录。
+
 ## 部署配置
 
 程序读取进程当前工作目录里的 `.env`。优先级从高到低：命令行参数 > 进程环境变量 > `.env` > 默认值。服务管理器或容器仍可以直接传环境变量。
@@ -177,6 +224,20 @@ docker logs uptime-polaris
 Open `http://127.0.0.1:8080/setup` and use the setup key from the logs. Protect logs containing the key. Replace `latest` with a specific version tag, such as `v0.1.0`, if needed.
 
 Data and themes are stored in `/data`; back up the volume. For a host directory mount, grant write access to UID and GID `65532`.
+
+### Updates from the console
+
+Official binaries support Linux, Windows and macOS on amd64 and arm64. Keep the same startup command, open the version popover in the console, and choose **Update now**. The updater verifies the download, restarts the service, and checks the running version and database connection. Choose **Reload page** when complete to load the new interface.
+
+Automatic updates are off by default. When enabled, stable releases are checked every 6 hours; a failed version requires a manual retry. Native installations keep versioned executables in `updates` inside the data directory, including on Windows. Keep the original launcher, data directory and arguments, and continue pointing the service manager at the original launcher. The update directory must be writable and allow execution. Update any custom `--frontend-dir` files separately.
+
+An unhealthy new version is replaced with the previous program. Managed updates require matching data compatibility declarations; releases that change data formats require a manual upgrade. Program recovery preserves database writes, so keep regular SQLite or PostgreSQL backups. See [operations](../../docs/operations.md#upgrade).
+
+For Docker, use [compose.yaml](compose.yaml) and the commands above to create `.secrets/updater-token.txt`. Restrict the parent directory to mode `0700`; mode `0644` on the file lets the container's non-root application read the mounted secret. Then run `docker compose up -d`. A PowerShell alternative is provided above; restrict Windows directory ACLs to deployment administrators and Docker. Docker Desktop must use Linux containers. Images support linux/amd64 and linux/arm64. When adopting an existing deployment, stop it first and map the existing data volume explicitly. `POLARIS_IMAGE` and `POLARIS_TAG` select the image repository and starting tag.
+
+Only the updater mounts the Docker socket, which grants control over host containers. Keep its network trusted, do not publish port 8091, and protect the token file. The application connects using `POLARIS_UPDATER_URL` and `POLARIS_UPDATER_TOKEN_FILE`. The updater preserves environment variables, ports, volumes and networks; stopped containers named `uptime-polaris-backup-*` provide a recovery path. Failed health checks restore the old container without replacing its data volumes. The optional updater settings and defaults are listed above.
+
+Before a manual Compose redeployment, set `POLARIS_TAG` to the intended version and retain that configuration, so `docker compose up` does not restore an old tag. Upgrade the updater itself using `docker compose pull updater` and `docker compose up -d --no-deps updater`. Once rollback is no longer needed, remove stopped backup containers while preserving volumes. For native installs, clean only version directories referenced by neither `active` nor `previous` in `updates/native.json`.
 
 ### Deployment and operation
 

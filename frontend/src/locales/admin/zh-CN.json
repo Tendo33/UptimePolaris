@@ -1906,7 +1906,39 @@
     "dismissed": "已忽略此版本",
     "undo": "撤销",
     "checkedAt": "检查于 {time}",
-    "notChecked": "尚未检查"
+    "notChecked": "尚未检查",
+    "update": {
+      "automatic": "自动更新",
+      "automaticHint": "每 6 小时检查正式版本。失败的版本需要手动重试。",
+      "install": "立即更新",
+      "restartHint": "更新会短暂重启服务。请保留近期的数据库备份。",
+      "reload": "已更新 · 刷新页面",
+      "loading": "正在读取更新状态…",
+      "unreachable": "无法连接更新服务，请检查部署后重试。",
+      "dockerSetup": "接入 Docker 更新服务后即可在此更新，配置方法见升级指南。",
+      "unavailable": "安装官方发布版后即可使用托管更新。",
+      "reconnecting": "服务正在重启，正在重新连接…",
+      "phases": {
+        "idle": "就绪",
+        "checking": "正在检查版本…",
+        "downloading": "正在下载并校验…",
+        "restarting": "正在重启服务…",
+        "verifying": "正在检查服务健康状态…",
+        "complete": "更新完成",
+        "rolled_back": "已恢复上一版本",
+        "failed": "更新失败"
+      },
+      "errors": {
+        "network": "无法连接更新服务或版本服务器，请检查网络后重试。",
+        "storage": "无法保存更新，请检查磁盘空间和目录权限。",
+        "verification": "更新校验失败，已保留当前版本。",
+        "manual": "此版本需要手动升级，请按升级指南操作。",
+        "rolledBack": "新版本健康检查未通过，已恢复运行上一版本。",
+        "recovery": "自动恢复失败，请查看服务日志并恢复保留的版本。",
+        "versionChanged": "可用版本已变化，请确认版本后重试。",
+        "failed": "更新失败，请查看更新服务日志后重试。"
+      }
+    }
   },
   "subscriptions": {
     "title": "订阅",

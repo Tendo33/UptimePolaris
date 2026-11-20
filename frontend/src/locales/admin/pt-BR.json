@@ -1906,7 +1906,39 @@
     "dismissed": "Esta versão está sendo ignorada",
     "undo": "Desfazer",
     "checkedAt": "Verificado {time}",
-    "notChecked": "Ainda não verificado"
+    "notChecked": "Ainda não verificado",
+    "update": {
+      "automatic": "Atualizações automáticas",
+      "automaticHint": "Verifica versões estáveis a cada 6 horas. Versões com falha exigem uma nova tentativa manual.",
+      "install": "Atualizar agora",
+      "restartHint": "O serviço será reiniciado brevemente. Mantenha um backup recente do banco de dados.",
+      "reload": "Atualizado · Recarregar página",
+      "loading": "Carregando o estado da atualização…",
+      "unreachable": "Não foi possível acessar o atualizador. Verifique a implantação e tente novamente.",
+      "dockerSetup": "Conecte o atualizador Docker para atualizar por aqui. Consulte o guia de atualização.",
+      "unavailable": "Instale uma versão oficial para ativar as atualizações gerenciadas.",
+      "reconnecting": "Reiniciando o serviço. Reconectando…",
+      "phases": {
+        "idle": "Pronto",
+        "checking": "Verificando versões…",
+        "downloading": "Baixando e verificando…",
+        "restarting": "Reiniciando o serviço…",
+        "verifying": "Verificando a integridade do serviço…",
+        "complete": "Atualização concluída",
+        "rolled_back": "Versão anterior restaurada",
+        "failed": "Falha na atualização"
+      },
+      "errors": {
+        "network": "Não foi possível acessar o atualizador ou o servidor de versões. Verifique a conexão e tente novamente.",
+        "storage": "Não foi possível salvar a atualização. Verifique o espaço em disco e as permissões da pasta.",
+        "verification": "A verificação da atualização falhou. A versão instalada foi mantida.",
+        "manual": "Esta versão exige atualização manual. Siga o guia de atualização.",
+        "rolledBack": "A nova versão falhou na verificação de integridade. A versão anterior está funcionando novamente.",
+        "recovery": "A recuperação automática falhou. Consulte os logs e restaure a versão preservada.",
+        "versionChanged": "A versão disponível mudou. Confira a versão e tente novamente.",
+        "failed": "A atualização falhou. Consulte os logs do atualizador antes de tentar novamente."
+      }
+    }
   },
   "subscriptions": {
     "title": "Assinaturas",
