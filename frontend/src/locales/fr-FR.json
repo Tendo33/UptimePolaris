@@ -552,6 +552,11 @@
       "removed": "Retiré de la source",
       "configuration_changed": "En attente de la nouvelle configuration",
       "archived": "Archivé"
-    }
+    },
+    "upCount": "{up} sur {total} opérationnels",
+    "externalHint": "États fournis par des sources externes.",
+    "availabilityShort": "Source {hours} h",
+    "railLabel": "{count} dernières observations reçues",
+    "railEmpty": "Aucune observation reçue"
   }
 }

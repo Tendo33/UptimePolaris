@@ -552,6 +552,11 @@
       "removed": "Удалено у источника",
       "configuration_changed": "Ожидание новой конфигурации",
       "archived": "В архиве"
-    }
+    },
+    "upCount": "Работают {up} из {total}",
+    "externalHint": "Состояния предоставлены внешними источниками.",
+    "availabilityShort": "Источник, {hours} ч",
+    "railLabel": "Последние полученные наблюдения: {count}",
+    "railEmpty": "Наблюдений пока нет"
   }
 }

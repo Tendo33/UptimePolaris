@@ -450,6 +450,7 @@ curl --fail-with-body -X POST \
 | `GET /api/admin/subscriptions` | 按 `category`、`q`、`health`、`archived` 筛选 |
 | `POST /api/admin/subscriptions` | 从预览创建，传 `requestId`、`previewId`、`name`、`category`、`selectedIds` |
 | `GET/PATCH/DELETE /api/admin/subscriptions/:id` | 读取、编辑、删除；写入携带 `revision` |
+| `GET /api/admin/subscriptions/:id/icon` | 读取订阅来源的网站图标，须启用站点图标同步 |
 | `GET/PATCH /api/admin/subscriptions/:id/items` | 读取、批量编辑条目；写入 `{items:[{id,revision,…}]}`，最多 100 项，返回逐项结果 |
 | `POST /api/admin/subscriptions/:id/sync` | 立即同步，返回任务 ID |
 | `GET /api/admin/subscription-runs/:runId` | 轮询同步状态与阶段 |
@@ -462,11 +463,15 @@ curl --fail-with-body -X POST \
 
 `category` 是 `website` 或 `model`。创建还可传 `intervalSec`、`staleAfterSec`、`isPublic`、`autoSubscribe`、网站 `groupId` 和 `notifications`。预览和同步返回 202，需轮询到状态不再为 `running`。预览不修改历史和通知；同步会更新状态。重复创建使用相同 `requestId` 可避免产生两个订阅。
 
+订阅列表另返回 `summary`，包含 `total`、`items`、`healthy`、`partial`、`failed`、`paused`、`archived`。汇总遵循 `category` 和 `archived`，不受搜索、状态筛选或分页影响；`items` 是已订阅且未移除的条目数。列表与详情都返回当前 `statusCounts`。
+
 条目身份变化时，应用请求还需 `confirmIdentityChange:true`。`identityMappings:[{itemId,sourceItemId}]` 显式关联旧条目和新 ID；未关联的旧条目归档。更新预览必须属于当前订阅和 `revision`。
 
 `notifications` 包含 `monitor`、`sync`，每项有 `notificationEnabled`、`notificationChannelIds`，`sync` 另有 `afterSec`。新订阅默认均关闭。普通监控在 `options_json`、AI 渠道在本体上使用相同的通知开关和渠道字段。`POST /api/notifications/resolve` 接受事件来源、类型、对象及通知策略，返回有效渠道、排除原因和静默状态，不会发送消息。
 
 公开接口为 `GET /api/public/subscriptions/items?category=website` 和 `GET /api/public/subscriptions/items/:id/history`；支持 `pageId` 页面范围。模型类别使用 `model`。响应只包含公开条目、来源、有效性、观测及可用率，不能从中读取接口配置或凭据。使用与备份方法见[订阅指南](subscriptions.md)。
+
+`GET /api/public/subscriptions/icons/:id` 返回订阅来源图标。订阅必须公开、未归档，并至少包含一个公开且已订阅的条目；类别须符合当前页面范围。图标接口不接受任意目标地址，且遵循 `site.syncMonitorIcons`。服务端缓存成功结果 7 天、未找到结果 1 小时，每次读取仍会检查权限。
 
 ## API reference
 
@@ -591,11 +596,15 @@ Agent installation downloads `install.sh` or `install.ps1` from the Agent GitHub
 
 The subscription management endpoints in the table above require administrator authentication. List responses use `items`, `total`, `nextOffset`, with `offset` and `limit` (default 50, maximum 200). Categories are `website` and `model`.
 
+Subscription lists also return `summary` with `total`, `items`, `healthy`, `partial`, `failed`, `paused`, and `archived`. Counts respect category and archive scope, independently of search, health filters, and pagination. `items` counts selected, nonremoved items. List and detail responses include current `statusCounts`.
+
 Import an HTTPS JSON URL or descriptor, create a preview, and poll its ID until it leaves `running`. Create with `requestId`, `previewId`, `name`, `category`, and source `selectedIds`. Reusing `requestId` makes creation idempotent. Updates and deletion require the current `revision`. Item batches carry each item's `id` and `revision` and return individual results.
 
 Configuration changes require a preview bound to the subscription and revision. Identity changes also require `confirmIdentityChange:true`; `identityMappings:[{itemId,sourceItemId}]` explicitly preserves associations. Unlinked old items are archived. `rollback:true` previews the previous descriptor.
 
 Public lists use `GET /api/public/subscriptions/items?category=website` (or `model`), with optional `pageId`. Public history uses `/api/public/subscriptions/items/:id/history`. Visibility and page scope apply to both endpoints. Responses exclude descriptors and credentials.
+
+Source icons use `/api/admin/subscriptions/:id/icon` or `/api/public/subscriptions/icons/:id`. Both require `site.syncMonitorIcons`. Public icons additionally require an unarchived public subscription with a selected public item in the current page's category. Targets come from the saved source, never a request parameter. Server caches last seven days for icons and one hour for misses; access is checked on every request.
 
 ### Notifications and operations
 

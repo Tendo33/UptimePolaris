@@ -131,6 +131,12 @@ func runSubscriptionManagement(t *testing.T, s *testServer) {
 	row := object(req("POST", "/api/admin/subscriptions", input, 201)["subscription"])
 	id := str(row, "id")
 	path := "/api/admin/subscriptions/" + id
+	if summary := object(req("GET", "/api/admin/subscriptions?q=not-found", nil, 200)["summary"]); integer(summary, "total") != 1 || integer(summary, "items") != 1 {
+		t.Fatal(summary)
+	}
+	if integer(object(object(req("GET", path, nil, 200)["subscription"])["statusCounts"]), "up") != 1 {
+		t.Fatal("detail missing status counts")
+	}
 	if object(object(row["notifications"])["monitor"])["notificationEnabled"] != false {
 		t.Fatal("notifications default on")
 	}

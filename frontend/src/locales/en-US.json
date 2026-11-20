@@ -552,6 +552,11 @@
       "removed": "Removed at source",
       "configuration_changed": "Waiting for new configuration",
       "archived": "Archived"
-    }
+    },
+    "upCount": "{up} of {total} up",
+    "externalHint": "Status comes from external sources and is reported by them.",
+    "availabilityShort": "Source {hours} h",
+    "railLabel": "Last {count} received observations",
+    "railEmpty": "No observations received yet"
   }
 }

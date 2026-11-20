@@ -11,6 +11,7 @@ import { isPrivateHost } from '../http/private-host';
 
 const MAX_BYTES = 256 * 1024;
 const TIMEOUT_MS = 4000;
+type IconOptions = { validateUrl?: (url: URL) => Promise<void> };
 
 export interface SiteIcon {
   bytes: ArrayBuffer;
@@ -29,9 +30,10 @@ function absolutize(href: string, base: URL): URL | null {
 }
 
 /** Follows at most two redirects, re-checking the host at each hop. / 最多跟随两次重定向，并逐跳重新检查主机。 */
-async function fetchGuarded(url: URL): Promise<Response | null> {
+async function fetchGuarded(url: URL, options: IconOptions): Promise<Response | null> {
   let current = url;
   for (let hop = 0; hop < 3; hop++) {
+    await options.validateUrl?.(current);
     const response = await fetch(current, {
       redirect: 'manual',
       signal: AbortSignal.timeout(TIMEOUT_MS),
@@ -39,13 +41,16 @@ async function fetchGuarded(url: URL): Promise<Response | null> {
     });
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location');
+      await response.body?.cancel();
       if (!location) return null;
       const next = absolutize(location, current);
       if (!next) return null;
       current = next;
       continue;
     }
-    return response.ok ? response : null;
+    if (response.ok) return response;
+    await response.body?.cancel();
+    return null;
   }
   return null;
 }
@@ -66,14 +71,36 @@ async function readImage(response: Response): Promise<SiteIcon | null> {
   // Anything that is not an image at all - an HTML error page served with 200 -
   // is not worth reading. The exact type is decided from the bytes below.
   // 完全不是图片的响应（如返回 200 的 HTML 错误页面）无需读取；具体类型由下方字节判断。
-  if (declared && !declared.startsWith('image/')) return null;
-  const length = Number(response.headers.get('content-length') ?? '0');
-  if (Number.isFinite(length) && length > MAX_BYTES) return null;
-  const buffer = await response.arrayBuffer();
-  if (buffer.byteLength === 0 || buffer.byteLength > MAX_BYTES) return null;
+  if (declared && !declared.startsWith('image/')) { await response.body?.cancel(); return null; }
+  const buffer = await readBounded(response, MAX_BYTES);
+  if (!buffer?.byteLength) return null;
   const contentType = sniffType(new Uint8Array(buffer));
   if (!contentType) return null;
   return { bytes: buffer, contentType };
+}
+
+async function readBounded(response: Response, maximum: number, prefix = false): Promise<ArrayBuffer | null> {
+  if (!response.body) return null;
+  if (!prefix && Number(response.headers.get('content-length')) > maximum) { await response.body.cancel(); return null; }
+  const reader = response.body.getReader(), chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (size + value.byteLength > maximum) {
+        await reader.cancel();
+        if (!prefix) return null;
+        chunks.push(value.slice(0, maximum - size)); size = maximum; break;
+      }
+      size += value.byteLength;
+      chunks.push(value);
+    }
+  } finally { reader.releaseLock(); }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  return bytes.buffer;
 }
 
 const LINK_TAG = /<link\b[^>]*>/gi;
@@ -93,13 +120,13 @@ function iconHref(html: string, base: URL): URL | null {
   return null;
 }
 
-export async function fetchSiteIcon(site: URL): Promise<SiteIcon | null> {
+export async function fetchSiteIcon(site: URL, options: IconOptions = {}): Promise<SiteIcon | null> {
   // 1. The conventional path. Cheap, and right for most sites.
   // 1. 常规路径；成本低，适用于大多数网站。
   const conventional = absolutize('/favicon.ico', site);
   if (conventional) {
     try {
-      const response = await fetchGuarded(conventional);
+      const response = await fetchGuarded(conventional, options);
       const icon = response ? await readImage(response) : null;
       if (icon) return icon;
     } catch {
@@ -111,14 +138,16 @@ export async function fetchSiteIcon(site: URL): Promise<SiteIcon | null> {
   // 2. The page's own declaration - covers `/assets/icon-32.png` layouts.
   // 2. 页面自身声明，覆盖 `/assets/icon-32.png` 等布局。
   try {
-    const page = await fetchGuarded(site);
+    const page = await fetchGuarded(site, options);
     if (!page) return null;
     const contentType = (page.headers.get('content-type') ?? '').toLowerCase();
-    if (!contentType.includes('text/html')) return null;
-    const html = (await page.text()).slice(0, 96 * 1024);
+    if (!contentType.includes('text/html')) { await page.body?.cancel(); return null; }
+    const bytes = await readBounded(page, 96 * 1024, true);
+    if (!bytes) return null;
+    const html = new TextDecoder().decode(bytes);
     const href = iconHref(html, site);
     if (!href) return null;
-    const response = await fetchGuarded(href);
+    const response = await fetchGuarded(href, options);
     return response ? await readImage(response) : null;
   } catch {
     return null;

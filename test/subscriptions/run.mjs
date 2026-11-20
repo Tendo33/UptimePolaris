@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 
 mkdirSync('artifacts/tmp', { recursive: true });
-for (const name of process.argv[2] ? [process.argv[2]] : ['descriptor', 'fetch', 'destination', 'runtime', 'pagination', 'cache', 'worker']) {
+for (const name of process.argv[2] ? [process.argv[2]] : ['descriptor', 'fetch', 'destination', 'runtime', 'pagination', 'cache', 'icon', 'worker']) {
   const outfile = `artifacts/tmp/subscription-${name}.mjs`;
   await build({ entryPoints: [`test/subscriptions/${name}.test.ts`], outfile, bundle: true, platform: 'node', format: 'esm', packages: 'external', plugins: [{ name: 'worker-socket', setup(builder) {
     builder.onResolve({ filter: /^cloudflare:sockets$/ }, () => ({ path: 'socket', namespace: 'fixture' }));

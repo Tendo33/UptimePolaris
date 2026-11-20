@@ -552,6 +552,11 @@
       "removed": "取得元で削除済み",
       "configuration_changed": "新しい設定の適用待ち",
       "archived": "アーカイブ済み"
-    }
+    },
+    "upCount": "{up} / {total} 正常",
+    "externalHint": "外部ソースが提供する状態です。",
+    "availabilityShort": "ソース {hours} 時間",
+    "railLabel": "受信した直近 {count} 件の観測",
+    "railEmpty": "受信した観測はまだありません"
   }
 }

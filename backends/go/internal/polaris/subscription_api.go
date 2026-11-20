@@ -110,6 +110,7 @@ func (a *App) validateSubscriptionNotifications(ctx context.Context, raw any) (O
 func (a *App) subscriptionRoutes() {
 	a.subscriptionConfigRoutes()
 	a.subscriptionPublicRoutes()
+	a.subscriptionIconRoutes()
 	a.route("GET /api/admin/subscriptions", false, func(w http.ResponseWriter, r *http.Request) error {
 		rows, err := a.store.list(r.Context(), "subscription")
 		if err != nil {
@@ -122,13 +123,25 @@ func (a *App) subscriptionRoutes() {
 			}
 		}
 		items := []Object{}
+		selectedCounts, err := a.store.subscriptionSelectedCounts(r.Context())
+		if err != nil {
+			return err
+		}
+		summary := Object{"total": int64(0), "items": int64(0), "healthy": int64(0), "partial": int64(0), "failed": int64(0), "paused": int64(0), "archived": int64(0)}
 		query := strings.ToLower(r.URL.Query().Get("q"))
 		for _, row := range rows {
-			health := r.URL.Query().Get("health")
-			if health != "" && health != "all" && (health == "paused" && boolean(row["enabled"]) || health != "paused" && (!boolean(row["enabled"]) || object(row["runtime"])["health"] != health)) {
+			if kind != "" && row["category"] != kind || r.URL.Query().Get("archived") != "true" && row["archivedAt"] != nil {
 				continue
 			}
-			if kind != "" && row["category"] != kind || r.URL.Query().Get("archived") != "true" && row["archivedAt"] != nil || !strings.Contains(strings.ToLower(str(row, "name")), query) {
+			state := subscriptionHealth(row)
+			summary["total"] = integer(summary, "total") + 1
+			summary["items"] = integer(summary, "items") + selectedCounts[str(row, "id")]
+			summary[state] = integer(summary, state) + 1
+			health := r.URL.Query().Get("health")
+			if health != "" && health != "all" && state != health {
+				continue
+			}
+			if !strings.Contains(strings.ToLower(str(row, "name")), query) {
 				continue
 			}
 			items = append(items, row)
@@ -137,25 +150,13 @@ func (a *App) subscriptionRoutes() {
 		if err != nil {
 			return err
 		}
+		result["summary"] = summary
 		dueUpdates := []Object{}
 		for _, row := range result["items"].([]Object) {
-			entries, err := a.store.subscriptionItemIndex(r.Context(), str(row, "id"), false)
+			_, err := a.subscriptionStatusView(r.Context(), row)
 			if err != nil {
 				return err
 			}
-			counts := Object{}
-			for _, item := range entries {
-				if boolean(item["selected"]) && item["removedAt"] == nil {
-					status := str(subscriptionItemView(item, row, time.Now().Unix()), "displayStatus")
-					counts[status] = integer(counts, status) + 1
-				}
-			}
-			row["statusCounts"] = counts
-			selected := int64(0)
-			for _, count := range counts {
-				selected += int64(number(count))
-			}
-			object(row["runtime"])["selectedCount"] = selected
 			update, err := a.store.get(r.Context(), "subscription_update", str(row, "configId"))
 			if err != nil {
 				return err
@@ -177,6 +178,10 @@ func (a *App) subscriptionRoutes() {
 	a.route("POST /api/admin/subscriptions", false, a.createSubscription)
 	a.route("GET /api/admin/subscriptions/{id}", false, func(w http.ResponseWriter, r *http.Request) error {
 		row, err := a.getSubscription(r.Context(), r.PathValue("id"))
+		if err != nil {
+			return err
+		}
+		row, err = a.subscriptionStatusView(r.Context(), row)
 		if err != nil {
 			return err
 		}
@@ -617,7 +622,7 @@ func (a *App) deleteSubscription(w http.ResponseWriter, r *http.Request) error {
 		if err := subscriptionRevision(row, input); err != nil {
 			return err
 		}
-		if _, err := tx.tx.ExecContext(r.Context(), tx.store.query("DELETE FROM polaris_documents WHERE kind IN ('subscription_item','subscription_config','subscription_previous','subscription_run','subscription_cache','subscription_create','subscription_preview','subscription_checkpoint','subscription_normalized','subscription_update') AND "+tx.store.jsonField("subscriptionId")+"=?"), id); err != nil {
+		if _, err := tx.tx.ExecContext(r.Context(), tx.store.query("DELETE FROM polaris_documents WHERE kind IN ('subscription_item','subscription_config','subscription_previous','subscription_run','subscription_cache','subscription_create','subscription_preview','subscription_checkpoint','subscription_normalized','subscription_update','subscription_icon') AND "+tx.store.jsonField("subscriptionId")+"=?"), id); err != nil {
 			return err
 		}
 		for _, kind := range []string{"outbox"} {

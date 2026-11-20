@@ -552,6 +552,11 @@
       "removed": "来源已移除",
       "configuration_changed": "等待新配置同步",
       "archived": "已归档"
-    }
+    },
+    "upCount": "{up} / {total} 正常",
+    "externalHint": "状态来自外部来源，由来源方提供。",
+    "availabilityShort": "来源 {hours} 小时",
+    "railLabel": "最近 {count} 次已接收的观测",
+    "railEmpty": "暂无已接收的观测"
   }
 }

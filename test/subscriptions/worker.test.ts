@@ -17,6 +17,7 @@ import { loadQueue } from '../../backends/worker/src/lib/queue/control';
 import { withWriterLease } from '../../backends/worker/src/lib/jobs/writer-lease';
 import { ExternalRequestBudget } from '../../backends/worker/src/lib/http/request-budget';
 import type { CheckQueueMessage } from '../../shared/check-queue';
+import { writeSettings } from '../../backends/worker/src/lib/settings/store';
 
 const mf = new Miniflare({ modules: true, script: 'export default {fetch(){return new Response("ok")}}', compatibilityDate: '2025-01-01', d1Databases: ['DB'], kvNamespaces: ['CONFIG'] });
 const db = await mf.getD1Database('DB');
@@ -30,12 +31,12 @@ try {
   const req = async (method: string, path: string, body?: unknown, authenticated = true) => {
     const tasks: Promise<unknown>[] = [];
     const response = await api.fetch(new Request(`https://fixture.test${path}`, { method, headers: { 'content-type': 'application/json', ...(authenticated ? { authorization: `Bearer ${env.ADMIN_TOKEN}` } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) }), env, { waitUntil(task: Promise<unknown>) { tasks.push(task); } } as ExecutionContext);
-    const value = await response.json() as any;
+    const value = response.headers.get('content-type')?.startsWith('image/') ? new Uint8Array(await response.arrayBuffer()) : await response.json() as any;
     await Promise.all(tasks);
     if (value.previewId) value.preview = (await req('GET', `/api/admin/subscription-previews/${value.previewId}`)).value.preview;
     if (value.runId) value.run = (await req('GET', `/api/admin/subscription-runs/${value.runId}`)).value.run;
     if (response.status >= 400) console.log(method, path, response.status, value);
-    return { status: response.status, value };
+    return { status: response.status, value, headers: response.headers };
   };
   assert.equal((await req('POST', '/api/auth/setup', { credential: env.ADMIN_TOKEN, username: 'subscription-owner', password: 'subscription-test-password' }, false)).status, 200);
   const presentation = await loadPresentation(env);
@@ -55,6 +56,33 @@ try {
   assert.equal(simultaneous[0].value.subscription.id, simultaneous[1].value.subscription.id);
   await req('DELETE', `/api/admin/subscriptions/${simultaneous[0].value.subscription.id}`, { revision: simultaneous[0].value.subscription.revision });
   const path = `/api/admin/subscriptions/${subscription.id}`;
+  assert.equal((await req('GET', path)).value.subscription.statusCounts.up, 1);
+  const summary = (await req('GET', '/api/admin/subscriptions?q=no-matching-name&limit=1')).value;
+  assert.equal(summary.total, 0); assert.equal(summary.summary.total, 1); assert.equal(summary.summary.items, 1); assert.equal(summary.summary.healthy, 1);
+  const savedFetch = globalThis.fetch;
+  let iconReads = 0;
+  globalThis.fetch = async input => {
+    if (new URL(String(input)).hostname === 'cloudflare-dns.com') return Response.json({ Status: 0, Answer: [{type:1,data:'1.1.1.1'}] });
+    assert.equal(new URL(String(input)).pathname, '/favicon.ico'); iconReads++;
+    return new Response(Uint8Array.from([137,80,78,71,13,10,26,10,0,0,0,0]), {headers:{'content-type':'image/png'}});
+  };
+  assert.equal((await req('GET', `${path}/icon`)).status, 404);
+  await writeSettings(env, { 'site.syncMonitorIcons': true });
+  assert.equal((await req('GET', `${path}/icon`, undefined, false)).status, 401);
+  assert.equal((await req('GET', `${path}/icon`)).headers.get('content-type'), 'image/png');
+  const publicIcon = `/api/public/subscriptions/icons/${subscription.id}`;
+  assert.equal((await req('GET', publicIcon, undefined, false)).status, 200);
+  assert.equal((await req('GET', publicIcon, undefined, false)).headers.get('cache-control'), 'private, no-store');
+  assert.equal(iconReads, 1);
+  const iconStore = new SubscriptionStore(getDB(env)), iconSub = await iconStore.get(subscription.id);
+  await iconStore.update(iconSub, {...iconSub,isPublic:false});
+  assert.equal((await req('GET', publicIcon, undefined, false)).status, 404);
+  await iconStore.update({...iconSub,isPublic:false},iconSub);
+  const iconItem = (await iconStore.items(subscription.id))[0];
+  await iconStore.db.commit([iconStore.itemWrite({...iconItem,isPublic:false})]);
+  assert.equal((await req('GET', publicIcon, undefined, false)).status, 404);
+  await iconStore.db.commit([iconStore.itemWrite(iconItem)]);
+  globalThis.fetch = savedFetch;
   assert.equal((await req('GET', `${path}/items`)).value.items.length, 1);
   assert.equal((await req('GET', '/api/public/subscriptions/items?category=website', undefined, false)).value.items.length, 1);
   status = 'down';
@@ -81,6 +109,7 @@ try {
   assert.equal((await notifyStore.db.query('SELECT id FROM pending_notifications')).length,0);
   env.AUTOMATIC_NOTIFICATIONS_DISABLED = 'true';
   const current = (await req('GET', path)).value.subscription;
+  assert.equal(Object.values(current.statusCounts).reduce((a: number,b: any)=>a+b,0),1);
   assert.equal((await req('PATCH', path, { revision: current.revision, isPublic: false })).status, 200);
   assert.equal((await req('GET', '/api/public/subscriptions/items?category=website', undefined, false)).value.items.length, 0);
   assert.equal((await req('PATCH', path, { revision: current.revision, name: 'Stale write' })).status, 409);
@@ -166,6 +195,15 @@ try {
   await consumeCheckQueue({queue:'subscription-test',messages:[message()]} as any,env,{waitUntil(){}} as ExecutionContext);
   await consumeCheckQueue({queue:'subscription-test',messages:[message()]} as any,env,{waitUntil(){}} as ExecutionContext);
   assert.equal(sourceCalls,1); assert.equal((await loadQueue(env)).state.pending[queued[0].id],undefined);
+  const summaryBase = await store.get(subscription.id);
+  for (let batch=0;batch<5;batch++) await store.db.commit(Array.from({length:41},(_,index)=>{
+    const i=batch*41+index,id=`summary-${i}`,row={...summaryBase,id,name:id,sourceUrl:null,enabled:i!==0,archivedAt:i===1?1:null,runtime:{...summaryBase.runtime,health:'healthy'}};
+    return store.write('INSERT INTO subscriptions(id,json,revision,sync_revision,enabled,next_due) VALUES(?,?,?,?,?,?)',[id,JSON.stringify(row),row.revision,row.syncRevision,Number(row.enabled),0]);
+  }));
+  const allSummary=(await req('GET','/api/admin/subscriptions?q=not-found&limit=1')).value;
+  assert.equal(allSummary.total,0);assert.equal(allSummary.summary.total,205);assert.equal(allSummary.summary.paused,1);
+  const pausedSummary=(await req('GET','/api/admin/subscriptions?archived=true&health=paused&limit=1')).value;
+  assert.equal(pausedSummary.total,1);assert.equal(pausedSummary.summary.archived,1);
   console.log('Subscription Worker API and atomic-write scenarios passed');
   });
 } finally { globalThis.fetch = originalFetch; Date.now = originalNow; await mf.dispose(); }

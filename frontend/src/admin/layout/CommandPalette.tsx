@@ -1,9 +1,10 @@
 import { Modal } from '@/components/ui/MotionOverlays';
 import { ModalContent } from '@heroui/react';
 import clsx from 'clsx';
-import { Activity, ArrowDown, ArrowUp, Bot, CornerDownLeft, Cpu, Globe, KeyRound, Network, Plus, RadioTower, Search, Server, Webhook } from 'lucide-react';
+import { Activity, ArrowDown, ArrowUp, Bot, CornerDownLeft, Cpu, Globe, KeyRound, Network, Plus, RadioTower, Rss, Search, Server, Webhook } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
+import useSWR from 'swr';
 import { useTranslations } from 'use-intl';
 import type { Hue } from '../../types/tone';
 import { IconTile } from '../components/IconTile';
@@ -13,12 +14,14 @@ import { toneForStatus } from '../monitors/presentation';
 import type { MonitorType } from '../monitors/types';
 import { useFleet, useOverview } from '../useConsoleData';
 import { useAiData } from '../ai/api';
+import { subscriptionsApi } from '../subscriptions/api';
+import { stateTone } from '@/components/subscriptions/observation';
 import { aiBucket, aiTone } from '../ai/presentation';
 import { useNavigation } from './useNavigation';
 
 interface Item {
   id: string;
-  group: 'pages' | 'actions' | 'monitors' | 'ai' | 'agents';
+  group: 'pages' | 'actions' | 'monitors' | 'ai' | 'subscriptions' | 'agents';
   label: string;
   sub?: string;
   icon: ReactNode;
@@ -68,6 +71,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
   const navigation = useNavigation();
   const ai = useAiData(open && navigation.some((entry) => entry.href === '/admin/ai'));
   const fleet = useFleet(open);
+  const subscriptions = useSWR(open && navigation.some((entry) => entry.href === '/admin/subscriptions') ? 'console:palette-subscriptions' : null, () => subscriptionsApi.all(), { revalidateOnFocus: false, shouldRetryOnError: false });
 
   useEffect(() => {
     if (open) {
@@ -92,6 +96,9 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     const actions: Item[] = [
       { id: 'action:monitor', group: 'actions', label: t('action.add'), icon: <Plus />, hue: 'primary', to: '/admin?new=1' },
       { id: 'action:enroll', group: 'actions', label: t('agents.enroll'), icon: <KeyRound />, hue: 'cyan', to: '/admin/agents?enroll=1' },
+      ...(navigation.some((entry) => entry.href === '/admin/subscriptions')
+        ? [{ id: 'action:subscription', group: 'actions' as const, label: t('subscriptions.add'), icon: <Rss />, hue: 'cyan' as const, to: '/admin/subscriptions/new' }]
+        : []),
     ];
     // Urgency, for the launcher view: down, retrying, warning, unchecked, up, paused. / 启动器视图按紧急程度排序：故障、重试、警告、未检查、正常、暂停。
     const urgency = (st: number | null, active: number) =>
@@ -146,6 +153,22 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
         trailing: <StatusPill tone={aiTone(model)} label={t(`ai.bucket.${aiBucket(model)}`)} />,
       }));
 
+    const subscriptionRank = { failed: 0, partial: 1, healthy: 2, paused: 3, archived: 4 } as const;
+    const healthOf = (row: { archivedAt: number | null; enabled: boolean; runtime: { health: 'healthy' | 'partial' | 'failed' } }) =>
+      row.archivedAt ? 'archived' : !row.enabled ? 'paused' : row.runtime.health;
+    const subscribed: Item[] = [...(subscriptions.data?.items ?? [])]
+      .sort((a, b) => subscriptionRank[healthOf(a)] - subscriptionRank[healthOf(b)])
+      .map((row) => ({
+        id: `subscription:${row.id}`,
+        group: 'subscriptions',
+        label: row.name,
+        sub: [row.templateName, ...(row.sourceHosts ?? [])].filter(Boolean).join(' · '),
+        icon: <Rss />,
+        hue: 'cyan',
+        to: `/admin/subscriptions/${encodeURIComponent(row.id)}`,
+        trailing: <StatusPill tone={stateTone(healthOf(row))} label={t(`subscriptions.status.${healthOf(row)}`)} />,
+      }));
+
     const needle = query.trim().toLowerCase();
     const match = (item: Item) =>
       !needle || [item.label, item.sub, item.keywords].some((text) => text?.toLowerCase().includes(needle));
@@ -161,9 +184,10 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
       ...actions.filter(match),
       ...monitors.filter(match).slice(0, needle ? 8 : 5),
       ...models.filter(match).slice(0, needle ? 6 : 3),
+      ...subscribed.filter(match).slice(0, needle ? 6 : 2),
       ...agents.filter(match).slice(0, needle ? 6 : 3),
     ];
-  }, [ai.data, fleet.data, navigation, overview.data, query, t]);
+  }, [ai.data, fleet.data, navigation, overview.data, query, subscriptions.data, t]);
 
   useEffect(() => {
     setActive((index) => Math.min(index, Math.max(0, items.length - 1)));
@@ -185,6 +209,7 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     { key: 'actions', label: t('console.searchActions') },
     { key: 'monitors', label: t('console.searchMonitors') },
     { key: 'ai', label: t('console.searchAi') },
+    { key: 'subscriptions', label: t('console.searchSubscriptions') },
     { key: 'agents', label: t('console.searchAgents') },
   ];
 

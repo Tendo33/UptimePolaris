@@ -552,6 +552,11 @@
       "removed": "원본에서 삭제됨",
       "configuration_changed": "새 설정 적용 대기",
       "archived": "보관됨"
-    }
+    },
+    "upCount": "{up} / {total} 정상",
+    "externalHint": "외부 소스가 제공하는 상태입니다.",
+    "availabilityShort": "소스 {hours}시간",
+    "railLabel": "최근 수신한 관측 {count}건",
+    "railEmpty": "수신한 관측이 아직 없습니다"
   }
 }

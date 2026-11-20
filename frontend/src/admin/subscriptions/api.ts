@@ -1,7 +1,7 @@
 import { requestJson } from '@/api/client';
 import { ApiError } from '@/api/errors';
 import useSWR from 'swr';
-import type { Subscription, SubscriptionCatalogEntry, SubscriptionConfig, SubscriptionDescriptor, SubscriptionItem, SubscriptionPreview } from '../../../../shared/subscriptions';
+import type { Subscription, SubscriptionCatalogEntry, SubscriptionConfig, SubscriptionDescriptor, SubscriptionItem, SubscriptionPreview, SubscriptionSummary } from '../../../../shared/subscriptions';
 
 export type Page<T> = { items: T[]; total: number; nextOffset: number | null };
 export type Catalog = { entries: SubscriptionCatalogEntry[]; fetchedAt: number | null; stale: boolean; error: string | null };
@@ -29,7 +29,18 @@ async function awaitRun(result: { run: Run; runId: string }, onProgress?: (run: 
   return result;
 }
 export const subscriptionsApi = {
-  list: (query = '') => requestJson<Page<Subscription>>(`${root}?${query}`),
+  list: (query = '') => requestJson<Page<Subscription> & { summary: SubscriptionSummary }>(`${root}?${query}`),
+  all: async (query = '') => {
+    const params = new URLSearchParams(query), items: Subscription[] = [];
+    params.set('limit', '200');
+    let offset: number | null = 0;
+    do {
+      params.set('offset', String(offset));
+      const page: Page<Subscription> = await subscriptionsApi.list(params.toString());
+      items.push(...page.items); offset = page.nextOffset;
+    } while (offset !== null);
+    return { items };
+  },
   get: (id: string) => requestJson<{ subscription: Subscription }>(path(id)),
   create: (input: unknown) => write<{ subscription: Subscription }>(root, 'POST', input),
   update: (subscription: Subscription, input: unknown) => write<{ subscription: Subscription }>(path(subscription.id), 'PATCH', { revision: subscription.revision, ...input as object }),

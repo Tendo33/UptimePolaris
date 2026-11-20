@@ -160,7 +160,7 @@ api.use('/api/*', async (c, next) => {
     '/api/public/subscriptions/items',
   ]);
   const PUBLIC_PREFIXES = [
-    '/api/public/subscriptions/items/',
+    '/api/public/subscriptions/',
     '/api/public/ai/models/',
     '/api/public/agent/',
     '/api/public/servers/',

@@ -11,6 +11,8 @@ Uptime Polaris 可以读取其他站点公开的网站和模型状态。打开�
 
 新订阅默认不公开，监控告警和同步告警也默认关闭。第一次读取用于建立状态基线，不发送来源已有的故障。开启“自动订阅新增条目”后，新条目仍保持私有。
 
+公开网站和模型页面按订阅分组，每组可以折叠。开启“设置 → 站点 → 同步监控网站图标”后，订阅来源也会获取网站图标；无法获取时保留默认图形。图标只读取公开 HTTPS 来源，不携带订阅凭据。
+
 目录不可用时，页面保留缓存和内置 Kuma 模板。已有订阅使用本地保存的描述文件运行，不依赖每轮下载仓库。
 
 ## 导入自定义接口
@@ -72,6 +74,8 @@ Worker 使用部署的 `ADMIN_TOKEN` 加密订阅凭据与响应缓存，备份�
 ## English
 
 Open **Subscriptions → Subscription library**, choose an official configuration or import a JSON descriptor, enter its parameters, preview the source, select items, and save. Website and model subscriptions are separate. Enable AI monitoring before activating model subscriptions.
+
+Public website and model items are grouped by subscription, with collapsible sections. Enable **Settings → Site → Sync monitor icons** to fetch source website icons; unavailable icons keep their default glyphs. Icon requests use public HTTPS sources without subscription credentials.
 
 The [official library](https://github.com/XingLingQAQ/UptimePolaris-Subscriptions) includes Uptime Kuma, Polaris, Statuspage, generic JSON, GitHub Status and Cloudflare Status. Kuma needs a base URL and status-page slug. Imports accept HTTPS links, JSON uploads and pasted JSON. Imported configurations remain reusable in the local library. Existing subscriptions use their saved descriptors when the library is unavailable.
 

@@ -18,6 +18,11 @@ export class SubscriptionStore {
     if (!row) throw new SubscriptionError('not_found', 404);
     return JSON.parse(row.json);
   }
+  async selectedCounts(): Promise<Map<string, number>> {
+    const removed = this.db.type === 'postgres' ? "json::jsonb->>'removedAt'" : "json_extract(json,'$.removedAt')";
+    const rows = await this.db.query<{subscription_id: string; count: number}>(`SELECT subscription_id,COUNT(*) AS count FROM subscription_items WHERE selected=1 AND ${removed} IS NULL GROUP BY subscription_id`);
+    return new Map(rows.map(row => [row.subscription_id, Number(row.count)]));
+  }
   async statusCounts(subscription: Subscription): Promise<NonNullable<Subscription['statusCounts']>> {
     const field = (path: string) => this.db.type === 'postgres' ? `(json::jsonb#>>'{${path.replaceAll('.', ',')}}')` : `json_extract(json,'$.${path}')`;
     const rows = await this.db.query<{ mode: string; version: string; status: string | null; observed: number | null; fetched: number | null; source_current: string | number | null }>(this.sql(`SELECT ${field('mode')} AS mode,${field('syncRevision')} AS version,${field('sourceCurrent')} AS source_current,${field('observation.status')} AS status,${field('observation.observedAt')} AS observed,${field('observation.fetchedAt')} AS fetched FROM subscription_items WHERE subscription_id=? AND selected=1 AND ${field('removedAt')} IS NULL`), [subscription.id]);

@@ -209,6 +209,20 @@ export interface Subscription {
   configUpdate?: { checkedAt: number; version: string | null; changed: boolean; conflict: boolean; error: string | null };
 }
 
+export interface SubscriptionSummary {
+  total: number;
+  items: number;
+  healthy: number;
+  partial: number;
+  failed: number;
+  paused: number;
+  archived: number;
+}
+
+export function subscriptionHealth(subscription: Subscription) {
+  return subscription.archivedAt !== null ? 'archived' : !subscription.enabled ? 'paused' : subscription.runtime.health;
+}
+
 export interface SubscriptionRuntime {
   runId: string | null;
   phase: 'idle' | 'queued' | 'fetching' | 'parsing' | 'committing';

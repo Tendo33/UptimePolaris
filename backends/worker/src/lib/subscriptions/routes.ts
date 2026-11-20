@@ -16,6 +16,9 @@ import { SubscriptionStore } from './store';
 import { checkSubscriptionUpdate, cachedRemoteDescriptor, catalogDescriptor, configView, createSubscriptionPreview, previewConfig, previewView, subscriptionCatalog, type StoredSubscriptionConfig, type StoredSubscriptionPreview } from './config';
 import { decryptSubscriptionSecrets } from './credentials';
 import { newSubscriptionItem, runSubscription, subscriptionRunView, type SubscriptionRun } from './runtime';
+import { subscriptionHealth, type SubscriptionSummary } from '../../../../../shared/subscriptions';
+import { subscriptionIcon } from './icon';
+import { readSetting } from '../settings/store';
 
 export const subscriptionRoutes = new Hono<{ Bindings: Env }>();
 subscriptionRoutes.use('/api/admin/subscription*', bodyLimit({ maxSize: 300000, onError: c => c.json({ error: 'subscription_limit_exceeded' }, 413) }));
@@ -111,11 +114,14 @@ subscriptionRoutes.get('/api/admin/subscriptions', async c => {
   let rows = await store.list();
   const kind = c.req.query('category');
   if (kind) rows = rows.filter(row => row.category === category(kind));
+  if (c.req.query('archived') !== 'true') rows = rows.filter(row => row.archivedAt === null);
+  const selectedCounts = await store.selectedCounts();
+  const summary: SubscriptionSummary = { total: rows.length, items: 0, healthy: 0, partial: 0, failed: 0, paused: 0, archived: 0 };
+  for (const row of rows) { summary[subscriptionHealth(row)]++; summary.items += selectedCounts.get(row.id) ?? 0; }
   const query = c.req.query('q')?.toLowerCase();
   if (query) rows = rows.filter(row => row.name.toLowerCase().includes(query));
-  if (c.req.query('archived') !== 'true') rows = rows.filter(row => row.archivedAt === null);
   const health = c.req.query('health');
-  if (health && health !== 'all') rows = rows.filter(row => health === 'paused' ? !row.enabled : row.enabled && row.runtime.health === health);
+  if (health && health !== 'all') rows = rows.filter(row => subscriptionHealth(row) === health);
   const result = page(rows, c.req.query('offset'), c.req.query('limit'));
   result.items = await Promise.all(result.items.map(async row => {
     const statusCounts = await store.statusCounts(row);
@@ -133,7 +139,7 @@ subscriptionRoutes.get('/api/admin/subscriptions', async c => {
       if (config) await checkSubscriptionUpdate(store, config, row.id);
     }
   })().catch(() => {}));
-  return c.json(result);
+  return c.json({ ...result, summary });
 });
 subscriptionRoutes.post('/api/admin/subscriptions', async c => {
   const body = object(await c.req.json()), store = new SubscriptionStore(getDB(c.env));
@@ -179,7 +185,23 @@ subscriptionRoutes.post('/api/admin/subscriptions', async c => {
   }
   return c.json({ subscription }, 201);
 });
-subscriptionRoutes.get('/api/admin/subscriptions/:id', async c => c.json({ subscription: await new SubscriptionStore(getDB(c.env)).get(c.req.param('id')) }));
+subscriptionRoutes.get('/api/admin/subscriptions/:id', async c => {
+  const store = new SubscriptionStore(getDB(c.env)), subscription = await store.get(c.req.param('id'));
+  const statusCounts = await store.statusCounts(subscription);
+  return c.json({ subscription: { ...subscription, statusCounts, runtime: { ...subscription.runtime, selectedCount: Object.values(statusCounts).reduce((sum, count) => sum + count, 0) } } });
+});
+for (const admin of [true, false]) subscriptionRoutes.get(admin ? '/api/admin/subscriptions/:id/icon' : '/api/public/subscriptions/icons/:id', async c => {
+  c.header('cache-control', 'private, no-store');
+  const store = new SubscriptionStore(getDB(c.env)), subscription = await store.get(c.req.param('id'));
+  if (!admin) {
+    if (!subscription.isPublic || subscription.archivedAt !== null || !await publicAllowed(c.env, c.req.raw, subscription.category)) throw new SubscriptionError('not_found', 404);
+    if (!(await store.itemIndex(subscription.id, true)).some(item => item.removedAt === null)) throw new SubscriptionError('not_found', 404);
+  }
+  if (!await readSetting(c.env, 'site.syncMonitorIcons')) throw new SubscriptionError('not_found', 404);
+  const icon = await subscriptionIcon(store, subscription);
+  if (!icon) throw new SubscriptionError('not_found', 404);
+  return c.body(icon.bytes, 200, { 'content-type': icon.contentType, 'x-content-type-options': 'nosniff' });
+});
 subscriptionRoutes.patch('/api/admin/subscriptions/:id', async c => {
   const body = object(await c.req.json()), store = new SubscriptionStore(getDB(c.env)), previous = await store.get(c.req.param('id'));
   checkRevision(previous, body);
