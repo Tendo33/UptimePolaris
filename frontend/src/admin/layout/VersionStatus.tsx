@@ -78,7 +78,7 @@ export function VersionStatus() {
   const quiet = available && dismissed === latest;
   const loud = available && !quiet;
   const checking = runtime === 'go' ? updater.data?.phase === 'checking' : resource.isValidating;
-  const failed = runtime === 'go' ? Boolean(updater.error || updater.data?.phase === 'failed') : Boolean(resource.error);
+  const failed = runtime === 'go' ? Boolean(updater.error && !updater.busy || updater.data?.phase === 'failed') : Boolean(resource.error);
   const checkedAt = runtime === 'go' ? updater.data?.checkedAt : resource.data?.checkedAt && Math.floor(resource.data.checkedAt / 1000);
 
   const tagPrefix = latest?.startsWith('v') ? 'v' : '';
