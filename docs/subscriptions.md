@@ -5,9 +5,11 @@ Uptime Polaris 能读别的站点公开的网站状态和模型状态，汇总�
 ## 从仓库添加
 
 1. 在订阅仓库里选通用模板或站点配置。默认接入[官方仓库](https://github.com/XingLingQAQ/UptimePolaris-Subscriptions)。
-2. 填数据地址和模板参数。Uptime Kuma 要的是状态页的基础地址和 slug，比如 `https://status.example.com/status/main` 对应基础地址 `https://status.example.com`、slug `main`。
+2. 填来源地址和模板要求的其他参数。可以填域名、带子目录的部署地址，或粘贴与模板匹配的状态页和 GET 接口链接。带预填地址的站点可直接预览。
 3. 点“读取预览”，核对名称、状态、时间和错误提示，勾选要订阅的条目。
 4. 设置名称、分组、公开范围和通知，然后创建。
+
+例如，Polaris 模型模板可直接填 `https://status.example.com/polaris/ai`，JSON 模板可直接填 `https://status.example.com/data/status.json`。Kuma 只填域名时，预览会识别 slug；识别不到就粘贴完整状态页链接，例如 `https://status.example.com/status/main`。
 
 新订阅默认不公开，监控告警和同步告警也默认关着。第一次读取只用来建立基线，不会把来源里已有的故障报出来。开了“自动订阅新增条目”以后，新条目还是保持私有。
 
@@ -29,7 +31,9 @@ Uptime Polaris 能读别的站点公开的网站状态和模型状态，汇总�
 
 请求地址必须是公开主机名加 HTTPS。认证值声明成 `secret` 输入，走参数表单填写，导出的描述文件里不含这些值。改了秘密参数发往的来源，凭据要重新填。
 
-`sourcePage` 用来指定公开列表里“来源”链接指向的状态页，例如 `{"baseUrlInput":"baseUrl","path":"/status/{slug}"}`。路径参数不能引用秘密输入；不配置时只显示来源名称。条目自己的网址和描述文件下载地址不会拿来顶替状态页。
+粘贴的链接可以补全来源地址。实际请求的路径、查询参数和认证方式仍由描述文件决定。使用不同的接口路径时，修改对应的 `requests` 条目。
+
+`sourcePage` 用来指定公开列表里“来源”链接指向的状态页，例如 `{"baseUrlInput":"baseUrl","path":"/status/{slug}"}`。路径参数不能引用秘密输入；不配置时只显示来源名称。路径由普通固定路径段和一个没有默认值的必填字符串参数组成时，表单可接受完整状态页链接，自动拆分为对应的 `inputs`。其他参数仍按描述文件填写。条目自己的网址和描述文件下载地址不会拿来顶替状态页。
 
 Worker 部署保留 `global_fetch_strictly_public` 兼容标记，外部请求先查公开 DNS，实际连接走 Cloudflare 隔离的公网出口。Go 会校验 DNS 结果，连的是校验过的地址。自托管 workerd 要保留公网出口限制，别为了订阅请求给内网权限。
 
@@ -84,9 +88,11 @@ Uptime Polaris reads public website and model status published by other sites an
 ### Add from the library
 
 1. Choose a generic template or a site configuration in the library. The default library is the [official repository](https://github.com/XingLingQAQ/UptimePolaris-Subscriptions).
-2. Fill in the data address and template parameters. Uptime Kuma takes a status-page base URL and slug: `https://status.example.com/status/main` means base URL `https://status.example.com` and slug `main`.
+2. Enter the source address and any other parameters the template requires. Use a hostname, an installation URL with a subdirectory, or a full status-page or GET endpoint URL that matches the template. Site configurations with a prefilled address are ready to preview.
 3. Select **Read preview**, check names, states, timestamps and any errors, then tick the items to subscribe.
 4. Set the name, group, public scope and notifications, then create.
+
+For example, paste `https://status.example.com/polaris/ai` into the Polaris model template or `https://status.example.com/data/status.json` into a JSON template. For Kuma, the preview looks up the slug when given a hostname. If it cannot find the slug, paste the full status-page URL, such as `https://status.example.com/status/main`.
 
 New subscriptions are private, with monitor and sync alerts off. The first read only establishes a baseline and does not report outages the source already had. With automatic subscription to new items enabled, new items still stay private.
 
@@ -108,7 +114,9 @@ Descriptors use `schemaVersion: 1`; the full format is in the [JSON Schema](../s
 
 Request addresses must use public hostnames over HTTPS. Declare credentials as `secret` inputs and fill them in the parameter form; exported descriptors omit them. Changing where a secret is sent means entering it again.
 
-`sourcePage` sets the status page the public "source" link points at, for example `{"baseUrlInput":"baseUrl","path":"/status/{slug}"}`. Its path cannot reference secret inputs, and without it only the source name is shown. An item's own URL and the descriptor's download address do not stand in for the status page.
+A pasted link can fill in the source address. The descriptor still controls request paths, query parameters and authentication. To use a different endpoint path, edit the corresponding `requests` entry.
+
+`sourcePage` sets the status page the public "source" link points at, for example `{"baseUrlInput":"baseUrl","path":"/status/{slug}"}`. Its path cannot reference secret inputs, and without it only the source name is shown. When the path has ordinary fixed segments followed by one required string parameter without a default, the form accepts a full status-page URL and splits it into the corresponding `inputs`. Other parameters follow the descriptor. An item's own URL and the descriptor's download address do not stand in for the status page.
 
 Worker deployments keep the `global_fetch_strictly_public` compatibility flag: requests check public DNS first and connect through Cloudflare's isolated public egress. Go validates DNS results and connects to the validated address. Self-hosted workerd must keep public-only egress; do not grant intranet access for subscriptions.
 

@@ -139,7 +139,7 @@ function QuickViewBody({
     <>
       <DrawerHeader className="flex flex-col gap-3.5 border-b border-[var(--polaris-line)] px-6 pt-5 pb-4">
         <div className="flex items-center gap-3.5 pr-6">
-          <MonitorGlyph type={m.type} target={m.target} monitorId={m.num_id} size="lg" />
+          <MonitorGlyph scope="admin" type={m.type} target={m.target} monitorId={m.num_id} size="lg" />
           <div className="min-w-0 flex-1">
             <p className="truncate text-[16px] font-semibold tracking-[-0.01em]">{m.name}</p>
             <p className="mt-0.5 truncate font-mono text-[11.5px] font-normal text-[var(--polaris-ink-3)]" title={m.type === 'push' ? undefined : m.target}>

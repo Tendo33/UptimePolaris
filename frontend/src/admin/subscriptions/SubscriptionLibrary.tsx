@@ -123,7 +123,7 @@ function TemplateCard({ entry }: { entry: SubscriptionCatalogEntry }) {
       <div className="flex items-start gap-3">
         <CategoryGlyphs categories={entry.categories} />
         <div className="ml-auto flex flex-wrap justify-end gap-1">
-          {entry.installedCount ? <Tag tone="success"><Check size={11} />{t('installed')}</Tag> : null}
+          {entry.origin === 'official' || entry.origin === 'local' || entry.installedCount ? <Tag tone="success"><Check size={11} />{t('installed')}</Tag> : null}
           <Tag tone={entry.origin === 'official' ? 'primary' : 'default'}>{entry.origin === 'official' ? <BadgeCheck size={11} /> : null}{entry.repositoryName || t(entry.origin === 'third-party' ? 'thirdParty' : entry.origin)}</Tag>
         </div>
       </div>

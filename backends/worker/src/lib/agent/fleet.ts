@@ -13,6 +13,7 @@ import { getDB } from '../db/factory';
 import { cachedAgentRelease, latestAgentRelease } from './release';
 import { agentIsOnline, agentStaleAfterSec } from './liveness';
 import { loadAgentTagLinks } from '../presentation/taxonomy';
+import { agentVersionState } from '../../../../../shared/agent-version';
 
 export interface FleetAgent {
   id: string;
@@ -148,22 +149,6 @@ export interface FleetSummary {
   latestVersion: string | null;
 }
 
-/** `x.y.z` compared numerically; a prerelease or junk reads as older. / 按数值比较 `x.y.z`；预发布版本或无效值视为较旧。 */
-function versionAtLeast(actual: string | null, expected: string | null): boolean {
-  if (!actual || !expected) return false;
-  const parse = (v: string): number[] | null => {
-    const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(v);
-    return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
-  };
-  const a = parse(actual);
-  const b = parse(expected);
-  if (!a || !b) return false;
-  for (let i = 0; i < 3; i++) {
-    if (a[i] !== b[i]) return a[i] > b[i];
-  }
-  return true;
-}
-
 function toNumber(value: unknown): number | null {
   if (value === null || value === undefined) return null;
   const n = Number(value);
@@ -172,7 +157,7 @@ function toNumber(value: unknown): number | null {
 
 /** 包含暂停和从未上报的机器。 / Include paused machines and those that have never reported. */
 export async function loadFleet(env: Env, now: number): Promise<FleetAgent[]> {
-  void latestAgentRelease().catch(() => undefined);
+  const release = latestAgentRelease().catch(() => null);
   const db = getDB(env);
   const sql = `
     SELECT m.id, m.name, m.active, m.created_at, m.options_json, m.group_id, m.is_public,
@@ -206,17 +191,14 @@ export async function loadFleet(env: Env, now: number): Promise<FleetAgent[]> {
     if (selection?.type !== 'agent' || typeof selection.agent_id !== 'string') continue;
     probeTargets.set(selection.agent_id, (probeTargets.get(selection.agent_id) ?? 0) + 1);
   }
-  const latest = cachedAgentRelease()?.version ?? null;
+  const latest = (await release)?.version ?? null;
   const tags = await loadAgentTagLinks(env);
 
   return rows.map((row) => {
     const reportedAt = toNumber(row.reported_at);
     const online = agentIsOnline(reportedAt, now, agentStaleAfterSec(toNumber(row.report_interval_secs)));
 
-    let versionState: FleetAgent['version_state'];
-    if (row.version === null || row.version === undefined) versionState = 'not_reported';
-    else if (latest === null) versionState = 'unknown';
-    else versionState = versionAtLeast(String(row.version), latest) ? 'current' : 'behind';
+    const versionState = agentVersionState(row.version == null ? null : String(row.version), latest);
 
     /*
       Capabilities are announced, not derived from the version.

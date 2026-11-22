@@ -470,7 +470,9 @@ func (a *App) publicRoutes() {
 	a.route("POST /api/public/push/{id}", true, a.publicPush)
 	a.route("/api/public/push/{id}", true, pushMethodNotAllowed)
 	a.route("GET /api/public/icon", true, a.publicIcon)
-	a.route("GET /api/public/monitor-icon", true, a.monitorIcon)
+	a.route("GET /api/public/monitor-icon", true, func(w http.ResponseWriter, r *http.Request) error {
+		return a.monitorIcon(w, r, false)
+	})
 	a.route("GET /api/public/servers", true, a.publicServers)
 	a.route("GET /api/public/servers/{id}", true, a.publicServers)
 	a.route("GET /api/public/agent/detail/{num}", true, a.publicAgentDetail)
@@ -710,7 +712,10 @@ func (a *App) publicIcon(w http.ResponseWriter, r *http.Request) error {
 	_, e = io.WriteString(w, brandIcon(r))
 	return e
 }
-func (a *App) monitorIcon(w http.ResponseWriter, r *http.Request) error {
+func (a *App) monitorIcon(w http.ResponseWriter, r *http.Request, admin bool) error {
+	if admin {
+		w.Header().Set("Cache-Control", "private, no-store")
+	}
 	settings, e := a.settings(r.Context())
 	if e != nil {
 		return e
@@ -718,15 +723,27 @@ func (a *App) monitorIcon(w http.ResponseWriter, r *http.Request) error {
 	if !boolean(settings["site.syncMonitorIcons"]) {
 		return failure("not_found", 404)
 	}
-	monitors, e := a.pageMonitors(r)
+	var monitors []Object
+	if admin {
+		monitors, e = a.store.list(r.Context(), "monitor")
+	} else {
+		monitors, e = a.pageMonitors(r)
+	}
 	if e != nil {
 		return e
 	}
-	num, _ := strconv.ParseInt(r.URL.Query().Get("id"), 10, 64)
+	id := r.URL.Query().Get("id")
+	if admin {
+		id = r.PathValue("numId")
+	}
+	num, err := strconv.ParseInt(id, 10, 64)
+	if err != nil || num <= 0 {
+		return failure("not_found", 404)
+	}
 	for _, m := range monitors {
 		if integer(m, "num_id") == num && str(m, "type") == "http" {
-			u, _ := url.Parse(str(m, "target"))
-			if !publicHost(r.Context(), u.Hostname()) {
+			u, err := url.Parse(str(m, "target"))
+			if err != nil || u.Scheme != "http" && u.Scheme != "https" || !publicHost(r.Context(), u.Hostname()) {
 				return failure("not_found", 404)
 			}
 			u.User = nil
@@ -751,6 +768,7 @@ func (a *App) monitorIcon(w http.ResponseWriter, r *http.Request) error {
 				return failure("not_found", 404)
 			}
 			w.Header().Set("Content-Type", http.DetectContentType(raw))
+			w.Header().Set("X-Content-Type-Options", "nosniff")
 			_, e = w.Write(raw)
 			return e
 		}

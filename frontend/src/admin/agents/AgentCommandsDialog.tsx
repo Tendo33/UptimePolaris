@@ -9,23 +9,25 @@ import { StatusPill } from '../monitors/MonitorIndicators';
 import { agentsApi } from './api';
 import type { AgentCommandRecord, BatchCommandAction, FleetAgent } from './types';
 import { useAgentCommands } from './useAgentCommands';
+import { useAgentUpdateCheck } from './useAgentUpdateCheck';
 
 const ACTIONS = [
   { action: 're_report', label: 'commandReReport', icon: RefreshCw },
-  { action: 'check_update', label: 'commandCheckUpdate', icon: SearchCheck },
   { action: 'restart', label: 'commandRestart', icon: RotateCw },
   { action: 'upgrade', label: 'commandUpgrade', icon: ArrowUpCircle },
 ] as const;
 
-export function AgentCommandsDialog({ agent, onClose, onCommandsLoaded }: {
+export function AgentCommandsDialog({ agent, onClose, onCommandsLoaded, onUpdated }: {
   agent: FleetAgent;
   onClose: () => void;
   onCommandsLoaded: (id: string, commands: AgentCommandRecord[]) => void;
+  onUpdated: () => void | Promise<void>;
 }) {
   const t = useTranslations('admin.agents');
   const adminT = useTranslations('admin');
   const locale = useLocale();
   const errorMessage = useApiErrorMessage();
+  const updateCheck = useAgentUpdateCheck(onUpdated);
   const { history, error, refreshing, refresh } = useAgentCommands({
     agentId: agent.id, enabled: true, mode: 'dialog', onCommandsLoaded,
   });
@@ -66,6 +68,7 @@ export function AgentCommandsDialog({ agent, onClose, onCommandsLoaded }: {
           <span className="pr-6 text-[13px] font-normal text-[var(--polaris-ink-3)]">{agent.name}</span>
         </DrawerHeader>
         <DrawerBody className="gap-5 px-6 py-5">
+          <Button variant="bordered" startContent={<SearchCheck size={15} />} isLoading={updateCheck.checking} isDisabled={updateCheck.checking} onPress={() => void updateCheck.check()}>{t('commandCheckUpdate')}</Button>
           {!history && !error ? <div role="status" className="flex items-center gap-2 py-6 text-small text-default-500"><Loader2 size={16} className="animate-spin" />{t('loading')}</div> : null}
           {error ? <div role="alert" className="polaris-well space-y-2 px-4 py-3 text-[13px] text-danger-600"><p>{errorMessage(error)}</p><Button size="sm" variant="light" onPress={refresh}>{adminT('action.retry')}</Button></div> : null}
           {blocked ? <p className="polaris-well px-4 py-3 text-[13px] leading-relaxed text-[var(--polaris-ink-3)]">{blocked}</p> : null}

@@ -9,10 +9,12 @@ import { Select } from '@/components/ui/MotionOverlays';
 import { Button, Input, SelectItem, Skeleton, Switch } from '@heroui/react';
 import clsx from 'clsx';
 import { AlertCircle, ChevronLeft, ChevronRight, Info, Lock, RotateCw } from 'lucide-react';
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, NavLink, useBlocker, useSearchParams } from 'react-router';
 import { useFormatter, useTranslations } from 'use-intl';
-import type { Subscription, SubscriptionDescriptor } from '../../../../shared/subscriptions';
+import { isKumaStatusPage } from '../../../../shared/subscription-page';
+import type { Subscription, SubscriptionDescriptor, SubscriptionInput } from '../../../../shared/subscriptions';
+import { parseSubscriptionLink, subscriptionBaseFromLink } from './parameter-links';
 
 const TAB = 'relative -mb-px inline-flex h-10 items-center gap-1.5 border-b-2 px-0.5 text-[13px] font-medium transition-colors';
 const TAB_ON = 'border-[var(--polaris-ink)] text-[var(--polaris-ink)]';
@@ -141,14 +143,34 @@ export function Pagination({ total, nextOffset, pageSize = 50 }: { total: number
   );
 }
 
-export function ParameterFields({ descriptor, parameters, onChange, secrets = [], disabled }: { descriptor: SubscriptionDescriptor; parameters: Record<string, string | number | boolean>; onChange: (value: Record<string, string | number | boolean>) => void; secrets?: string[]; disabled?: boolean }) {
+type TemplateParameters = Record<string, string | number | boolean>;
+type PagePathInput = { prefix: string; parameter: string; discover: boolean };
+
+export function ParameterFields({ descriptor, parameters, onChange, secrets = [], disabled }: { descriptor: SubscriptionDescriptor; parameters: TemplateParameters; onChange: (value: TemplateParameters) => void; secrets?: string[]; disabled?: boolean }) {
   const t = useTranslations('admin.subscriptions');
   const entries = Object.entries(descriptor.inputs);
+  const page = descriptor.sourcePage;
+  const pagePath = page?.path.match(/^(\/(?:[A-Za-z0-9._~-]+\/)*)\{([A-Za-z][A-Za-z0-9_]*)\}$/);
+  const pageInput = pagePath && page && descriptor.inputs[page.baseUrlInput]?.type === 'url' && descriptor.inputs[pagePath[2]]?.type === 'string' && descriptor.inputs[pagePath[2]].required && descriptor.inputs[pagePath[2]].default === undefined
+    ? { base: page.baseUrlInput, prefix: pagePath[1], parameter: pagePath[2], discover: isKumaStatusPage(descriptor) } : undefined;
+  const bases = new Set(Object.values(descriptor.requests).map(request => request.baseUrlInput));
+  if (page) bases.add(page.baseUrlInput);
   if (!entries.length) return <p className="text-[13px] text-[var(--polaris-ink-3)]">{t('noParameters')}</p>;
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      {entries.map(([name, field]) => field.type === 'boolean' ? (
-        <SettingRow key={name} className="sm:col-span-2" title={field.label || name} hint={field.description}>
+    <div className="space-y-4">
+      {entries.map(([name, field]) => name === pageInput?.parameter ? null : field.type === 'url' && bases.has(name) ? (
+        <ParameterLinkField
+          key={`${descriptor.id}:${descriptor.version}:${name}:${pageInput?.prefix ?? ''}:${pageInput?.parameter ?? ''}:${pageInput?.discover ?? ''}`}
+          descriptor={descriptor}
+          name={name}
+          field={field}
+          page={name === pageInput?.base ? pageInput : undefined}
+          parameters={parameters}
+          onChange={onChange}
+          disabled={disabled}
+        />
+      ) : field.type === 'boolean' ? (
+        <SettingRow key={name} title={field.label || name} hint={field.description}>
           <Switch size="sm" aria-label={field.label || name} isSelected={Boolean(parameters[name] ?? field.default)} onValueChange={value => onChange({ ...parameters, [name]: value })} isDisabled={disabled} />
         </SettingRow>
       ) : field.type === 'enum' ? (
@@ -167,13 +189,73 @@ export function ParameterFields({ descriptor, parameters, onChange, secrets = []
           autoComplete="off"
           startContent={field.type === 'secret' ? <Lock size={13} className="shrink-0 text-[var(--polaris-ink-4)]" /> : undefined}
           classNames={field.type === 'url' || field.type === 'secret' ? { input: 'font-mono text-[12.5px]' } : undefined}
-          className={field.type === 'url' ? 'sm:col-span-2' : undefined}
           value={String(parameters[name] ?? field.default ?? '')}
           isDisabled={disabled}
           onValueChange={value => { const next = { ...parameters }; if (field.type === 'secret' && !value && secrets.includes(name)) delete next[name]; else next[name] = field.type === 'number' ? Number(value) : value; onChange(next); }}
         />
       ))}
     </div>
+  );
+}
+
+function ParameterLinkField({ descriptor, name, field, page, parameters, onChange, disabled }: {
+  descriptor: SubscriptionDescriptor;
+  name: string;
+  field: SubscriptionInput;
+  page?: PagePathInput;
+  parameters: TemplateParameters;
+  onChange: (value: TemplateParameters) => void;
+  disabled?: boolean;
+}) {
+  const t = useTranslations('admin.subscriptions');
+  const base = String(parameters[name] ?? field.default ?? '');
+  const segment = page ? String(parameters[page.parameter] ?? '') : '';
+  const [draft, setDraft] = useState<{ text: string; base: string; segment: string; valid: boolean }>();
+  const [touched, setTouched] = useState(false);
+  const activeDraft = draft && draft.base === base && draft.segment === segment ? draft : undefined;
+  const value = activeDraft?.text ?? (page && base && segment ? `${base.replace(/\/$/, '')}${page.prefix}${encodeURIComponent(segment)}` : base);
+
+  const parse = (text: string): { base: string; segment: string } | undefined => {
+    const url = parseSubscriptionLink(text);
+    if (!url) return;
+    if (!page) return { base: subscriptionBaseFromLink(descriptor, name, url), segment: '' };
+    const path = url.pathname.replace(/\/$/, ''), index = path.lastIndexOf(page.prefix);
+    const suffix = index < 0 ? '' : path.slice(index + page.prefix.length);
+    if (!suffix || suffix.includes('/')) {
+      return page.discover ? { base: url.origin + path, segment: '' } : undefined;
+    }
+    try {
+      const segment = decodeURIComponent(suffix);
+      if (segment && !/[\u0000\r\n]/.test(segment)) return { base: url.origin + path.slice(0, index), segment };
+    } catch { return; }
+  };
+  const update = (text: string) => {
+    const parsed = parse(text);
+    const next = { ...parameters, [name]: parsed?.base ?? '' };
+    if (page) next[page.parameter] = parsed?.segment ?? '';
+    setDraft({ text, base: parsed?.base ?? '', segment: parsed?.segment ?? '', valid: Boolean(parsed) });
+    onChange(next);
+  };
+  const required = Boolean(page || field.required);
+  const errorMessage = page && !page.discover ? t('sourcePageUrlInvalid') : t('errors.subscription_source_blocked');
+  return (
+    <Input
+      label={field.label || t(page ? 'sourcePageUrl' : 'parameterUrl')}
+      labelPlacement="outside"
+      inputMode="url"
+      autoCapitalize="none"
+      spellCheck={false}
+      value={value}
+      onValueChange={update}
+      onBlur={() => setTouched(true)}
+      isRequired={required}
+      isDisabled={disabled}
+      isInvalid={touched && activeDraft?.valid === false && (required || Boolean(value.trim()))}
+      errorMessage={errorMessage}
+      description={field.description}
+      placeholder={page && !page.discover ? `https://example.com${page.prefix}main` : 'status.example.com'}
+      classNames={{ input: 'font-mono text-[12.5px]' }}
+    />
   );
 }
 

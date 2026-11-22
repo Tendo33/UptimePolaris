@@ -86,7 +86,7 @@ export async function resolvePage(
     kind,
     page: resolveBuiltinPageView(kind, config.pages[kind]),
     enabled: kind === 'ai' ? config.aiEnabled : !!preview || kind !== 'agent' || config.agentEnabled,
-    configured: !!preview || !!explicit || !domains.length || !!domain,
+    configured: true,
     config,
     revision,
     preview: !!preview,

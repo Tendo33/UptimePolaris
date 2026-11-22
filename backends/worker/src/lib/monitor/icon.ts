@@ -8,6 +8,8 @@
  * 手动跟随并复查重定向；不解码 HTML 实体；拒绝第三方 SVG。
  */
 import { isPrivateHost } from '../http/private-host';
+import type { Env } from '../../types';
+import { readSetting } from '../settings/store';
 
 const MAX_BYTES = 256 * 1024;
 const TIMEOUT_MS = 4000;
@@ -16,6 +18,21 @@ type IconOptions = { validateUrl?: (url: URL) => Promise<void> };
 export interface SiteIcon {
   bytes: ArrayBuffer;
   contentType: string;
+}
+
+export async function monitorIconResponse(env: Env, target: string, admin = false): Promise<Response> {
+  let site: URL;
+  try { site = new URL(target); }
+  catch { return Response.json({ error: 'invalid_target' }, { status: 400 }); }
+  if (!['http:', 'https:'].includes(site.protocol)) return Response.json({ error: 'invalid_target' }, { status: 400 });
+  if (isPrivateHost(site.hostname) || !await readSetting(env, 'site.syncMonitorIcons')) return Response.json({ error: 'not_found' }, { status: 404 });
+  const icon = await fetchSiteIcon(new URL(`${site.protocol}//${site.host}/`));
+  if (!icon) return Response.json({ error: 'not_found' }, { status: 404 });
+  return new Response(icon.bytes, { headers: {
+    'content-type': icon.contentType,
+    'cache-control': admin ? 'private, no-store' : 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400',
+    'x-content-type-options': 'nosniff',
+  } });
 }
 
 function absolutize(href: string, base: URL): URL | null {

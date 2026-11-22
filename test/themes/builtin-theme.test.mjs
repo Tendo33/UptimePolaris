@@ -85,10 +85,11 @@ try {
     assert.equal(response.status, 400);
     assert.equal(response.body.error, 'invalid_presentation');
   }
-  const unavailable = await request('/api/public/config?fresh=1', {}, 'other.test');
-  assert.equal(unavailable.body.presentation.configured, false);
-  assert.equal(unavailable.body.theme_head_code, null);
-  assert.equal(unavailable.body.theme_content_html, null);
+  const fallback = await request('/api/public/config?fresh=1', {}, 'other.test');
+  assert.equal(fallback.body.presentation.configured, true);
+  assert.equal(fallback.body.presentation.kind, 'monitor');
+  assert.equal(fallback.body.theme_head_code, config.pages.monitor.headCode);
+  assert.equal(fallback.body.theme_content_html, config.pages.monitor.contentHtml);
   const machine = await write('/api/admin/agents', 'POST', { name: 'country fixture' });
   await write('/api/admin/agents/visibility', 'POST', { ids: [machine.id], is_public: true });
   await db.prepare('INSERT INTO machine_live(agent_id,region,updated_at) VALUES(?,?,0)').bind(machine.id, 'private city, US').run();

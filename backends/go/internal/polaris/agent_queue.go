@@ -236,6 +236,13 @@ func (a *App) leaseAgentQueue(ctx context.Context, t *transaction, agentID, kind
 		if str(row, "state") == "leased" && integer(row, "lease_until") > now {
 			continue
 		}
+		if kind == "command" && !contains([]string{"upgrade", "restart", "re_report"}, str(row, "action")) {
+			row["state"] = "expired"
+			if e = t.put(kind, id, row); e != nil {
+				return nil, e
+			}
+			continue
+		}
 		if scheduled+ttl < now || integer(row, "attempts") >= 3 {
 			row["state"] = "expired"
 			if e = t.put(kind, id, row); e != nil {
@@ -400,7 +407,7 @@ func (a *App) agentProbeResult(w http.ResponseWriter, r *http.Request) error {
 }
 
 func (a *App) enqueueCommand(ctx context.Context, id, action string) (string, error) {
-	if !contains([]string{"upgrade", "restart", "re_report", "check_update"}, action) {
+	if !contains([]string{"upgrade", "restart", "re_report"}, action) {
 		return "", failure("unknown_action", 400)
 	}
 	settings, e := a.settings(ctx)
@@ -427,6 +434,19 @@ func (a *App) enqueueCommand(ctx context.Context, id, action string) (string, er
 	online := agentOnline(live, time.Now().Unix())
 	if online == nil || !*online {
 		return "", failure("agent_offline", 409)
+	}
+	if action == "upgrade" {
+		release, err := latestAgentRelease()
+		if err != nil {
+			return "", failure("agent_update_unavailable", 502)
+		}
+		switch agentVersionState(str(live, "version"), str(release, "version")) {
+		case "behind":
+		case "current":
+			return "", failure("agent_up_to_date", 409)
+		default:
+			return "", failure("agent_update_unavailable", 502)
+		}
 	}
 	commandID := uuid()
 	row := Object{"id": commandID, "agent_id": id, "action": action, "queued_at": time.Now().Unix(), "state": "pending", "attempts": 0, "ok": nil, "message": nil, "completed_at": nil, "issued_by": nil}

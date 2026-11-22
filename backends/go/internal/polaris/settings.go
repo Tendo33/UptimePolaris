@@ -242,7 +242,7 @@ func (a *App) pageContext(r *http.Request) (string, bool, bool, Object, error) {
 	}
 	config := object(state["config"])
 	kind := "monitor"
-	enabled, configured := true, true
+	enabled := true
 	if preview := r.URL.Query().Get("preview"); preview != "" {
 		if !contains([]string{"monitor", "agent", "ai"}, preview) {
 			return "", false, false, nil, failure("invalid_request", 400)
@@ -253,16 +253,14 @@ func (a *App) pageContext(r *http.Request) (string, bool, bool, Object, error) {
 		kind = preview
 		enabled = true
 	} else if boolean(config["agentEnabled"]) || boolean(config["aiEnabled"]) {
-		configured = len(array(config["domains"])) == 0
 		host, _, e := netSplitHost(r.Host)
 		if e != nil {
 			host = r.Host
 		}
 		for _, v := range array(config["domains"]) {
 			domain := object(v)
-			if strings.EqualFold(str(domain, "hostname"), host) {
+			if strings.EqualFold(str(domain, "hostname"), strings.TrimSuffix(host, ".")) {
 				kind = str(domain, "page")
-				configured = true
 				break
 			}
 		}
@@ -277,7 +275,7 @@ func (a *App) pageContext(r *http.Request) (string, bool, bool, Object, error) {
 			explicit = "agent"
 		}
 		if explicit == "ai" || explicit == "agent" {
-			kind, configured = explicit, true
+			kind = explicit
 		}
 	}
 	if kind == "ai" {
@@ -286,7 +284,7 @@ func (a *App) pageContext(r *http.Request) (string, bool, bool, Object, error) {
 	if kind == "agent" {
 		enabled = r.URL.Query().Get("preview") != "" || boolean(config["agentEnabled"])
 	}
-	return kind, enabled, configured, resolveBuiltinPageView(kind, object(object(config["pages"])[kind])), nil
+	return kind, enabled, true, resolveBuiltinPageView(kind, object(object(config["pages"])[kind])), nil
 }
 func netSplitHost(host string) (string, string, error) {
 	u, e := url.Parse("http://" + host)

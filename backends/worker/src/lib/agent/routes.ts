@@ -7,11 +7,22 @@ import { loadFleetWithSummary } from './fleet';
 import { handleGetAgentConfiguration, handleSaveAgentConfiguration } from './runtime-config';
 import { agentPresentationEnabled } from '../presentation/store';
 import { visibilityRevisionWrite } from '../public/cache';
+import { latestAgentRelease } from './release';
 
 /** 管理 Agent 清单、运行配置、命令及详情的接口。 / Endpoints for managing the Agent fleet, runtime configuration, commands, and details. */
 export const agentRoutes = new Hono<{ Bindings: Env }>();
 agentRoutes.get('/api/admin/agents/:id/config', handleGetAgentConfiguration);
 agentRoutes.put('/api/admin/agents/:id/config', handleSaveAgentConfiguration);
+
+agentRoutes.post('/api/admin/agents/check-update', async c => {
+  c.header('cache-control', 'private, no-store');
+  try {
+    const release = await latestAgentRelease(true);
+    return c.json({ latestVersion: release.version });
+  } catch {
+    return c.json({ error: 'agent_update_unavailable' }, 502);
+  }
+});
 
 agentRoutes.get('/api/admin/agents', async (c) => {
   c.header('cache-control', 'private, no-store');
@@ -182,6 +193,8 @@ agentRoutes.post('/api/admin/agents/:id/commands', async (c) => {
       // 二者的处理方式不同，因此控制台分别显示。
       : result.error === 'agent_unsupported' ? 409
       : result.error === 'agent_offline' ? 409
+      : result.error === 'agent_up_to_date' ? 409
+      : result.error === 'agent_update_unavailable' ? 502
       : 403;
     return c.json({ error: result.error }, status);
   }

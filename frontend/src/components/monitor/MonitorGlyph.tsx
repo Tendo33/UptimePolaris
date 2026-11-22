@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { Tone } from '../../types/tone';
 import type { GlyphSize } from '../ui/GlyphTile';
 import { GlyphTile, TILE } from '../ui/GlyphTile';
+import { publicApiUrl } from '../../api/public-url';
 
 /**
  * Monitor mark: proxied favicon for public web targets, transport glyph
@@ -59,15 +60,20 @@ export function MonitorGlyph({
   monitorId,
   size = 'md',
   badge,
+  scope = 'public',
 }: {
   type: GlyphType;
   target: string;
   monitorId?: number;
   size?: GlyphSize;
   badge?: Tone | 'maintenance';
+  scope?: 'public' | 'admin';
 }) {
   const host = faviconHost(type, target);
-  const [state, setState] = useState<'loading' | 'ok' | 'failed'>('loading');
+  const source = !host || !monitorId ? '' : scope === 'admin' ? `/api/monitors/${monitorId}/icon` : publicApiUrl(`/api/public/monitor-icon?id=${monitorId}`);
+  const imageKey = `${source}:${target}`;
+  const [image, setImage] = useState<{ key: string; state: 'ok' | 'failed' }>();
+  const state = image?.key === imageKey ? image.state : 'loading';
   const Glyph = TYPE_GLYPH[type];
   const px = TILE[size].px;
 
@@ -79,7 +85,8 @@ export function MonitorGlyph({
       />
       {host && monitorId && state !== 'failed' ? (
         <img
-          src={`/api/public/monitor-icon?id=${monitorId}${['monitor', 'agent'].includes(new URLSearchParams(window.location.search).get('preview') ?? '') ? `&preview=${encodeURIComponent(new URLSearchParams(window.location.search).get('preview')!)}` : ''}`}
+          key={imageKey}
+          src={source}
           alt=""
           width={px}
           height={px}
@@ -88,9 +95,9 @@ export function MonitorGlyph({
           referrerPolicy="no-referrer"
           onLoad={(event) => {
             // A 1x1 tracking pixel or an empty response is not an icon. / 1×1 跟踪像素或空响应不是有效图标。
-            setState(event.currentTarget.naturalWidth >= 8 ? 'ok' : 'failed');
+            setImage({ key: imageKey, state: event.currentTarget.naturalWidth >= 8 ? 'ok' : 'failed' });
           }}
-          onError={() => setState('failed')}
+          onError={() => setImage({ key: imageKey, state: 'failed' })}
           className={clsx(
             'absolute rounded-[3px] transition-opacity duration-300',
             state === 'ok' ? 'opacity-100' : 'opacity-0',

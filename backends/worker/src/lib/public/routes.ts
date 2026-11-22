@@ -21,13 +21,12 @@ import { agentSQL } from '../db/sql/agent';
 import { monitorSQL } from '../db/sql/monitors';
 import { loadGroups } from '../group/groups';
 import { loadMonitorTags } from '../group/tags';
-import { isPrivateHost } from '../http/private-host';
 import { overallAvailability } from '../monitor/daily-stats';
-import { fetchSiteIcon } from '../monitor/icon';
+import { monitorIconResponse } from '../monitor/icon';
 import { loadHeartbeats, loadLive, loadUptime } from '../monitor/store';
 import { iconEtag, readSiteIcon } from '../settings/site-icon';
 import type { MaintenanceWindow } from '../settings/store';
-import { readAll, readSetting, readSiteMetadata } from '../settings/store';
+import { readAll, readSiteMetadata } from '../settings/store';
 import { pageTheme } from '../theme/registry';
 import { pageMonitors, requestPage } from '../presentation/context';
 import { publicServers } from '../presentation/servers';
@@ -274,28 +273,7 @@ publicRoutes.get('/api/public/monitor-icon', async (c) => {
   const id = c.req.query('id');
   const monitor = (await pageMonitors(c.env, c.req.raw)).find(m => m.type === 'http' && m.num_id === Number(id));
   if (!monitor) return c.json({ error: 'not_found' }, 404);
-  let parsed: URL;
-  try {
-    parsed = new URL(monitor.target);
-  } catch {
-    return c.json({ error: 'invalid_target' }, 400);
-  }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return c.json({ error: 'invalid_target' }, 400);
-  /** Reject private literal hosts; fetchSiteIcon also checks redirect destinations. Hostname resolution is not checked here. / 拒绝私有字面主机；fetchSiteIcon 还会检查重定向目标。此处不检查主机名解析结果。 */
-  if (isPrivateHost(parsed.hostname)) return c.json({ error: 'not_found' }, 404);
-
-  if (!(await readSetting(c.env, 'site.syncMonitorIcons'))) return c.json({ error: 'not_found' }, 404);
-
-  const icon = await fetchSiteIcon(new URL(`${parsed.protocol}//${parsed.host}/`));
-  if (!icon) return c.json({ error: 'not_found' }, 404);
-  return c.body(icon.bytes, 200, {
-    'content-type': icon.contentType,
-    // A favicon changes about never; a day in the browser and a week at the
-    // edge keeps origin traffic to roughly one fetch per site per week.
-    // favicon 极少变化；浏览器缓存一天、边缘缓存一周，使每站点源站流量约为每周一次请求。
-    'cache-control': 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400',
-    'x-content-type-options': 'nosniff',
-  });
+  return monitorIconResponse(c.env, monitor.target);
 });
 
 publicRoutes.get('/api/public/health', (c) => c.json({ ok: true, ts: Date.now() }));

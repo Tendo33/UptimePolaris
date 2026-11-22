@@ -5,9 +5,11 @@ import { randomToken } from '../auth/service';
 import { getDB } from '../db/factory';
 import { commandsSQL } from '../db/sql/commands';
 import { readAll } from '../settings/store';
+import { latestAgentRelease } from './release';
+import { agentVersionState } from '../../../../../shared/agent-version';
 
 /** Supported parameterless Agent actions. / 支持的无参数 Agent 操作。 */
-export const COMMAND_ACTIONS = ['upgrade', 'restart', 're_report', 'check_update'] as const;
+export const COMMAND_ACTIONS = ['upgrade', 'restart', 're_report'] as const;
 export type CommandAction = (typeof COMMAND_ACTIONS)[number];
 
 export function isCommandAction(value: unknown): value is CommandAction {
@@ -50,7 +52,7 @@ export async function commandsEnabled(env: Env): Promise<boolean> {
   return values['security.allowAgentCommands'] === true;
 }
 
-export type EnqueueError = 'commands_disabled' | 'unknown_action' | 'agent_not_found' | 'agent_unsupported' | 'agent_offline';
+export type EnqueueError = 'commands_disabled' | 'unknown_action' | 'agent_not_found' | 'agent_unsupported' | 'agent_offline' | 'agent_update_unavailable' | 'agent_up_to_date';
 
 export type EnqueueResult =
   | { ok: true; id: string }
@@ -87,6 +89,13 @@ export async function enqueueCommand(
   const { agentIsOnline, agentStaleAfterSec } = await import('./liveness');
   const online = agentIsOnline(agent.reported_at, now, agentStaleAfterSec(agent.report_interval_secs));
   if (online !== true) return { ok: false, error: 'agent_offline' };
+
+  if (action === 'upgrade') {
+    const release = await latestAgentRelease().catch(() => null);
+    const state = agentVersionState(agent.version, release?.version ?? null);
+    if (state === 'unknown' || state === 'not_reported') return { ok: false, error: 'agent_update_unavailable' };
+    if (state !== 'behind') return { ok: false, error: 'agent_up_to_date' };
+  }
 
   const id = crypto.randomUUID();
   await db.execute(commandsSQL[db.type].insert, [id, agentId, action, now, issuedBy]);

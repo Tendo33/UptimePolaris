@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -32,8 +33,9 @@ var releaseRepository = func() string {
 }()
 var releaseCache struct {
 	sync.Mutex
-	value Object
-	until time.Time
+	value     Object
+	until     time.Time
+	checkedAt time.Time
 }
 
 // 合并刷新请求；等待者拿到锁后重新检查五分钟缓存。
@@ -55,6 +57,7 @@ var releaseClient = &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(
 	return http.ErrUseLastResponse
 }}
 var releaseManifestPattern = regexp.MustCompile(`^(v(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*))/manifest\.json$`)
+var agentVersionPattern = regexp.MustCompile(`^\d+\.\d+\.\d+$`)
 
 func agentReleaseURL(tag, file string) string {
 	return "https://github.com/" + releaseRepository + "/releases/download/" + tag + "/" + file
@@ -138,10 +141,14 @@ func requestAgentManifest() (Object, string, error) {
 }
 
 func latestAgentRelease() (Object, error) {
+	return readAgentRelease(false)
+}
+
+func readAgentRelease(refresh bool) (Object, error) {
 	releaseFetchLock.Lock()
 	defer releaseFetchLock.Unlock()
 	releaseCache.Lock()
-	if time.Now().Before(releaseCache.until) {
+	if time.Now().Before(releaseCache.until) && (!refresh || time.Since(releaseCache.checkedAt) < time.Minute) {
 		value := releaseCache.value
 		releaseCache.Unlock()
 		return value, nil
@@ -173,8 +180,40 @@ func latestAgentRelease() (Object, error) {
 	releaseCache.Lock()
 	releaseCache.value = manifest
 	releaseCache.until = time.Now().Add(5 * time.Minute)
+	releaseCache.checkedAt = time.Now()
 	releaseCache.Unlock()
 	return manifest, nil
+}
+
+func agentVersionState(actual, latest string) string {
+	if actual == "" {
+		return "not_reported"
+	}
+	if !agentVersionPattern.MatchString(actual) || !agentVersionPattern.MatchString(latest) {
+		return "unknown"
+	}
+	current, target := strings.Split(actual, "."), strings.Split(latest, ".")
+	var left, right [3]uint64
+	for index := range left {
+		var err error
+		left[index], err = strconv.ParseUint(current[index], 10, 53)
+		if err != nil {
+			return "unknown"
+		}
+		right[index], err = strconv.ParseUint(target[index], 10, 53)
+		if err != nil {
+			return "unknown"
+		}
+	}
+	for index := range left {
+		if left[index] < right[index] {
+			return "behind"
+		}
+		if left[index] > right[index] {
+			return "current"
+		}
+	}
+	return "current"
 }
 
 func cachedAgentManifest() Object {

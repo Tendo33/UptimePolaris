@@ -173,12 +173,19 @@ export function SubscriptionCreate() {
 
               <FieldGroup title={t('requestTargets')} icon={<Server />}>
                 <ul className="space-y-1.5">
-                  {Object.entries(descriptor.requests).map(([key, request]) => (
-                    <li key={key} className="flex min-w-0 items-center gap-2 rounded-lg bg-[var(--polaris-well)] px-3 py-2">
-                      <span className="shrink-0 rounded bg-[var(--polaris-card)] px-1.5 font-mono text-[12px] font-semibold text-[var(--polaris-ink-2)] ring-1 ring-[var(--polaris-line)]">{request.method}</span>
-                      <code className="min-w-0 break-all font-mono text-[12px] text-[var(--polaris-ink-2)]">{String(parameters[request.baseUrlInput] ?? descriptor.inputs[request.baseUrlInput]?.default ?? '{' + request.baseUrlInput + '}')}{request.path}</code>
-                    </li>
-                  ))}
+                  {Object.entries(descriptor.requests).map(([key, request]) => {
+                    const base = parameters[request.baseUrlInput] ?? descriptor.inputs[request.baseUrlInput]?.default;
+                    const path = request.path.replace(/\{([A-Za-z][A-Za-z0-9_]*)\}/g, (token, name: string) => {
+                      const value = parameters[name] ?? descriptor.inputs[name]?.default;
+                      return descriptor.inputs[name]?.type === 'secret' || value === undefined || value === '' ? token : encodeURIComponent(String(value));
+                    });
+                    return (
+                      <li key={key} className="flex min-w-0 items-center gap-2 rounded-lg bg-[var(--polaris-well)] px-3 py-2">
+                        <span className="shrink-0 rounded bg-[var(--polaris-card)] px-1.5 font-mono text-[12px] font-semibold text-[var(--polaris-ink-2)] ring-1 ring-[var(--polaris-line)]">{request.method}</span>
+                        <code className="min-w-0 break-all font-mono text-[12px] text-[var(--polaris-ink-2)]">{base || '{' + request.baseUrlInput + '}'}{path}</code>
+                      </li>
+                    );
+                  })}
                 </ul>
                 <Note>{t('readOnlyPreview')}</Note>
               </FieldGroup>

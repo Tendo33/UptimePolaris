@@ -145,8 +145,9 @@ func TestBuiltinThemePublicConfig(t *testing.T) {
 	}
 	code, result := s.request(t, "GET", "/api/public/config", nil, false)
 	expectStatus(t, code, 200, result)
-	if boolean(object(result["presentation"])["configured"]) || result["theme_head_code"] != nil || result["theme_content_html"] != nil {
-		t.Fatal("unconfigured page injection", result)
+	monitorPage := object(object(config["pages"])["monitor"])
+	if !boolean(object(result["presentation"])["configured"]) || object(result["presentation"])["kind"] != "monitor" || result["theme_head_code"] != monitorPage["headCode"] || result["theme_content_html"] != monitorPage["contentHtml"] {
+		t.Fatal("default monitor page missing", result)
 	}
 	code, machine := s.request(t, "POST", "/api/admin/agents", Object{"name": "country fixture"}, true)
 	expectStatus(t, code, 201, machine)

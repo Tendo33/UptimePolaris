@@ -206,7 +206,7 @@ Uptime Polaris 在 `/` 提供监控状态页，在 `/servers` 提供机器页，
 
 如需独立域名，先完成 DNS 和部署侧域名绑定，再配置页面映射。例如把 `status.example.com` 的首页指向监控页，把 `servers.example.com` 的首页指向机器页。只填主机名，不填协议、端口或路径。后台配置不会创建 DNS 记录或绑定 Worker。有效修改自动保存；保存失败会保留输入并允许重试。
 
-域名映射决定首页显示哪个页面；配置映射后，未匹配域名的首页显示未配置。`/servers` 和 `/ai` 仍按对应功能开关访问。关闭机器页不会关闭 AI 页；两种可选页面都关闭后，域名映射暂停生效，已保存配置保留。
+域名映射决定首页显示哪个页面；未匹配映射的域名默认显示监控页，无需额外添加映射。`/servers` 和 `/ai` 仍按对应功能开关访问。关闭机器页不会关闭 AI 页；两种可选页面都关闭后，域名映射暂停生效，已保存配置保留。
 
 两个域名的 `/admin` 进入同一套后台，登录会留在当前域名。会话 Cookie 按域名保存，第一次访问另一个域名的后台时，需要在该域名下登录。
 
@@ -321,7 +321,7 @@ HTTP and TCP monitors support SSL, domain-expiry and DNS add-ons; Go also suppor
 
 Monitor groups organize status pages and notification scope; monitor tags classify monitors. Agent groups and tags are separate. A channel with no group scope applies to all monitors, including ungrouped ones. Recheck channel scope after moving monitors or deleting a group.
 
-The optional machine page is disabled by default. Enable it to use `/servers` without an extra domain; details remain at `/server/:id`, with comparison, tags and back links returning to the machine list. New Agents have public visibility enabled. Use the Agent list or editor to change visibility, individually or in bulk. Domain mappings optionally select the homepage after DNS and deployment-side domain bindings are configured. Unmapped homepages show an unconfigured state, while `/servers` and `/ai` follow their feature switches. Disabling the machine page stops its public API but not Agent reporting or the AI page. Cookies are scoped to each domain, so a second domain may require a separate login.
+The optional machine page is disabled by default. Enable it to use `/servers` without an extra domain; details remain at `/server/:id`, with comparison, tags and back links returning to the machine list. New Agents have public visibility enabled. Use the Agent list or editor to change visibility, individually or in bulk. Domain mappings optionally select the homepage after DNS and deployment-side domain bindings are configured. Unmapped hostnames show the monitor page without an extra mapping, while `/servers` and `/ai` follow their feature switches. Disabling the machine page stops its public API but not Agent reporting or the AI page. Cookies are scoped to each domain, so a second domain may require a separate login.
 
 The built-in machine page supports search, state/group/tag/region filters, card and list views, and a map when recognizable region data exists. Select 2–4 machines for comparison. History charts and CSV export are limited to published fields and available samples. Filter, view and comparison choices are shareable in the URL; pins and refresh interval are stored in the browser, and live samples in the current tab session.
 

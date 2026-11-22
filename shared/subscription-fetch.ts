@@ -31,7 +31,7 @@ export function subscriptionFileUrl(input: string): string {
   return url.href;
 }
 
-export async function readSubscriptionJson(response: Response, maxBytes: number): Promise<{ value: unknown; bytes: number }> {
+export async function readSubscriptionText(response: Response, maxBytes: number): Promise<{ text: string; bytes: number }> {
   if (!response.body) throw new SubscriptionError('subscription_response_invalid', 502);
   const length = Number(response.headers.get('content-length'));
   if (length > maxBytes) { await response.body.cancel(); throw new SubscriptionError('subscription_limit_exceeded', 413); }
@@ -46,12 +46,18 @@ export async function readSubscriptionJson(response: Response, maxBytes: number)
       text += decoder.decode(next.value, { stream: true });
     }
     text += decoder.decode();
-    return { value: JSON.parse(text), bytes };
+    return { text, bytes };
   } catch (error) {
     await reader.cancel().catch(() => {});
     if (error instanceof SubscriptionError) throw error;
     throw new SubscriptionError('subscription_response_invalid', 502);
   } finally { reader.releaseLock(); }
+}
+
+export async function readSubscriptionJson(response: Response, maxBytes: number): Promise<{ value: unknown; bytes: number }> {
+  const { text, bytes } = await readSubscriptionText(response, maxBytes);
+  try { return { value: JSON.parse(text), bytes }; }
+  catch { throw new SubscriptionError('subscription_response_invalid', 502); }
 }
 
 function substitute(value: string, parameters: Record<string, string | number | boolean>, encode = false): string {

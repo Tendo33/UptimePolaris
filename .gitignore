@@ -16,6 +16,8 @@ node_modules/
 /public/
 artifacts/
 screenshots/
+/promo-screenshots/
+/promo-video/
 .tools/
 frontend/.vite/
 frontend/*.tsbuildinfo

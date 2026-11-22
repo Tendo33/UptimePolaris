@@ -24,11 +24,23 @@ import { clampInteger } from '../util';
 import { invalidateConfig, invalidateLive, lastD1Meta, loadAllMonitors, logMeta } from './store';
 import { deleteMonitor } from './writes';
 import { notificationChannelIds } from '../../../../../shared/notification-routing';
+import { monitorIconResponse } from './icon';
 
 // Mounted behind the management gate in api.ts.
 // 在 api.ts 的管理鉴权之后挂载。
 /** 监控的管理、即时检查及配置验证接口。 / Management, immediate check, and configuration validation endpoints for monitors. */
 export const monitorRoutes = new Hono<{ Bindings: Env }>();
+
+monitorRoutes.get('/api/monitors/:numId/icon', async c => {
+  const id = c.req.param('numId');
+  if (!/^\d+$/.test(id) || !Number.isSafeInteger(Number(id)) || Number(id) <= 0) return c.json({ error: 'not_found' }, 404);
+  const db = getDB(c.env);
+  const monitor = await db.queryOne<Pick<Monitor, 'target'>>(db.type === 'postgres'
+    ? "SELECT target FROM monitors WHERE num_id=$1 AND type='http'"
+    : "SELECT target FROM monitors WHERE num_id=? AND type='http'", [Number(id)]);
+  if (!monitor) return c.json({ error: 'not_found' }, 404);
+  return monitorIconResponse(c.env, monitor.target, true);
+});
 
 const TYPES: MonitorType[] = [...ACTIVE_PROBE_TYPES, 'push', 'agent'];
 

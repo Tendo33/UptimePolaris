@@ -82,7 +82,7 @@ export interface FleetAgent {
   interfaces?: AgentInterface[];
 }
 
-export type BatchCommandAction = 're_report' | 'check_update' | 'upgrade' | 'restart';
+export type BatchCommandAction = 're_report' | 'upgrade' | 'restart';
 
 export interface BatchCommandResult {
   id: string;

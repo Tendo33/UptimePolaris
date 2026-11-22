@@ -3,7 +3,7 @@ import { publicSubscriptionUrl, subscriptionFileUrl, readSubscriptionJson, fetch
 import { parseSubscriptionResponses } from '../../../../../shared/subscription-parser';
 import { redactSubscriptionItems, redactSubscriptionIssues } from '../../../../../shared/subscription-redaction';
 import { subscriptionIdentityDiff } from '../../../../../shared/subscription-identity';
-import { subscriptionParameters, validateSubscriptionDescriptor } from '../../../../../shared/subscription-validation';
+import { validateSubscriptionDescriptor } from '../../../../../shared/subscription-validation';
 import { KUMA_SUBSCRIPTION, OFFICIAL_SUBSCRIPTION_ROOT } from '../../../../../shared/subscription-templates';
 import { SUBSCRIPTION_LIMITS, SubscriptionError, type SubscriptionCatalogEntry, type SubscriptionConfig, type SubscriptionDescriptor, type SubscriptionPreview } from '../../../../../shared/subscriptions';
 import { decryptSubscriptionSecrets, encryptSubscriptionSecrets } from './credentials';
@@ -12,6 +12,7 @@ import { ExternalBudgetExceeded, type ExternalRequestBudget } from '../http/requ
 import { validateSubscriptionDestination } from './egress';
 import { parseSubscriptionCatalog } from '../../../../../shared/subscription-catalog';
 import { repositoryEntries, type StoredSubscriptionRepository } from './repositories';
+import { subscriptionPreviewParameters } from './source-page';
 
 export interface StoredSubscriptionConfig extends SubscriptionConfig { ciphertext: string }
 export interface StoredSubscriptionPreview extends SubscriptionPreview { owner: string; ciphertext: string; subscriptionId?: string; revision?: string }
@@ -100,7 +101,8 @@ export function previewView(preview: StoredSubscriptionPreview): SubscriptionPre
 export async function createSubscriptionPreview(store: SubscriptionStore, env: Env, input: {
   descriptor: unknown; parameters: unknown; sourceUrl?: string | null; origin?: 'official' | 'local'; subscriptionId?: string; revision?: string; modified?: boolean;
 }, owner: string, transport = subscriptionTransport(), defer?: (work: Promise<unknown>) => void): Promise<StoredSubscriptionPreview> {
-  const descriptor = validateSubscriptionDescriptor(input.descriptor), parameters = subscriptionParameters(descriptor, input.parameters);
+  const descriptor = validateSubscriptionDescriptor(input.descriptor);
+  const parameters = await subscriptionPreviewParameters(descriptor, input.parameters, transport);
   const id = crypto.randomUUID(), now = Math.floor(Date.now() / 1000);
   const secrets: Record<string, string | number | boolean> = {}, ordinary: Record<string, string | number | boolean> = {};
   for (const [name, value] of Object.entries(parameters)) (descriptor.inputs[name].type === 'secret' ? secrets : ordinary)[name] = value;

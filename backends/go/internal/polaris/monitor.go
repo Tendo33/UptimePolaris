@@ -474,6 +474,9 @@ func validateMonitorTaxonomy(t *transaction, m, input Object) error {
 }
 
 func (a *App) monitorRoutes() {
+	a.route("GET /api/monitors/{numId}/icon", false, func(w http.ResponseWriter, r *http.Request) error {
+		return a.monitorIcon(w, r, true)
+	})
 	a.route("POST /api/monitors/push-credentials", false, func(w http.ResponseWriter, r *http.Request) error {
 		respond(w, 200, Object{"id": uuid(), "push_token": token(24)})
 		return nil

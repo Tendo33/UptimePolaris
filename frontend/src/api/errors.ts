@@ -50,6 +50,7 @@ const ERROR_KEYS: Record<string, string> = {
   invalid_json: 'error.invalidRequest', invalid_request: 'error.invalidRequest',
   unknown_action: 'admin.agents.commandUnknown', commands_disabled: 'admin.agents.commandDisabled',
   agent_unsupported: 'admin.agents.commandUnsupported', agent_offline: 'admin.agents.commandOffline', agent_not_found: 'admin.agents.commandNotFound',
+  agent_update_unavailable: 'admin.agents.updateCheckFailed', agent_up_to_date: 'admin.agents.versionCurrent',
   theme_not_found: 'error.notFound', theme_version_not_found: 'error.notFound',
   theme_unavailable: 'error.themeUnavailable', rollback_unavailable: 'error.rollbackUnavailable',
   theme_delete_failed: 'admin.themes.deleteFailed',

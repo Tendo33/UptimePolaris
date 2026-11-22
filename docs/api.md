@@ -136,6 +136,8 @@ Agent 上报中的 `load.load1`、`load.load5`、`load.load15`、`connections.tc
 | `GET /api/admin/presentation` | 读取生效配置 `config` 和并发控制用的 `revision` |
 | `PUT /api/admin/presentation` | 提交完整 `config` 和读取到的 `revision`，保存后立即生效 |
 
+域名映射未命中时，首页默认显示监控页；已映射域名仍使用指定页面。机器页和 AI 页继续受各自功能开关控制。
+
 展示设置只有一份生效配置。`revision` 变了会返回 409 `presentation_conflict`，这时重新读取并合并修改。配置包含 `agentEnabled`、`aiEnabled`、`aiOnMonitorPage`、`workerService`、`domains` 和 `pages`；域名项为 `{ hostname, page }`，`page` 为 `monitor`、`agent` 或 `ai`。添加后立即生效，没有逐项开关。每个页面保存 `theme`、`themeOptions`，以及可选的 `headCode` 和 `contentHtml`，约束见[主题页面自定义内容](#主题页面自定义内容--theme-page-custom-content)。域名映射由管理员手动填写。先在部署侧完成 DNS 配置和 Worker 或服务器的域名绑定，再保存映射。
 
 `agentEnabled` 控制机器独立展示，`aiEnabled` 控制 AI 监控及公开读取。关闭 AI 时停止定时、Queue 和手动 AI 调用，保留配置与历史；手动调用返回 409 `ai_disabled`。`aiOnMonitorPage` 控制 AI 模型是否出现在主监控页，不影响独立 AI 页。机器和 AI 功能都关闭时，域名映射停止生效，默认显示监控页；已保存的配置不删除。
@@ -147,6 +149,7 @@ Agent 上报中的 `load.load1`、`load.load5`、`load.load15`、`connections.tc
 | 方法与路径 | 用途 |
 | --- | --- |
 | `GET /api/monitors` | 管理监控列表，含管理所需配置 |
+| `GET /api/monitors/:numId/icon` | 管理端读取 HTTP 监控的网站图标，须启用图标同步；不受公开范围或域名映射限制 |
 | `POST /api/monitors` | 创建监控 |
 | `POST /api/monitors/push-credentials` | 预先生成 Push 上报凭据，不创建监控 |
 | `PUT /api/monitors/:id` | 修改监控 |
@@ -334,6 +337,7 @@ Agent 协议用独立的机器 Token，涉及上报、WebSocket、带租约的�
 | 方法与路径 | 用途 |
 | --- | --- |
 | `GET /api/admin/agents` | 机器列表 |
+| `POST /api/admin/agents/check-update` | 后端检查 Agent 最新正式版，返回 `{ latestVersion }`，不向机器下发指令 |
 | `POST /api/admin/agents` | 登记机器，接收 `name` 和可选布尔值 `probe_enabled`、`is_public`（均默认 `true`），返回 201 `{ id, token }`，不创建监控 |
 | `POST /api/admin/agents/visibility` | `{ ids, is_public }` 批量设置机器公开状态；最多 500 个 ID，要求机器页已启用 |
 | `POST /api/admin/agents/:id/rename` | 使用 `{ name }` 修改名称 |
@@ -352,7 +356,9 @@ Agent 协议用独立的机器 Token，涉及上报、WebSocket、带租约的�
 | `DELETE /api/admin/agent-groups/:id`、`DELETE /api/admin/agent-tags/:id` | 删除 Agent 分组或标签 |
 | `PUT /api/admin/agents/:id/taxonomy` | 设置机器 `group_id` 和 `tag_ids` |
 
-下发远程指令要同时满足功能开关、机器能力和在线状态。动作只有 `re_report`、`check_update`、`restart`、`upgrade`。单机请求体为 `{ "action": "re_report" }`，返回的 `id` 是指令 ID；接受入队不代表执行成功。Worker 返回 202，Go 返回 200。批量请求用 `{ "ids": ["机器 UUID"], "action": "re_report" }`；Worker 最多接受 100 个去重后的 ID，Go 最多接受 500 个。检查 `results` 里每台机器的结果。字段和限制见 [Agent 手册](agents.md#远程配置与指令)。
+下发远程指令要同时满足功能开关、机器能力和在线状态。动作只有 `re_report`、`restart`、`upgrade`。单机请求体为 `{ "action": "re_report" }`，返回的 `id` 是指令 ID；接受入队不代表执行成功。Worker 返回 202，Go 返回 200。批量请求用 `{ "ids": ["机器 UUID"], "action": "re_report" }`；Worker 最多接受 100 个去重后的 ID，Go 最多接受 500 个。检查 `results` 里每台机器的结果。字段和限制见 [Agent 手册](agents.md#远程配置与指令)。
+
+检查版本使用独立的 `POST /api/admin/agents/check-update`，需要管理认证，不要求机器在线或开启远程指令。成功清单缓存 5 分钟，手动检查 60 秒内复用结果；读取失败返回 502 `agent_update_unavailable`。升级入队前还会检查版本：已是最新或更高版本返回 409 `agent_up_to_date`，版本未知返回 502 `agent_update_unavailable`。
 
 读到运行配置后，保存时提交 `{ "expected_revision": "读取到的 desired_revision", "config": { ... } }`。首次版本可能为 `null`；`config` 必须包含七个运行字段。响应里的 `revision` 是期望版本，只有 Agent 上报匹配结果后才代表已经应用。状态为 `unreported`、`pending`、`synced` 或 `error`。关闭远程功能返回 403 `commands_disabled`；配置未上报或版本冲突分别返回 409 `agent_config_unsupported` 和 `agent_config_conflict`。
 
@@ -546,6 +552,10 @@ Public heartbeat states are `0` DOWN, `1` UP, `2` WARN and `4` PENDING; missing 
 
 ### Monitors and Push
 
+Domain mappings select the homepage. An unmapped hostname defaults to the monitor page; machine and AI pages still follow their feature switches.
+
+`GET /api/monitors/:numId/icon` reads an HTTP monitor's site icon using administrator authentication. It requires `site.syncMonitorIcons` and is independent of public visibility and domain mappings. Public icon requests keep their public-page visibility checks.
+
 Management uses `GET` and `POST /api/monitors`, `PUT` and `DELETE /api/monitors/:id`, `POST /api/monitors/:id/check`, and `POST /api/monitors/check`. Creation returns 201 and `id`; a Push monitor also returns `push_token`. An Agent monitor references an existing `agent_id` and does not create a machine. Common fields include `name`, `type`, `target`, `interval_sec`, `timeout_ms`, `is_public`, `group_id`, `tag_ids` and type-specific `options_json`. Worker intervals are 60–86400 seconds and timeouts 1000–60000 ms; Go intervals are 5–86400 seconds and timeouts 100–120000 ms. Query capabilities before presenting choices.
 
 `POST /api/monitors/visibility` accepts `{ "ids": ["UUID"], "is_public": false }` for 1–500 monitors. Any missing ID rejects the change. HTTP options can include headers, authentication, JSON matching and `check_source`. Native source types are `worker` and `server` for the respective runtime; an Agent source uses `{ "type": "agent", "agent_id": "UUID" }`. Worker UDP and ICMP require an online Agent with the relevant capability. Immediate checks reject paused, Push, Agent-host and Agent-source monitors.
@@ -594,7 +604,9 @@ Create a machine with `POST /api/admin/agents`; the 201 response contains `id` a
 
 `GET` and `PUT /api/admin/agents/:id/config` read and submit the complete seven-field runtime configuration. Submit `expected_revision` from `desired_revision`; a saved revision is not applied until the Agent acknowledges it. States are `unreported`, `pending`, `synced` and `error`. A conflict returns 409 `agent_config_conflict`; reload before merging changes.
 
-`POST /api/admin/agents/:id/commands` accepts `{ "action": "re_report" }`; supported actions are `re_report`, `check_update`, `restart` and `upgrade`. Worker returns 202 and Go 200 when queued. Query `GET /api/admin/agents/:id/commands` for the outcome. Batch requests use `ids` and `action`; inspect each result. The Worker limit is 100 deduplicated IDs and the Go limit is 500. The feature switch, Agent capability and online status gate commands; the Agent also checks whether restart or upgrade is safe. Installation, rollback and configuration details are in [the Agent guide](agents.md#agent-guide).
+`POST /api/admin/agents/:id/commands` accepts `{ "action": "re_report" }`; supported actions are `re_report`, `restart` and `upgrade`. Worker returns 202 and Go 200 when queued. Query `GET /api/admin/agents/:id/commands` for the outcome. Batch requests use `ids` and `action`; inspect each result. The Worker limit is 100 deduplicated IDs and the Go limit is 500. The feature switch, Agent capability and online status gate commands; the Agent also checks whether restart or upgrade is safe. Installation, rollback and configuration details are in [the Agent guide](agents.md#agent-guide).
+
+`POST /api/admin/agents/check-update` checks the release on the backend and returns `{ latestVersion }` without issuing commands. It requires administrator authentication, not online Agents or enabled remote commands. Successful manifests are cached for five minutes; manual checks reuse a result for 60 seconds. Unavailable or unknown release information returns 502 `agent_update_unavailable`. An upgrade for a current or newer Agent returns 409 `agent_up_to_date`.
 
 Agent installation downloads `install.sh` or `install.ps1` from the Agent GitHub repository and passes the site endpoint as an argument. The script queries GitHub and downloads the latest stable binary on the target machine. The separate `/api/public/agent/manifest`, `/api/public/agent/download/:file` and `/api/public/agent/capabilities` release endpoints are not prerequisites for installation or reinstallation. Agent reporting, jobs and configuration use a machine token even though their paths contain `public`; never log those URLs. Agent groups and tags are separate from monitor groups and tags. Unified group management is under `/api/admin/groups`; destructive membership changes require `confirm_membership_reset: true`.
 

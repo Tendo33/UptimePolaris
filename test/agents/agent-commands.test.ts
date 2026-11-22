@@ -38,16 +38,16 @@ async function checkAsync(name: string, fn: () => Promise<void>): Promise<void> 
 // ------------------------------------------------------------------ whitelist
 // 白名单 / Whitelist
 
-check('the whitelist is exactly the four documented actions', () => {
-  assert.deepEqual([...COMMAND_ACTIONS], ['upgrade', 'restart', 're_report', 'check_update']);
+check('the whitelist contains only remote execution actions', () => {
+  assert.deepEqual([...COMMAND_ACTIONS], ['upgrade', 'restart', 're_report']);
 });
 
 check('only whitelisted actions are accepted', () => {
   for (const action of COMMAND_ACTIONS) assert.equal(isCommandAction(action), true, action);
 });
 
-check('check_update is accepted and still exact', () => {
-  assert.equal(isCommandAction('check_update'), true);
+check('release checks are not remote commands', () => {
+  assert.equal(isCommandAction('check_update'), false);
   assert.equal(isCommandAction('check-update'), false);
   assert.equal(isCommandAction('check_update '), false);
 });
@@ -133,7 +133,7 @@ const failingEnv = { CONFIG: { get: async () => { throw new Error('db down'); } 
 const disabledEnv = { DB: { prepare() { return { bind() { return this; }, all: async () => ({ results: [], meta: {} }) }; } } } as unknown as Parameters<typeof enqueueCommands>[0];
 
 await checkAsync('a batch reports one verdict per id and does not abort', async () => {
-  const results = await enqueueCommands(disabledEnv, ['a', 'b', 'c'], 'check_update', null, 0);
+  const results = await enqueueCommands(disabledEnv, ['a', 'b', 'c'], 're_report', null, 0);
   assert.equal(results.length, 3);
   for (const id of ['a', 'b', 'c']) {
     assert.deepEqual(results.find((r) => r.id === id), { id, ok: false, error: 'commands_disabled' });
@@ -141,7 +141,7 @@ await checkAsync('a batch reports one verdict per id and does not abort', async 
 });
 
 await checkAsync('unreadable settings do not masquerade as a disabled command switch', async () => {
-  await assert.rejects(enqueueCommands(failingEnv, ['a'], 'check_update', null, 0), /db down/);
+  await assert.rejects(enqueueCommands(failingEnv, ['a'], 're_report', null, 0), /db down/);
 });
 
 await checkAsync('a batch refuses an unknown action for every id', async () => {
@@ -155,7 +155,7 @@ await checkAsync('a batch refuses an unknown action for every id', async () => {
 // -------------------------------------------------------------- sql parity
 // SQL 一致性 / SQL parity
 
-check('both dialects extend the action CHECK with check_update', () => {
+check('historical command rows remain readable in both SQL dialects', () => {
   const sqlite = readSource('database/schema/d1/0030_agent_check_update.sql');
   const pg = readSource('database/schema/postgres/0011_agent_check_update.postgres.sql');
   for (const sql of [sqlite, pg]) {

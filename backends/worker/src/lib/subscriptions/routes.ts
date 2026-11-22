@@ -13,7 +13,7 @@ import { currentUser } from '../auth/routes';
 import { requestPage } from '../presentation/context';
 import { loadPresentation } from '../presentation/store';
 import { SubscriptionStore } from './store';
-import { checkSubscriptionUpdate, cachedRemoteDescriptor, catalogDescriptor, configView, createSubscriptionPreview, previewConfig, previewView, subscriptionCatalog, type StoredSubscriptionConfig, type StoredSubscriptionPreview } from './config';
+import { checkSubscriptionUpdate, cachedRemoteDescriptor, catalogDescriptor, configView, createSubscriptionPreview, previewConfig, previewView, subscriptionCatalog, subscriptionTransport, type StoredSubscriptionConfig, type StoredSubscriptionPreview } from './config';
 import { decryptSubscriptionSecrets } from './credentials';
 import { newSubscriptionItem, runSubscription, subscriptionRunView, type SubscriptionRun } from './runtime';
 import { subscriptionHealth, type SubscriptionSummary } from '../../../../../shared/subscriptions';
@@ -21,6 +21,7 @@ import { subscriptionIcon } from './icon';
 import { readSetting } from '../settings/store';
 import { subscriptionRepositoryUrl } from '../../../../../shared/subscription-catalog';
 import { repositoryEntries, repositoryView, refreshSubscriptionRepository, subscriptionRepositories, type StoredSubscriptionRepository } from './repositories';
+import { subscriptionPreviewParameters } from './source-page';
 
 export const subscriptionRoutes = new Hono<{ Bindings: Env }>();
 subscriptionRoutes.use('/api/admin/subscription*', bodyLimit({ maxSize: 300000, onError: c => c.json({ error: 'subscription_limit_exceeded' }, 413) }));
@@ -347,9 +348,9 @@ subscriptionRoutes.post('/api/admin/subscriptions/:id/config/preview', async c =
   const secrets = await decryptSubscriptionSecrets(config.ciphertext, config.id, c.env.ADMIN_TOKEN);
   if (Object.keys(secrets).some(name => descriptor.inputs[name] && descriptor.inputs[name].type !== 'secret')) throw new SubscriptionError('subscription_secret_type_changed', 409);
   const inherited = Object.fromEntries(Object.entries({ ...(candidate?.parameters ?? config.parameters), ...secrets }).filter(([name]) => Object.hasOwn(descriptor.inputs, name)));
-  const parameters = { ...inherited, ...object(body.parameters ?? {}) };
   const oldBindings = subscriptionCredentialBindings(config.descriptor, { ...config.parameters, ...secrets });
-  const newBindings = subscriptionCredentialBindings(descriptor, parameters as Record<string, string | number | boolean>);
+  const parameters = await subscriptionPreviewParameters(descriptor, { ...inherited, ...object(body.parameters ?? {}) }, subscriptionTransport());
+  const newBindings = subscriptionCredentialBindings(descriptor, parameters);
   if (Object.keys(secrets).some(name => descriptor.inputs[name] && JSON.stringify(oldBindings[name]) !== JSON.stringify(newBindings[name]) && !Object.hasOwn(object(body.parameters ?? {}), name))) throw new SubscriptionError('subscription_credentials_rebind_required', 409);
   const knownUpdate = await store.document<{ candidate?: SubscriptionDescriptor; sourceUrl?: string }>('config-update', config.id);
   const modified = JSON.stringify(descriptor) === JSON.stringify(knownUpdate?.candidate) ? false : JSON.stringify(descriptor) === JSON.stringify(config.descriptor) ? config.modified : true;

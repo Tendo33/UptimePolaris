@@ -368,6 +368,10 @@ func (a *App) previewSubscriptionConfig(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		return err
 	}
+	parameters, err = a.resolveSubscriptionPageParameters(r.Context(), descriptor, parameters)
+	if err != nil {
+		return err
+	}
 	newBindings, err := subscriptionCredentialBindings(descriptor, parameters)
 	if err != nil {
 		return err

@@ -7,7 +7,7 @@ export const PROBE_PLATFORMS: Record<string, string> = {
 };
 export interface AgentPlatform { key: string; file: string; size: number; sha256: string; version: string }
 export interface AgentManifest { repository: string; tag: string; version: string; platforms: AgentPlatform[] }
-let cached: { value: AgentManifest; until: number } | undefined;
+let cached: { value: AgentManifest; until: number; checkedAt: number } | undefined;
 let pending: Promise<AgentManifest> | undefined;
 
 const releaseBase = `https://github.com/${AGENT_RELEASE_REPOSITORY}/releases/download/`;
@@ -77,9 +77,9 @@ async function load(): Promise<AgentManifest> {
   return manifest;
 }
 /** 成功结果缓存五分钟，并合并同一实例内的并发刷新。 / Cache successful results for five minutes and share concurrent refreshes within this instance. */
-export async function latestAgentRelease(): Promise<AgentManifest> {
-  if (cached && cached.until > Date.now()) return cached.value;
-  pending ??= load().then(value => { cached = { value, until: Date.now() + 300_000 }; return value; }).finally(() => { pending = undefined; });
+export async function latestAgentRelease(refresh = false): Promise<AgentManifest> {
+  if (cached && cached.until > Date.now() && (!refresh || Date.now() - cached.checkedAt < 60_000)) return cached.value;
+  pending ??= load().then(value => { const now = Date.now(); cached = { value, until: now + 300_000, checkedAt: now }; return value; }).finally(() => { pending = undefined; });
   return pending;
 }
 export function cachedAgentRelease(): AgentManifest | null {

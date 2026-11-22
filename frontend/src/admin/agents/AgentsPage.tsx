@@ -60,6 +60,7 @@ import { AgentVersionPopover } from './AgentVersionPopover';
 import { agentsApi } from './api';
 import { useAgentTaxonomy } from './Taxonomy';
 import { FleetInsights, FleetOverview } from './FleetOverview';
+import { useAgentUpdateCheck } from './useAgentUpdateCheck';
 import type { AgentCommandRecord, BatchCommandAction, FleetAgent } from './types';
 
 /** A percentage with one decimal, or an em dash. / 保留一位小数的百分比；无值时显示破折号。 */
@@ -142,6 +143,7 @@ function AgentFleetPage() {
   const load = async () => {
     await fleet.mutate().catch(() => undefined);
   };
+  const updateCheck = useAgentUpdateCheck(load);
 
   /** Deep links `?agent=` and `?enroll=1`, consumed once. / 深链接 `?agent=` 和 `?enroll=1`，读取一次后移除。 */
   useEffect(() => {
@@ -209,7 +211,7 @@ function AgentFleetPage() {
     const pending = commands.find(
       (row) =>
         (row.state === 'pending' || row.state === 'leased') &&
-        (row.action === 'check_update' || row.action === 'upgrade'),
+        row.action === 'upgrade',
     );
     setInProgress((prev) => {
       if (!pending) {
@@ -286,7 +288,7 @@ function AgentFleetPage() {
         toast.warning(t('batchPartial', { failed, total: resultRows.length }));
       }
 
-      if (action === 'check_update' || action === 'upgrade') {
+      if (action === 'upgrade') {
         const now = Math.floor(Date.now() / 1000);
         setInProgress((prev) => {
           const next = { ...prev };
@@ -333,7 +335,7 @@ function AgentFleetPage() {
   };
 
   return (
-    <AdminPage title={t('title')} description={t('description')}>
+    <AdminPage title={t('title')} description={t('description')} actions={<Button variant="bordered" startContent={<SearchCheck size={15} />} isLoading={updateCheck.checking} isDisabled={updateCheck.checking} onPress={() => void updateCheck.check()}>{t('commandCheckUpdate')}</Button>}>
       <div className="flex min-h-0 flex-1 flex-col gap-4">
         {/*
           Summary strip. Six tiles, each with the shape that answers its own
@@ -416,9 +418,9 @@ function AgentFleetPage() {
               size="sm"
               variant="flat"
               startContent={<SearchCheck size={15} />}
-              isDisabled={batchRunning !== null || busy !== null}
-              isLoading={batchRunning === 'check_update'}
-              onPress={() => void runBatch('check_update')}
+              isDisabled={updateCheck.checking}
+              isLoading={updateCheck.checking}
+              onPress={() => void updateCheck.check()}
             >
               {t('commandCheckUpdate')}
             </Button>
@@ -725,7 +727,7 @@ function AgentFleetPage() {
       </div>
 
       <AgentDetailDialog agent={detail} onClose={() => setDetail(null)} onEdit={(agent) => { setDetail(null); setEditing(agent); }} />
-      {agents?.filter(agent => agent.id === commandAgentId).map(agent => <AgentCommandsDialog key={agent.id} agent={agent} onClose={() => setCommandAgentId(null)} onCommandsLoaded={noteCommands} />)}
+      {agents?.filter(agent => agent.id === commandAgentId).map(agent => <AgentCommandsDialog key={agent.id} agent={agent} onClose={() => setCommandAgentId(null)} onCommandsLoaded={noteCommands} onUpdated={load} />)}
       {editing ? <AgentEditDrawer key={editing.id} agent={editing} onClose={() => { setEditing(null); void taxonomy.load(); }} onUpdated={() => { void load(); void taxonomy.load(); }} /> : null}
 
       <Modal isOpen={deleteTargets !== null} onClose={() => !deleting && setDeleteTargets(null)} isDismissable={!deleting} isKeyboardDismissDisabled={deleting} size="md" scrollBehavior="inside">

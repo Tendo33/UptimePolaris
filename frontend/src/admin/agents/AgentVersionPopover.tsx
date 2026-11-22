@@ -9,6 +9,7 @@ import { useTranslations } from 'use-intl';
 import { agentsApi } from './api';
 import type { AgentCommandRecord, FleetAgent } from './types';
 import { useAgentCommands } from './useAgentCommands';
+import { useAgentUpdateCheck } from './useAgentUpdateCheck';
 
 export function AgentVersionPopover({ agent, latestVersion, onCommandsLoaded, onUpdated }: {
   agent: FleetAgent;
@@ -19,6 +20,7 @@ export function AgentVersionPopover({ agent, latestVersion, onCommandsLoaded, on
   const t = useTranslations('admin.agents');
   const adminT = useTranslations('admin');
   const apiErrorMessage = useApiErrorMessage();
+  const updateCheck = useAgentUpdateCheck(onUpdated);
   const [open, setOpen] = useState(false);
   const { history, setHistory, error, setError, refresh } = useAgentCommands({
     agentId: agent.id, enabled: open, mode: 'version', onCommandsLoaded, onUpdated,
@@ -33,7 +35,7 @@ export function AgentVersionPopover({ agent, latestVersion, onCommandsLoaded, on
     : !agent.capabilities.includes('commands') ? t('commandUnsupported')
     : !agent.active || agent.online !== true ? t('commandOffline') : '';
   const disabled = !history || Boolean(error) || Boolean(reason) || busy !== null || pending;
-  const issue = async (action: 'check_update' | 'upgrade') => {
+  const issue = async (action: 'upgrade') => {
     if (issuing.current || disabled) return;
     issuing.current = true;
     setBusy(action);
@@ -77,7 +79,7 @@ export function AgentVersionPopover({ agent, latestVersion, onCommandsLoaded, on
         {last && !pending ? <p role="status" className={clsx('text-tiny', last.state === 'completed' && last.ok === 0 ? 'text-danger' : 'text-default-500')}>{t(`command_${last.action}`)} · {t(last.state === 'expired' ? 'commandExpired' : last.ok === 1 ? 'commandOk' : 'commandFailed')}</p> : null}
         {error ? <div role="alert" className="space-y-1 text-tiny text-danger"><p>{apiErrorMessage(error)}</p><Button size="sm" variant="light" onPress={refresh}>{adminT('action.retry')}</Button></div> : null}
         <div className="flex flex-wrap gap-2 border-t border-[var(--polaris-line)] pt-3">
-          <Button size="sm" variant="flat" startContent={<SearchCheck size={14} />} isLoading={busy === 'check_update'} isDisabled={disabled} onPress={() => void issue('check_update')}>{t('commandCheckUpdate')}</Button>
+          <Button size="sm" variant="flat" startContent={<SearchCheck size={14} />} isLoading={updateCheck.checking} isDisabled={updateCheck.checking} onPress={() => void updateCheck.check()}>{t('commandCheckUpdate')}</Button>
           <Button size="sm" color="warning" variant="flat" startContent={<ArrowUpCircle size={14} />} isLoading={busy === 'upgrade'} isDisabled={disabled || !behind || !latestVersion} onPress={() => void issue('upgrade')}>{t('commandUpgrade')}</Button>
         </div>
       </PopoverContent>

@@ -70,7 +70,10 @@ try {
   state = await write('/api/admin/presentation', 'PUT', { revision: state.revision, config: cfg });
   await write('/api/admin/agents/visibility', 'POST', { ids: [machine.id], is_public: true });
   assert.equal((await db.prepare('SELECT is_public FROM agents WHERE id=?').bind(hiddenMachine.id).first()).is_public, 0);
-  assert.equal((await req('unknown.example.com', '/api/public/config')).data.presentation.configured, false);
+  const fallback = await req('unknown.example.com', '/api/public/config');
+  assert.equal(fallback.data.presentation.configured, true);
+  assert.equal(fallback.data.presentation.kind, 'monitor');
+  assert.equal((await req('unknown.example.com', '/api/public/status')).data.monitors.length, 1);
   const servers = await req('servers.example.com', '/api/public/servers');
   assert.deepEqual(servers.data.servers.map(server => server.id), [machine.id]);
   assert.equal((await req('servers.example.com', `/api/public/servers/${hiddenMachine.id}`)).status, 404);

@@ -845,7 +845,7 @@ function MonitorRow({
       <td className="px-3"><Checkbox size="sm" aria-label={t('list.selectOne', { name: m.name })} isSelected={selected} isDisabled={selectionDisabled} onValueChange={onToggleSelection} classNames={{ base: 'm-0' }} /></td>
       <td className="max-w-[28rem] pl-4">
         <div className="flex min-w-0 items-center gap-3">
-          <MonitorGlyph type={m.type} target={m.target} monitorId={m.num_id} badge={paused ? undefined : tone} />
+          <MonitorGlyph scope="admin" type={m.type} target={m.target} monitorId={m.num_id} badge={paused ? undefined : tone} />
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1.5">
               <Tooltip

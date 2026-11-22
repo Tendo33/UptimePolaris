@@ -48,14 +48,7 @@ func (a *App) fleetRow(ctx context.Context, agent Object) Object {
 		row["capabilities"] = live["capabilities"]
 	}
 	if str(live, "version") != "" {
-		row["version_state"] = "unknown"
-		manifest := cachedAgentManifest()
-		if str(manifest, "version") != "" {
-			row["version_state"] = "behind"
-			if str(manifest, "version") == str(live, "version") {
-				row["version_state"] = "current"
-			}
-		}
+		row["version_state"] = agentVersionState(str(live, "version"), str(cachedAgentManifest(), "version"))
 	}
 	monitors, _ := a.store.list(ctx, "monitor")
 	for _, m := range monitors {
@@ -69,6 +62,15 @@ func (a *App) fleetRow(ctx context.Context, agent Object) Object {
 // 管理入口与公开 Agent 协议在此注册，公开上报依赖独立 Agent 凭据。
 // Register admin and public Agent routes; public reporting uses the individual Agent credential.
 func (a *App) agentRoutes() {
+	a.route("POST /api/admin/agents/check-update", false, func(w http.ResponseWriter, r *http.Request) error {
+		w.Header().Set("Cache-Control", "private, no-store")
+		release, err := readAgentRelease(true)
+		if err != nil {
+			return failure("agent_update_unavailable", 502)
+		}
+		respond(w, 200, Object{"latestVersion": release["version"]})
+		return nil
+	})
 	a.route("GET /api/admin/agents", false, func(w http.ResponseWriter, r *http.Request) error {
 		agents, e := a.store.list(r.Context(), "agent")
 		if e != nil {

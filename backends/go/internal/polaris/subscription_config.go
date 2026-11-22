@@ -95,6 +95,10 @@ func (a *App) subscriptionPreview(ctx context.Context, descriptor, parameters Ob
 	if err := validateSubscriptionDescriptor(descriptor); err != nil {
 		return nil, err
 	}
+	parameters, err := a.resolveSubscriptionPageParameters(ctx, descriptor, parameters)
+	if err != nil {
+		return nil, err
+	}
 	values, err := subParameters(descriptor, parameters)
 	if err != nil {
 		return nil, err
