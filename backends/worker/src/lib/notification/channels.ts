@@ -86,8 +86,6 @@ export async function loadChannels(
 interface StoredChannel {
   event_kinds?: string;
   source_types?: string;
-  ai_channel_ids?: string;
-  subscription_ids?: string;
   id: string;
   name: string;
   type: NotificationType;
@@ -107,8 +105,6 @@ function toChannel(row: StoredChannel): NotificationChannel {
     group_ids: [],
     event_kinds: JSON.parse(row.event_kinds ?? '["monitor_state","ai_state","agent_resource"]'),
     source_types: JSON.parse(row.source_types ?? '["local"]'),
-    ai_channel_ids: JSON.parse(row.ai_channel_ids ?? '[]'),
-    subscription_ids: JSON.parse(row.subscription_ids ?? '[]'),
     active: row.active,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -144,8 +140,6 @@ export async function createChannel(
   input: {
     event_kinds?: NotificationRoutingScope['event_kinds'];
     source_types?: NotificationRoutingScope['source_types'];
-    ai_channel_ids?: string[];
-    subscription_ids?: string[];
     name: string;
     type: NotificationType;
     config: Record<string, string>;
@@ -156,8 +150,8 @@ export async function createChannel(
   const id = crypto.randomUUID();
   const now = Math.floor(Date.now() / 1000);
   const db = getDB(env);
-  const scopeDefaults = { event_kinds: input.event_kinds ?? ['monitor_state', 'ai_state', 'agent_resource'], source_types: input.source_types ?? ['local'], ai_channel_ids: input.ai_channel_ids ?? [], subscription_ids: input.subscription_ids ?? [] };
-  const columns = ['id', 'name', 'type', 'config_json', 'active', 'created_at', 'updated_at', 'event_kinds', 'source_types', 'ai_channel_ids', 'subscription_ids'];
+  const scopeDefaults = { event_kinds: input.event_kinds ?? ['monitor_state', 'ai_state', 'agent_resource'], source_types: input.source_types ?? ['local'] };
+  const columns = ['id', 'name', 'type', 'config_json', 'active', 'created_at', 'updated_at', 'event_kinds', 'source_types'];
   await db.execute(`INSERT INTO notifications (${columns.join(',')}) VALUES (${columns.map((_, index) => placeholderFor(db.type, index + 1)).join(',')})`, [
     id,
     input.name,
@@ -189,8 +183,6 @@ export async function updateChannel(
   input: Partial<{
     event_kinds: NotificationRoutingScope['event_kinds'];
     source_types: NotificationRoutingScope['source_types'];
-    ai_channel_ids: string[];
-    subscription_ids: string[];
     name: string;
     type: NotificationType;
     config: Record<string, string>;
@@ -203,7 +195,7 @@ export async function updateChannel(
   const db = getDB(env);
   let position = 1;
   const token = () => placeholderFor(db.type, position++);
-  for (const field of ['event_kinds', 'source_types', 'ai_channel_ids', 'subscription_ids'] as const) {
+  for (const field of ['event_kinds', 'source_types'] as const) {
     if (input[field] !== undefined) { sets.push(`${field} = ${token()}`); values.push(JSON.stringify(input[field])); }
   }
 

@@ -46,7 +46,7 @@ const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   let resolve;
   const pending = new Promise(r => { resolve = r; });
   const env = {React,useState,useRef,useEffect,notificationFieldRequired:()=>true,useTranslations:()=>key=>key,useLocale:()=>({locale:'en-US'}),useApiErrorMessage:()=>String,defaultNotificationLanguage:'en-US',resolveNotificationLanguage:()=> 'en-US',isNotificationLanguage:()=>true,messageLanguages:[],NOTIFICATION_META:{telegram:{fields:[],labelKey:'provider',hintKey:'hint'}},scopeIds:()=>[],notificationsApi:{createNotification:()=>pending}};
-  env.defaultChannelScope = () => ({ event_kinds: ['monitor_state', 'ai_state', 'agent_resource'], source_types: ['local'], ai_channel_ids: [], subscription_ids: [] });
+  env.defaultChannelScope = () => ({ event_kinds: ['monitor_state', 'ai_state', 'agent_resource'], source_types: ['local'] });
   env.NotificationScope = 'NotificationScope';
   for (const name of ['Drawer','DrawerBody','DrawerContent','DrawerFooter','DrawerHeader','Input','Select','SelectItem','Switch','Button','ProviderTile','Loader2']) env[name]=name;
   const Form = Function(...Object.keys(env),code)(...Object.values(env));

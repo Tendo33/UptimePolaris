@@ -301,6 +301,14 @@ func TestSubscriptionNotificationPolicy(t *testing.T) {
 			t.Fatal(test.event, actual, test.reason)
 		}
 	}
+	channel["ai_channel_ids"], channel["subscription_ids"] = []string{"old-ai"}, []string{"old-subscription"}
+	if reason := notificationRoutingReason(channel, Object{"aiModelId": "m", "aiChannelId": "other-ai"}); reason != "" {
+		t.Fatal("retired AI scope filtered a global event", reason)
+	}
+	channel["source_types"] = []string{"local", "subscription"}
+	if reason := notificationRoutingReason(channel, Object{"subscriptionId": "other-subscription"}); reason != "" {
+		t.Fatal("retired subscription scope filtered a global event", reason)
+	}
 }
 
 func TestSubscriptionPublicAddresses(t *testing.T) {

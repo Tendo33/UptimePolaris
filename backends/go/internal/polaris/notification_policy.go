@@ -53,12 +53,6 @@ func notificationRoutingReason(channel, event Object) string {
 	if groups := stringsOf(channel["group_ids"]); len(groups) > 0 && !contains(groups, str(event, "groupId")) {
 		return "group_outside_scope"
 	}
-	if ids := stringsOf(channel["ai_channel_ids"]); kind == "ai_state" && source == "local" && len(ids) > 0 && !contains(ids, str(event, "aiChannelId")) {
-		return "ai_channel_outside_scope"
-	}
-	if ids := stringsOf(channel["subscription_ids"]); source == "subscription" && len(ids) > 0 && !contains(ids, str(event, "subscriptionId")) {
-		return "subscription_outside_scope"
-	}
 	return ""
 }
 

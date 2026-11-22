@@ -18,7 +18,6 @@ import { sendToChannel } from './send';
 import { isNotificationLanguage } from '../../../../../shared/notification-language';
 import { notificationCopy } from './locales';
 import { NOTIFICATION_EVENT_KINDS, notificationRoutingReason, type NotificationRoutingEvent, type NotificationRoutingScope } from '../../../../../shared/notification-policy';
-import { getDB } from '../db/factory';
 import { alertsSuppressed } from '../settings/maintenance';
 
 /** 通知渠道、测试发送和投递记录接口。 / Endpoints for notification channels, test sends, and delivery history. */
@@ -26,20 +25,17 @@ export const notifyRoutes = new Hono<{ Bindings: Env }>();
 
 /** Provider types come from notify.ts so this list cannot drift. / 提供商类型来自 notify.ts，避免列表漂移。 */
 const TYPES: readonly NotificationType[] = NOTIFICATION_TYPES;
+const CHANNEL_FIELDS: readonly string[] = ['name', 'type', 'config', 'active', 'group_ids', 'event_kinds', 'source_types'];
 
-type RoutingFields = Pick<NotificationRoutingScope, 'event_kinds' | 'source_types' | 'ai_channel_ids' | 'subscription_ids'>;
-async function routingScope(env: Env, body: Record<string, unknown>, previous: RoutingFields = {}): Promise<RoutingFields | null> {
+type RoutingFields = Pick<NotificationRoutingScope, 'event_kinds' | 'source_types'>;
+function routingScope(body: Record<string, unknown>): RoutingFields | null {
   const result: RoutingFields = {};
-  for (const field of ['event_kinds', 'source_types', 'ai_channel_ids', 'subscription_ids'] as const) {
+  for (const field of ['event_kinds', 'source_types'] as const) {
     if (body[field] === undefined) continue;
     const values = body[field];
     if (!Array.isArray(values) || values.length > 100 || values.some(value => typeof value !== 'string' || !value || value.length > 64) || new Set(values).size !== values.length) return null;
     if (field === 'event_kinds' && values.some(value => !(NOTIFICATION_EVENT_KINDS as readonly string[]).includes(value))) return null;
     if (field === 'source_types' && values.some(value => !['local', 'subscription'].includes(value))) return null;
-    if (field === 'ai_channel_ids' || field === 'subscription_ids') {
-      const db = getDB(env), table = field === 'ai_channel_ids' ? 'ai_channels' : 'subscriptions';
-      for (const id of values) if (!previous[field]?.includes(id) && !await db.queryOne(`SELECT id FROM ${table} WHERE id=${db.type === 'postgres' ? '$1' : '?'}`, [id])) return null;
-    }
     Object.assign(result, { [field]: values });
   }
   return result;
@@ -135,6 +131,8 @@ notifyRoutes.post('/api/notifications', async (c) => {
     return c.json({ error: 'invalid_request' }, 400);
   }
 
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => !CHANNEL_FIELDS.includes(key))) return c.json({ error: 'invalid_request' }, 400);
+
   const name = (body.name ?? '').trim();
   if (!name) return c.json({ error: 'name_required' }, 400);
   if (!isType(body.type)) return c.json({ error: 'invalid_type' }, 400);
@@ -156,7 +154,7 @@ notifyRoutes.post('/api/notifications', async (c) => {
   const groupIds = await readGroupIds(c.env, body.group_ids);
   if (groupIds.kind === 'bad') return c.json({ error: groupIds.error }, 400);
 
-  const scope = await routingScope(c.env, body);
+  const scope = routingScope(body);
   if (scope === null) return c.json({ error: 'notification_scope_invalid' }, 400);
   const id = await createChannel(c.env, {
     ...scope,
@@ -192,6 +190,8 @@ notifyRoutes.put('/api/notifications/:id', async (c) => {
     return c.json({ error: 'invalid_request' }, 400);
   }
 
+  if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => !CHANNEL_FIELDS.includes(key))) return c.json({ error: 'invalid_request' }, 400);
+
   const stored = (await loadChannels(c.env)).find((ch) => ch.id === id);
   if (!stored) return c.json({ error: 'not_found' }, 404);
 
@@ -222,7 +222,7 @@ notifyRoutes.put('/api/notifications/:id', async (c) => {
   const groupIds = await readGroupIds(c.env, body.group_ids);
   if (groupIds.kind === 'bad') return c.json({ error: groupIds.error }, 400);
 
-  const scope = await routingScope(c.env, body, stored);
+  const scope = routingScope(body);
   if (scope === null) return c.json({ error: 'notification_scope_invalid' }, 400);
   const ok = await updateChannel(c.env, id, {
     ...scope,

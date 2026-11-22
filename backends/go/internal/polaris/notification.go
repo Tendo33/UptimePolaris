@@ -78,7 +78,17 @@ func (a *App) notificationRoutes() {
 		if e != nil {
 			return e
 		}
-		respond(w, 200, Object{"channels": rows})
+		channels := make([]Object, 0, len(rows))
+		for _, row := range rows {
+			channel := Object{}
+			for _, field := range []string{"id", "name", "type", "config", "group_ids", "active", "event_kinds", "source_types", "created_at", "updated_at"} {
+				if value, exists := row[field]; exists {
+					channel[field] = value
+				}
+			}
+			channels = append(channels, channel)
+		}
+		respond(w, 200, Object{"channels": channels})
 		return nil
 	})
 	for _, method := range []string{"POST", "PUT", "DELETE"} {
@@ -144,16 +154,18 @@ func deleteNotification(t *transaction, id string) error {
 }
 
 func writeNotification(t *transaction, id string, row, input Object) error {
-	previous := clone(row)
+	if !knownFields(input, []string{"name", "type", "config", "group_ids", "active", "event_kinds", "source_types"}) {
+		return failure("invalid_request", 400)
+	}
 	if row == nil {
 		row = Object{"id": id, "name": "", "type": "", "config": Object{}, "group_ids": []string{}, "active": 1, "created_at": time.Now().Unix()}
 	}
-	for _, key := range []string{"name", "type", "config", "group_ids", "active", "event_kinds", "source_types", "ai_channel_ids", "subscription_ids"} {
+	for _, key := range []string{"name", "type", "config", "group_ids", "active", "event_kinds", "source_types"} {
 		if v, exists := input[key]; exists {
 			row[key] = v
 		}
 	}
-	for _, key := range []string{"event_kinds", "source_types", "ai_channel_ids", "subscription_ids"} {
+	for _, key := range []string{"event_kinds", "source_types"} {
 		if raw, exists := input[key]; exists {
 			values, ok := raw.([]any)
 			if !ok || len(values) > 100 {
@@ -168,19 +180,6 @@ func writeNotification(t *transaction, id string, row, input Object) error {
 				seen[value] = true
 				if key == "event_kinds" && !contains([]string{"monitor_state", "ai_state", "agent_resource", "subscription_sync"}, value) || key == "source_types" && !contains([]string{"local", "subscription"}, value) {
 					return failure("notification_scope_invalid", 400)
-				}
-				if key == "ai_channel_ids" || key == "subscription_ids" {
-					kind := "ai_channel"
-					if key == "subscription_ids" {
-						kind = "subscription"
-					}
-					reference, err := t.get(kind, value)
-					if err != nil {
-						return err
-					}
-					if reference == nil && !contains(stringsOf(previous[key]), value) {
-						return failure("notification_scope_invalid", 400)
-					}
 				}
 			}
 		}

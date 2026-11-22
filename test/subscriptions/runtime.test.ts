@@ -70,6 +70,9 @@ test('routing preserves local defaults while subscriptions require an explicit s
   assert.equal(notificationRoutingReason(channel, { notificationEnabled: false, notificationChannelIds: ['n'] }), 'notifications_disabled');
   assert.equal(notificationRoutingReason({ ...channel, active: 0 }, { notificationChannelIds: ['n'] }), 'channel_inactive');
   assert.equal(notificationRoutingReason({ ...channel, group_ids: ['g'] }, { aiModelId: 'm' }), 'group_outside_scope');
+  const stored = { ...channel, ai_channel_ids: ['old-ai'], subscription_ids: ['old-subscription'] };
+  assert.equal(notificationRoutingReason(stored, { aiModelId: 'm', aiChannelId: 'other-ai' }), null);
+  assert.equal(notificationRoutingReason({ ...stored, source_types: ['local', 'subscription'] }, { subscriptionId: 'other-subscription' }), null);
 });
 
 test('pending or maintenance baselines do not produce a false recovery', () => {

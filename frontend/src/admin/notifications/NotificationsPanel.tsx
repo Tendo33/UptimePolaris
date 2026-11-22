@@ -548,7 +548,7 @@ function ChannelForm({
     setConfig(channel?.config ?? {});
     setLanguage(resolveNotificationLanguage(channel ? channel.config.language : locale));
     setGroupIds(channel ? scopeIds(channel) : []);
-    setScope({ event_kinds: channel?.event_kinds ?? ['monitor_state', 'ai_state', 'agent_resource'], source_types: channel?.source_types ?? ['local'], ai_channel_ids: channel?.ai_channel_ids ?? [], subscription_ids: channel?.subscription_ids ?? [] });
+    setScope({ event_kinds: channel?.event_kinds ?? ['monitor_state', 'ai_state', 'agent_resource'], source_types: channel?.source_types ?? ['local'] });
     setActive(channel ? channel.active === 1 : true);
     setError(null);
   }, [open, channel, initialType, locale, session]);
