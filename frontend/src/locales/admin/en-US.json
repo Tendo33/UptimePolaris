@@ -633,7 +633,7 @@
     "groupFeatures": "Optional features",
     "groupFeaturesDesc": "Enable the console features you need. Disabling keeps their configuration.",
     "agentManagement": "Agent management",
-    "agentManagementHint": "Show Agent management in the console. Existing Agent reporting, monitor checks and public visibility settings are unchanged."
+    "agentManagementHint": "Agent management appears when the machine page is enabled. Disabling it preserves settings and does not stop existing Agent reports or monitor checks."
   },
   "toast": {
     "saved": "Saved",
@@ -1005,9 +1005,9 @@
     "configConflict": "This agent’s configuration changed. Reload the latest configuration to continue.",
     "reloadConfig": "Discard draft and reload",
     "deleteInUse": "Remove or change monitors using this machine before deleting it.",
-    "featureDisabled": "Agent management is not enabled",
-    "enableFeature": "Enable Agent management",
-    "openFeatureSettings": "Feature settings"
+    "featureDisabled": "The machine page is disabled",
+    "enableFeature": "Enable machine page",
+    "openFeatureSettings": "Presentation settings"
   },
   "quick": {
     "lastPush": "Last heartbeat",
@@ -1553,7 +1553,7 @@
     "locale": "Language",
     "auto": "Automatic",
     "historyHours": "History window (hours)",
-    "enableAgentsHint": "Show public machine resources and status at /servers, optionally on a separate domain. Disabling preserves settings.",
+    "enableAgentsHint": "Enable the machine page and Agent management. Public machines are available at /servers; disabling retains settings.",
     "retry": "Retry",
     "monitorDomains": "Monitor page domains",
     "agentDomains": "Server page domains",
@@ -2153,7 +2153,8 @@
       "subscription_sync_failed": "The source could not be read. Check the URL and retry.",
       "subscription_preview_failed": "The source could not be read. Check the URL and retry.",
       "subscription_redirect_invalid": "The source could not be read. Check the URL and retry.",
-      "subscription_config_unavailable": "This item no longer exists. Return to the subscription list."
+      "subscription_config_unavailable": "This item no longer exists. Return to the subscription list.",
+      "subscription_repository_exists": "A repository with this URL already exists."
     },
     "changed": {
       "requests": "Requests",
@@ -2286,7 +2287,21 @@
     "toastApplied": "New configuration applied",
     "toastRefreshed": "Library refreshed, {count} configurations",
     "toastConfigRemoved": "Local configuration removed",
-    "toastFileLoaded": "Loaded {name}"
+    "toastFileLoaded": "Loaded {name}",
+    "repositories": "Repositories",
+    "manageRepositories": "Manage repositories",
+    "close": "Close",
+    "repositoryHint": "Add up to 8 HTTPS catalog.json URLs. Removing a repository keeps existing subscriptions.",
+    "repositoryName": "Repository name",
+    "repositoryUrl": "Catalog URL",
+    "addRepository": "Add repository",
+    "removeRepository": "Remove",
+    "removeRepositoryNamed": "Remove repository {name}",
+    "removeRepositoryHint": "Remove this repository? Existing subscriptions and their saved configurations are kept.",
+    "repositoryStale": "Repository refresh failed; showing cached entries.",
+    "thirdParty": "Third party",
+    "colReading": "Reading",
+    "sourceAvailabilityColumn": "Source availability"
   },
   "notificationPolicy": {
     "mode": "Notification mode",

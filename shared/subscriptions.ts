@@ -299,10 +299,22 @@ export interface SubscriptionCatalogEntry {
   capabilities: string[];
   verifiedAt: string | null;
   limitations: string[];
-  origin: 'official' | 'local';
+  origin: 'official' | 'local' | 'third-party';
+  repositoryId?: string;
+  repositoryName?: string;
+  sourceUrl?: string;
   installedCount?: number;
   minimumAppVersion?: string;
   versions?: { version: string; path: string }[];
+}
+
+export interface SubscriptionRepository {
+  id: string;
+  name: string;
+  url: string;
+  fetchedAt: number | null;
+  stale: boolean;
+  error: string | null;
 }
 
 export interface SubscriptionPreview {

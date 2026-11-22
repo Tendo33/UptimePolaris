@@ -8,19 +8,16 @@ import useSWR from 'swr';
 import { useTranslations } from 'use-intl';
 import type { SubscriptionConfig, SubscriptionDescriptor, SubscriptionPreview } from '../../../../shared/subscriptions';
 import { validateSubscriptionDescriptor } from '../../../../shared/subscription-validation';
-import { AdminPage } from '../layout/AdminPage';
-import { subscriptionsApi, useSubscription } from './api';
-import { DetailTabs, Failure, FieldGroup, Loading, Note, ParameterFields, Status, Tag, useDraftWarning, useSubscriptionError } from './Parts';
+import { subscriptionsApi } from './api';
+import { Failure, FieldGroup, Loading, Note, ParameterFields, Status, Tag, useDraftWarning, useSubscriptionError } from './Parts';
 
-export function SubscriptionConfigEditor({ id }: { id: string }) {
-  const t = useTranslations('admin.subscriptions'), subscription = useSubscription(id);
+export function SubscriptionConfigEditor({ id, onSaved }: { id: string; onSaved: () => Promise<void> }) {
   const resource = useSWR(['console:subscription-config', id], () => subscriptionsApi.config(id), { shouldRetryOnError: false, revalidateOnFocus: false });
   return (
-    <AdminPage title={subscription.data?.subscription.name || t('config')} description={t('configDescription')} back={{ href: `/admin/subscriptions/${id}`, label: subscription.data?.subscription.name || t('mine') }}>
-      <DetailTabs id={id} active="config" />
+    <>
       <Failure error={resource.error} retry={() => void resource.mutate()} />
-      {!resource.data && !resource.error ? <Loading /> : resource.data ? <Editor key={resource.data.revision} id={id} config={resource.data.config} revision={resource.data.revision} onSaved={async () => { await Promise.all([resource.mutate(), subscription.mutate()]); }} /> : null}
-    </AdminPage>
+      {!resource.data && !resource.error ? <Loading /> : resource.data ? <Editor key={resource.data.revision} id={id} config={resource.data.config} revision={resource.data.revision} onSaved={async () => { await Promise.all([resource.mutate(), onSaved()]); }} /> : null}
+    </>
   );
 }
 
@@ -71,7 +68,7 @@ function Editor({ id, config, revision, onSaved }: { id: string; config: Subscri
       </section>
 
       {update ? (
-        <Note tone={update.conflict ? 'warn' : 'info'}>
+        <Note tone={update.conflict ? 'warn' : 'info'} align="center">
           <div className="flex flex-wrap items-center gap-3">
             <span className="flex-1">{t(update.conflict ? 'versionConflict' : update.changed ? 'updateAvailable' : 'upToDate', { version: update.candidate.version })}</span>
             {update.changed ? <Button size="sm" variant="flat" startContent={<GitCompare size={14} />} onPress={() => { setText(JSON.stringify(update.candidate, null, 2)); setPreview(undefined); }}>{t('compareUpdate')}</Button> : null}

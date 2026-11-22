@@ -633,7 +633,7 @@
     "groupFeatures": "Fonctions facultatives",
     "groupFeaturesDesc": "Activez les fonctions nécessaires. Leur désactivation conserve les réglages.",
     "agentManagement": "Gestion des Agents",
-    "agentManagementHint": "Afficher la gestion des Agents dans la console. Les rapports existants, les vérifications et la visibilité publique restent inchangés."
+    "agentManagementHint": "La gestion des Agents apparaît lorsque la page des machines est activée. La désactivation conserve les réglages et ne coupe pas les rapports ni les vérifications existants."
   },
   "toast": {
     "saved": "Enregistré",
@@ -1005,9 +1005,9 @@
     "configConflict": "La configuration de cet agent a changé. Rechargez la dernière configuration pour continuer.",
     "reloadConfig": "Abandonner le brouillon et recharger",
     "deleteInUse": "Supprimez ou modifiez les moniteurs utilisant cette machine avant de la supprimer.",
-    "featureDisabled": "La gestion des Agents est désactivée",
-    "enableFeature": "Activer la gestion des Agents",
-    "openFeatureSettings": "Réglages des fonctions"
+    "featureDisabled": "La page des machines est désactivée",
+    "enableFeature": "Activer la page des machines",
+    "openFeatureSettings": "Réglages de présentation"
   },
   "quick": {
     "lastPush": "Dernier signal",
@@ -1553,7 +1553,7 @@
     "locale": "Langue",
     "auto": "Automatique",
     "historyHours": "Période d’historique (heures)",
-    "enableAgentsHint": "Afficher les ressources et l’état des machines publiques sur /servers, avec un domaine distinct en option. La désactivation conserve les réglages.",
+    "enableAgentsHint": "Activer la page des machines et la gestion des Agents. Les machines publiques sont accessibles sur /servers ; la désactivation conserve les réglages.",
     "retry": "Réessayer",
     "monitorDomains": "Domaines de la page de surveillance",
     "agentDomains": "Domaines de la page des serveurs",
@@ -2153,7 +2153,8 @@
       "subscription_sync_failed": "Impossible de lire la source. Vérifiez l’URL et réessayez.",
       "subscription_preview_failed": "Impossible de lire la source. Vérifiez l’URL et réessayez.",
       "subscription_redirect_invalid": "Impossible de lire la source. Vérifiez l’URL et réessayez.",
-      "subscription_config_unavailable": "Cet élément n’existe plus. Revenez à la liste des abonnements."
+      "subscription_config_unavailable": "Cet élément n’existe plus. Revenez à la liste des abonnements.",
+      "subscription_repository_exists": "Un dépôt avec cette URL existe déjà."
     },
     "changed": {
       "requests": "Requêtes",
@@ -2286,7 +2287,21 @@
     "toastApplied": "Nouvelle configuration appliquée",
     "toastRefreshed": "Catalogue actualisé, {count} configurations",
     "toastConfigRemoved": "Configuration locale retirée",
-    "toastFileLoaded": "{name} chargé"
+    "toastFileLoaded": "{name} chargé",
+    "repositories": "Dépôts tiers",
+    "manageRepositories": "Gérer les dépôts",
+    "close": "Fermer",
+    "repositoryHint": "Ajoutez jusqu’à 8 URL HTTPS catalog.json. Retirer un dépôt conserve les abonnements existants.",
+    "repositoryName": "Nom du dépôt",
+    "repositoryUrl": "URL du catalogue",
+    "addRepository": "Ajouter un dépôt",
+    "removeRepository": "Retirer",
+    "removeRepositoryNamed": "Retirer le dépôt {name}",
+    "removeRepositoryHint": "Retirer ce dépôt ? Les abonnements et configurations existants seront conservés.",
+    "repositoryStale": "Actualisation impossible ; entrées en cache affichées.",
+    "thirdParty": "Tiers",
+    "colReading": "Mesure",
+    "sourceAvailabilityColumn": "Disponibilité source"
   },
   "notificationPolicy": {
     "mode": "Mode de notification",

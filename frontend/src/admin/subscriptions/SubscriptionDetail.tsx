@@ -6,7 +6,7 @@ import { StatusDot, TONE_TEXT } from '@/components/ui/StatusDot';
 import { useTimeAgo } from '@/hooks/useTimeAgo';
 import { Button, Checkbox, DrawerBody, DrawerContent, DrawerFooter, DrawerHeader, DropdownItem, DropdownMenu, DropdownSection, DropdownTrigger, Input, ModalBody, ModalContent, ModalFooter, ModalHeader, SelectItem, Spinner, Switch, Tooltip } from '@heroui/react';
 import clsx from 'clsx';
-import { Archive, ArchiveRestore, ArrowUpRight, Bell, BellOff, Bot, CircleCheck, Clock, Download, Eye, EyeOff, Globe, History, Layers, MoreHorizontal, Pause, Pencil, Play, Plus, RefreshCw, Search, Settings2, Trash2, X } from 'lucide-react';
+import { Archive, ArchiveRestore, ArrowUpRight, Bell, BellOff, Bot, CircleCheck, Clock, Download, Eye, EyeOff, Globe, History, Layers, LockKeyhole, MoreHorizontal, Pause, Pencil, Play, Plus, RefreshCw, Search, Settings2, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import useSWR from 'swr';
@@ -19,10 +19,10 @@ import { groupsApi } from '../groups/api';
 import { AdminPage } from '../layout/AdminPage';
 import { NotificationPolicyControl } from '../notifications/NotificationPolicyControl';
 import { subscriptionsApi, useSubscription, type Run } from './api';
+import { SubscriptionConfigEditor } from './SubscriptionConfigEditor';
 import { DetailTabs, Failure, FieldGroup, IntervalPresets, Loading, Note, Pagination, SettingRow, Status, subscriptionHealth, Tag, Timestamp, useDraftWarning, useDuration, useSubscriptionError } from './Parts';
 
 const SCOPES = ['selected', 'discovered', 'removed', 'all'] as const;
-const GRID = 'grid grid-cols-[1.25rem_minmax(0,1fr)_auto] gap-x-3 gap-y-2 lg:grid-cols-[1.25rem_minmax(0,1.3fr)_minmax(0,0.9fr)_minmax(8rem,14rem)_auto_2.5rem] lg:items-center lg:gap-x-5';
 
 export function SubscriptionDetail({ id }: { id: string }) {
   const describe = useSubscriptionError(), t = useTranslations('admin.subscriptions'), [search, setSearch] = useSearchParams();
@@ -30,7 +30,8 @@ export function SubscriptionDetail({ id }: { id: string }) {
   const ago = useTimeAgo();
   const duration = useDuration();
   const resource = useSubscription(id), subscription = resource.data?.subscription;
-  const tab = search.get('tab') || 'items';
+  const requestedTab = search.get('tab');
+  const tab = requestedTab && ['items', 'runs', 'config', 'settings'].includes(requestedTab) ? requestedTab : 'items';
   const [activeRunId, setActiveRunId] = useState<string>();
   const activeRun = useSWR(activeRunId ? ['console:subscription-run', activeRunId] : null, () => subscriptionsApi.run(activeRunId!), { refreshInterval: data => data?.run.state === 'running' ? 1000 : 0, shouldRetryOnError: false });
   const itemQuery = new URLSearchParams(search); itemQuery.delete('tab'); if (!itemQuery.has('state')) itemQuery.set('state', 'selected');
@@ -174,15 +175,10 @@ export function SubscriptionDetail({ id }: { id: string }) {
                     <EmptyState art={<SearchArt />} title={t('noItems')} hint={search.get('state') === 'discovered' ? undefined : t('noItemsHint')} action={search.get('q') ? <Button size="sm" variant="bordered" onPress={() => change('q', '')}>{t('clearFilters')}</Button> : undefined} />
                   ) : (
                     <>
-                      <div aria-hidden="true" className={clsx(GRID, 'hidden border-b border-[var(--polaris-line-soft)] px-5 py-2 text-[12px] text-[var(--polaris-ink-3)] lg:grid')}>
-                        <span />
-                        <span>{t('colName')}</span>
-                        <span>{t('colStatus')}</span>
-                        <span>{t('colRecent')}</span>
-                        <span>{t('colVisibility')}</span>
-                        <span />
-                      </div>
-                      <ul className="divide-y divide-[var(--polaris-line-soft)]">
+                      <div className="polaris-scroll-x overflow-x-auto">
+                      <table className="polaris-table min-w-[34rem] table-fixed text-[13px]">
+                        <thead><tr><th className="w-10 px-3" /><th className="pl-4">{t('colName')}</th><th className="w-28 text-right sm:w-[15%]">{t('colReading')}</th><th className="hidden w-[15%] text-right sm:table-cell">{t('sourceAvailabilityColumn')}</th><th className="hidden w-[30%] xl:table-cell">{t('colRecent')}</th><th className="w-14 pr-4"><span className="sr-only">{t('colActions')}</span></th></tr></thead>
+                        <tbody>
                         {rows.map(item => (
                           <ItemRow
                             key={item.id}
@@ -194,7 +190,9 @@ export function SubscriptionDetail({ id }: { id: string }) {
                             onOpen={() => setEditing(item)}
                           />
                         ))}
-                      </ul>
+                        </tbody>
+                      </table>
+                      </div>
                     </>
                   )}
                 </div>
@@ -212,7 +210,7 @@ export function SubscriptionDetail({ id }: { id: string }) {
                 </ol>
               )}
             </>
-          ) : <SubscriptionSettings key={subscription.id} subscription={subscription} onSaved={reload} />}
+          ) : tab === 'config' ? <SubscriptionConfigEditor id={id} onSaved={reload} /> : <SubscriptionSettings key={subscription.id} subscription={subscription} onSaved={reload} />}
 
           {editing ? <ItemDrawer key={editing.id} item={editing} onClose={() => setEditing(undefined)} onSaved={async () => { setEditing(undefined); await reload(); }} /> : null}
         </>
@@ -232,43 +230,29 @@ function ItemRow({ item, subscription, selected, locked, onSelect, onOpen }: { i
   const Icon = item.category === 'model' ? Bot : Globe;
   const shownPublic = item.isPublic && subscription.isPublic;
   return (
-    <li className={clsx('px-4 py-3 transition-colors sm:px-5', selected ? 'bg-[var(--polaris-hover)]' : 'hover:bg-[var(--polaris-hover)]', (!item.selected || item.removedAt) && 'opacity-70')}>
-      <div className={GRID}>
-        <div className="col-start-1 row-start-1 flex items-center">
-          <Checkbox size="sm" aria-label={t('selectItem', { name })} isSelected={selected} isDisabled={locked} onValueChange={onSelect} />
-        </div>
-        <div className="col-start-2 row-start-1 flex min-w-0 items-center gap-3">
+    <tr className={clsx('group cursor-pointer', (!item.selected || item.removedAt) && 'opacity-70')} onClick={event => { if (!(event.target as HTMLElement).closest('button, a, input, label, [role="checkbox"]')) onOpen(); }}>
+      <td className="px-3"><Checkbox size="sm" aria-label={t('selectItem', { name })} isSelected={selected} isDisabled={locked} onValueChange={onSelect} /></td>
+      <td className="min-w-0 pl-4">
+        <div className="flex min-w-0 items-center gap-3">
           <GlyphTile badge={tone}><Icon size={17} /></GlyphTile>
           <div className="min-w-0 flex-1">
-            <button type="button" onClick={onOpen} className="block max-w-full truncate text-left text-[14px] font-medium text-[var(--polaris-ink)] underline-offset-4 hover:underline" title={item.localName ? `${item.localName} · ${item.name}` : item.name}>{name}</button>
-            <p className="mt-0.5 truncate text-[12px] text-[var(--polaris-ink-3)]">
-              {item.modelId ? <span className="font-mono text-[11.5px]">{item.modelId}</span> : item.group || <span className="font-mono text-[11.5px] text-[var(--polaris-ink-4)]">{item.sourceItemId}</span>}
-            </p>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <button type="button" onClick={onOpen} className="min-w-0 max-w-full truncate text-left text-[13.5px] font-medium text-[var(--polaris-ink)] hover:underline" title={name}>{name}</button>
+              {!shownPublic ? <span title={t(item.isPublic ? 'publicBlocked' : 'private')} aria-label={t('private')} role="img" className="text-[var(--polaris-ink-3)]"><LockKeyhole size={13} /></span> : null}
+              {item.muted ? <span title={t('muted')}><BellOff size={13} /></span> : null}
+              {!item.selected ? <Tag>{t(item.removedAt ? 'removed' : 'discovered')}</Tag> : null}
+            </div>
+            <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--polaris-ink-3)]">
+              <span className={clsx('shrink-0 font-medium', tone === 'idle' ? 'text-[var(--polaris-ink-3)]' : TONE_TEXT[tone])}>{t(`status.${state}`)}</span><span aria-hidden="true">·</span><span className="min-w-0 flex-1 truncate" title={item.modelId || item.url || item.group || item.sourceItemId}>{item.modelId || item.url || item.group || item.sourceItemId}</span>
+            </div>
           </div>
         </div>
-        <div className="col-span-2 col-start-2 row-start-2 min-w-0 lg:col-span-1 lg:col-start-3 lg:row-start-1">
-          <p className={clsx('truncate text-[13px] font-medium', tone === 'idle' ? 'text-[var(--polaris-ink-2)]' : TONE_TEXT[tone])}>{t(`status.${state}`)}</p>
-          <p className="mt-0.5 flex flex-wrap gap-x-1.5 text-[12px] text-[var(--polaris-ink-3)]">
-            {at ? <span title={format.dateTime(new Date(at * 1000), { dateStyle: 'medium', timeStyle: 'medium' })}>{ago(at)}</span> : <span>{t('never')}</span>}
-            {item.observation?.latencyMs != null && tone !== 'down' ? <span className="polaris-num">· {Math.round(item.observation.latencyMs)} ms</span> : null}
-            {item.availability ? <span className="polaris-num">· {format.number(item.availability.value, { maximumFractionDigits: 2 })}%</span> : null}
-          </p>
-        </div>
-        <div className="col-span-2 col-start-2 row-start-3 min-w-0 lg:col-span-1 lg:col-start-4 lg:row-start-1">
-          <ObservationRail points={item.recent} max={24} height="h-5" />
-        </div>
-        <div className="col-span-2 col-start-2 row-start-4 flex flex-wrap items-center gap-1 lg:col-span-1 lg:col-start-5 lg:row-start-1">
-          {!item.selected ? <Tag tone="primary">{t(item.removedAt ? 'removed' : 'discovered')}</Tag> : null}
-          <Tag tone={shownPublic ? 'success' : 'default'} title={item.isPublic && !subscription.isPublic ? t('publicBlocked') : undefined}>{shownPublic ? <Eye size={10} /> : <EyeOff size={10} />}{t(shownPublic ? 'public' : 'private')}</Tag>
-          {item.muted ? <Tag><BellOff size={10} />{t('muted')}</Tag> : null}
-        </div>
-        <div className="col-start-3 row-start-1 flex items-center justify-end lg:col-start-6">
-          <Tooltip content={t('editItem')} delay={300} closeDelay={0}>
-            <Button size="sm" isIconOnly variant="light" aria-label={t('editItem')} onPress={onOpen}><Pencil size={14} /></Button>
-          </Tooltip>
-        </div>
-      </div>
-    </li>
+      </td>
+      <td className="text-right whitespace-nowrap"><span className="polaris-num text-[13px] font-medium">{item.freshness === 'current' && tone !== 'down' && item.observation?.latencyMs != null ? `${Math.round(item.observation.latencyMs)} ms` : '—'}</span><span className="block text-[12px] text-[var(--polaris-ink-3)]">{at ? ago(at) : t('never')}</span></td>
+      <td className="hidden text-right whitespace-nowrap sm:table-cell"><span className="polaris-num text-[13px]" title={item.availability ? t('sourceAvailability', { hours: item.availability.windowSec / 3600, value: item.availability.value }) : undefined}>{item.availability ? `${format.number(item.availability.value, { maximumFractionDigits: 2 })}%` : '—'}</span></td>
+      <td className="hidden xl:table-cell"><ObservationRail points={item.recent} max={40} height="h-5" /></td>
+      <td className="pr-4 text-right"><Button size="sm" isIconOnly variant="light" aria-label={t('editItem')} onPress={onOpen}><Pencil size={14} /></Button></td>
+    </tr>
   );
 }
 
@@ -282,17 +266,17 @@ function RunRow({ run }: { run: Run }) {
   const tone = stateTone(state);
   const seconds = run.finishedAt ? Math.max(0, run.finishedAt - run.startedAt) : null;
   return (
-    <li className="flex gap-3 px-5 py-3.5">
-      <span className="mt-1.5"><StatusDot tone={tone} size={8} pulse={tone === 'pending'} /></span>
-      <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5">
-          <span className={clsx('text-[13px] font-medium', tone === 'idle' ? 'text-[var(--polaris-ink-2)]' : TONE_TEXT[tone])}>{statusText.has(state) ? statusText(state) : state}</span>
-          <span className="text-[12.5px] text-[var(--polaris-ink-2)]" title={format.dateTime(new Date(run.startedAt * 1000), { dateStyle: 'medium', timeStyle: 'medium' })}>{ago(run.startedAt)}</span>
-          {seconds !== null ? <span className="polaris-num text-[12px] text-[var(--polaris-ink-4)]">{t('runDuration', { seconds: format.number(seconds, { maximumFractionDigits: 1 }) })}</span> : null}
-          <span className="polaris-num ml-auto text-[12px] text-[var(--polaris-ink-3)]">{t('runCounts', { requests: run.requests, items: run.updatedItems })}</span>
-        </div>
-        {run.error ? <p className="mt-1 break-words text-[12.5px] text-danger-600">{describe(run.error)}</p> : null}
+    <li className="px-5 py-3.5">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 leading-5">
+        <span className={clsx('inline-flex items-center gap-3 text-[13px] font-medium leading-5', tone === 'idle' ? 'text-[var(--polaris-ink-2)]' : TONE_TEXT[tone])}>
+          <StatusDot tone={tone} size={8} pulse={tone === 'pending'} />
+          {statusText.has(state) ? statusText(state) : state}
+        </span>
+        <span className="text-[12.5px] leading-5 text-[var(--polaris-ink-2)]" title={format.dateTime(new Date(run.startedAt * 1000), { dateStyle: 'medium', timeStyle: 'medium' })}>{ago(run.startedAt)}</span>
+        {seconds !== null ? <span className="polaris-num text-[12px] leading-5 text-[var(--polaris-ink-4)]">{t('runDuration', { seconds: format.number(seconds, { maximumFractionDigits: 1 }) })}</span> : null}
+        <span className="polaris-num ml-auto text-[12px] leading-5 text-[var(--polaris-ink-3)]">{t('runCounts', { requests: run.requests, items: run.updatedItems })}</span>
       </div>
+      {run.error ? <p className="mt-1 break-words pl-5 text-[12.5px] leading-5 text-danger-600">{describe(run.error)}</p> : null}
     </li>
   );
 }

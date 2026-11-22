@@ -23,7 +23,6 @@ import { AccountAvatarUpload } from './AccountAvatarUpload';
 import { DatabaseMigration } from './DatabaseMigration';
 import { PresentationPanel } from './PresentationPanel';
 import { MaintenanceStatus } from './MaintenanceStatus';
-import { CheckQueuePanel } from './CheckQueuePanel';
 
 /** Keep this rule aligned with USERNAME_RE in src/lib/auth/service.ts. / 此规则须与 src/lib/auth/service.ts 中的 USERNAME_RE 一致。 */
 const USERNAME_RE = /^[a-z0-9._-]{2,32}$/;
@@ -235,7 +234,6 @@ export function SettingsPage() {
                     disabled={busy !== null}
                     onPress={() => void run('sync')}
                   />
-                  <CheckQueuePanel />
                 </>
               );
             }

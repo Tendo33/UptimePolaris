@@ -286,21 +286,8 @@ func (a *App) subscriptionCatalog(ctx context.Context, refresh bool) (Object, er
 	remaining := 4
 	result, fetchErr := a.subFetchJSON(ctx, target, "GET", http.Header{"Accept": []string{"application/json"}}, nil, &remaining, 1048576)
 	if fetchErr == nil {
-		body := object(result["value"])
-		entries := array(body["entries"])
-		valid := integer(body, "schemaVersion") == 1 && entries != nil && len(entries) <= 500
-		ids := map[string]bool{}
-		for _, raw := range entries {
-			entry := object(raw)
-			id := str(entry, "id")
-			path := str(entry, "path")
-			if id == "" || ids[id] || str(entry, "name") == "" || str(entry, "version") == "" || strings.Contains(path, "..") || !(strings.HasPrefix(path, "templates/") || strings.HasPrefix(path, "sites/")) || !strings.HasSuffix(path, ".json") || strings.ContainsAny(path, "\\?#:") {
-				valid = false
-				break
-			}
-			ids[id] = true
-			entry["origin"] = "official"
-		}
+		entries, parseErr := parseSubscriptionCatalog(object(result["value"]))
+		valid := parseErr == nil
 		if valid {
 			cached = Object{"id": "official", "entries": entries, "fetchedAt": now, "stale": false, "error": nil}
 			if err := a.store.put(ctx, "subscription_catalog", "official", cached); err != nil {
@@ -318,6 +305,35 @@ func (a *App) subscriptionCatalog(ctx context.Context, refresh bool) (Object, er
 }
 
 func (a *App) subscriptionTemplate(ctx context.Context, id string) (Object, string, error) {
+	if strings.HasPrefix(id, "repo-") && strings.Contains(id, ":") {
+		parts := strings.Split(id, ":")
+		if len(parts) != 2 {
+			return nil, "", failure("not_found", 404)
+		}
+		repository, err := a.store.get(ctx, "subscription_repository", parts[0])
+		if err != nil {
+			return nil, "", err
+		}
+		if repository == nil {
+			return nil, "", failure("not_found", 404)
+		}
+		for _, raw := range repositoryEntries(repository) {
+			entry := object(raw)
+			if entry["id"] != id {
+				continue
+			}
+			address := str(entry, "sourceUrl")
+			descriptor, err := a.cachedSubscriptionDescriptor(ctx, address, false)
+			if err != nil {
+				return nil, "", err
+			}
+			if descriptor["id"] != parts[1] || descriptor["version"] != entry["version"] {
+				return nil, "", subscriptionError("version_conflict")
+			}
+			return descriptor, address, nil
+		}
+		return nil, "", failure("not_found", 404)
+	}
 	if strings.HasPrefix(id, "local-") {
 		config, err := a.store.get(ctx, "subscription_library", id)
 		if err != nil {

@@ -19,6 +19,8 @@ import { newSubscriptionItem, runSubscription, subscriptionRunView, type Subscri
 import { subscriptionHealth, type SubscriptionSummary } from '../../../../../shared/subscriptions';
 import { subscriptionIcon } from './icon';
 import { readSetting } from '../settings/store';
+import { subscriptionRepositoryUrl } from '../../../../../shared/subscription-catalog';
+import { repositoryEntries, repositoryView, refreshSubscriptionRepository, subscriptionRepositories, type StoredSubscriptionRepository } from './repositories';
 
 export const subscriptionRoutes = new Hono<{ Bindings: Env }>();
 subscriptionRoutes.use('/api/admin/subscription*', bodyLimit({ maxSize: 300000, onError: c => c.json({ error: 'subscription_limit_exceeded' }, 413) }));
@@ -76,9 +78,32 @@ subscriptionRoutes.get('/api/admin/subscription-catalog', async c => {
   const entries = catalog.entries.map(entry => ({ ...entry, installedCount: installed.filter(config => config.origin === 'official' && config.descriptor.id === entry.id).length }));
   const local = await store.documents<{ id: string; descriptor: SubscriptionDescriptor; sourceUrl: string | null; fetchedAt: number }>('library', undefined, 500);
   const imported: SubscriptionCatalogEntry[] = local.map(row => ({ id: row.id, name: row.descriptor.name, description: row.descriptor.description, version: row.descriptor.version, categories: row.descriptor.categories, kind: 'template', path: '', capabilities: row.descriptor.capabilities, verifiedAt: null, limitations: [], origin: 'local', installedCount: installed.filter(config => config.origin === 'local' && config.descriptor.id === row.descriptor.id && config.sourceUrl === row.sourceUrl).length }));
-  return c.json({ ...catalog, entries: [...entries, ...imported] });
+  const repositories = await subscriptionRepositories(store);
+  const external = repositories.flatMap(repositoryEntries).map(entry => ({ ...entry, installedCount: installed.filter(config => config.sourceUrl === entry.sourceUrl).length }));
+  return c.json({ ...catalog, entries: [...entries, ...external, ...imported], repositories: repositories.map(repositoryView) });
 });
-subscriptionRoutes.post('/api/admin/subscription-catalog/refresh', async c => c.json(await subscriptionCatalog(new SubscriptionStore(getDB(c.env)), true)));
+subscriptionRoutes.post('/api/admin/subscription-catalog/refresh', async c => {
+  const store = new SubscriptionStore(getDB(c.env));
+  const [catalog, repositories] = await Promise.all([subscriptionCatalog(store, true), subscriptionRepositories(store, true)]);
+  return c.json({ ...catalog, repositories: repositories.map(repositoryView) });
+});
+subscriptionRoutes.post('/api/admin/subscription-repositories', async c => {
+  const input = object(await c.req.json()), store = new SubscriptionStore(getDB(c.env));
+  const rows = await store.documents<StoredSubscriptionRepository>('repository', undefined, 8);
+  const url = subscriptionRepositoryUrl(text(input.url, 2048));
+  if (rows.some(row => row.url === url)) throw new SubscriptionError('subscription_repository_exists', 409);
+  if (rows.length >= 8) throw new SubscriptionError('subscription_limit_exceeded', 413);
+  const repository = await refreshSubscriptionRepository(store, { id: `repo-${crypto.randomUUID().replaceAll('-', '')}`, name: text(input.name), url, entries: [], fetchedAt: null, stale: false, error: null });
+  return c.json({ repository: repositoryView(repository) }, 201);
+});
+subscriptionRoutes.delete('/api/admin/subscription-repositories/:id', async c => {
+  const id = c.req.param('id');
+  if (!/^repo-[a-f0-9]{32}$/.test(id)) throw new SubscriptionError('invalid_request');
+  const store = new SubscriptionStore(getDB(c.env));
+  await store.putDocument('repository', id, {});
+  await store.db.execute(store.sql("DELETE FROM subscription_documents WHERE kind='repository' AND id=?"), [id]);
+  return c.json({ ok: true });
+});
 subscriptionRoutes.get('/api/admin/subscription-catalog/:templateId', async c => c.json(await catalogDescriptor(new SubscriptionStore(getDB(c.env)), c.req.param('templateId'))));
 
 subscriptionRoutes.post('/api/admin/subscription-configs/import', async c => {
@@ -99,7 +124,7 @@ subscriptionRoutes.delete('/api/admin/subscription-configs/:configId', async c =
 });
 subscriptionRoutes.post('/api/admin/subscription-configs/preview', async c => {
   const body = object(await c.req.json()), store = new SubscriptionStore(getDB(c.env));
-  const imported = body.templateId ? await catalogDescriptor(store, text(body.templateId, 64)) : { descriptor: validateSubscriptionDescriptor(body.descriptor), sourceUrl: typeof body.sourceUrl === 'string' ? body.sourceUrl : null, origin: 'local' as const };
+  const imported = body.templateId ? await catalogDescriptor(store, text(body.templateId, 128)) : { descriptor: validateSubscriptionDescriptor(body.descriptor), sourceUrl: typeof body.sourceUrl === 'string' ? body.sourceUrl : null, origin: 'local' as const };
   const preview = await createSubscriptionPreview(store, c.env, { ...imported, parameters: body.parameters ?? {} }, await owner(c), undefined, work => c.executionCtx.waitUntil(work));
   return c.json({ preview: previewView(preview), previewId: preview.id }, 202);
 });

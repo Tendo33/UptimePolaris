@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { useTranslations } from 'use-intl';
+import { ApiError } from '@/api/errors';
 import { StatusPageRoute } from './StatusPageRoute';
 import { RouteError, RouteLoading } from './RouteStates';
 import { PresentationViewContext } from '@/components/context/PresentationViewContext';
@@ -12,7 +12,6 @@ const PublicServersPage = lazy(() => import('@/components/servers/PublicServersP
 
 export function PublicPageRoute() {
   const { data: config, error, refresh, isValidating } = usePublicConfig();
-  const t = useTranslations('presentation');
   const { setTheme } = useTheme();
   const { applyDefaultLocale } = useLocale();
   useEffect(() => {
@@ -22,7 +21,7 @@ export function PublicPageRoute() {
     void applyDefaultLocale(config.presentation.locale, controller.signal).catch(() => undefined);
     return () => controller.abort();
   }, [config?.presentation.kind, config?.presentation.colorMode, config?.presentation.locale, setTheme, applyDefaultLocale]);
-  if (!config) return error ? <RouteError code="render" error={error} onRetry={() => { void refresh().catch(() => undefined); }} /> : <RouteLoading />;
-  if (!config.presentation.configured || !config.presentation.enabled) return <main className="mx-auto max-w-3xl px-6 py-20"><h1 className="text-2xl font-semibold">{t(!config.presentation.configured ? 'unconfigured' : 'disabled')}</h1><p className="mt-3 text-default-500">{t(!config.presentation.configured ? 'unconfiguredHint' : 'disabledHint')}</p></main>;
+  if (!config) return error instanceof ApiError && error.status === 404 ? <RouteError code="notFound" /> : error ? <RouteError code="render" error={error} onRetry={() => { void refresh().catch(() => undefined); }} /> : <RouteLoading />;
+  if (!config.presentation.configured || !config.presentation.enabled) return <RouteError code="notFound" />;
   return <PresentationViewContext.Provider value={config.presentation}><Suspense fallback={<RouteLoading />}>{config.presentation.kind === 'agent' ? <PublicServersPage config={config} configError={error} configRefreshing={isValidating} onRefreshConfig={refresh} /> : <StatusPageRoute />}</Suspense></PresentationViewContext.Provider>;
 }

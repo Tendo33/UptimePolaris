@@ -633,7 +633,7 @@
     "groupFeatures": "Recursos opcionais",
     "groupFeaturesDesc": "Ative os recursos necessários. Desativá-los mantém as configurações.",
     "agentManagement": "Gerenciamento de Agents",
-    "agentManagementHint": "Mostrar o gerenciamento de Agents no painel. Os relatórios existentes, as verificações e a visibilidade pública não mudam."
+    "agentManagementHint": "O gerenciamento de Agents aparece quando a página de máquinas está ativada. Ao desativá-la, as configurações são mantidas e os relatórios e verificações existentes continuam."
   },
   "toast": {
     "saved": "Salvo",
@@ -1005,9 +1005,9 @@
     "configConflict": "A configuração deste agente foi alterada. Carregue a configuração mais recente para continuar.",
     "reloadConfig": "Descartar rascunho e recarregar",
     "deleteInUse": "Remova ou altere os monitores que usam esta máquina antes de excluí-la.",
-    "featureDisabled": "O gerenciamento de Agents está desativado",
-    "enableFeature": "Ativar gerenciamento de Agents",
-    "openFeatureSettings": "Configurações de recursos"
+    "featureDisabled": "A página de máquinas está desativada",
+    "enableFeature": "Ativar página de máquinas",
+    "openFeatureSettings": "Configurações de apresentação"
   },
   "quick": {
     "lastPush": "Último sinal",
@@ -1553,7 +1553,7 @@
     "locale": "Idioma",
     "auto": "Automático",
     "historyHours": "Período do histórico (horas)",
-    "enableAgentsHint": "Exibir recursos e estado das máquinas públicas em /servers, com domínio separado opcional. Desativar mantém as configurações.",
+    "enableAgentsHint": "Ativar a página de máquinas e o gerenciamento de Agents. Máquinas públicas ficam em /servers; desativar mantém as configurações.",
     "retry": "Tentar novamente",
     "monitorDomains": "Domínios da página de monitores",
     "agentDomains": "Domínios da página de servidores",
@@ -2153,7 +2153,8 @@
       "subscription_sync_failed": "Não foi possível ler a fonte. Confira a URL e tente novamente.",
       "subscription_preview_failed": "Não foi possível ler a fonte. Confira a URL e tente novamente.",
       "subscription_redirect_invalid": "Não foi possível ler a fonte. Confira a URL e tente novamente.",
-      "subscription_config_unavailable": "Este item não existe mais. Volte à lista de assinaturas."
+      "subscription_config_unavailable": "Este item não existe mais. Volte à lista de assinaturas.",
+      "subscription_repository_exists": "Já existe um repositório com esta URL."
     },
     "changed": {
       "requests": "Requisições",
@@ -2286,7 +2287,21 @@
     "toastApplied": "Nova configuração aplicada",
     "toastRefreshed": "Catálogo atualizado, {count} configurações",
     "toastConfigRemoved": "Configuração local removida",
-    "toastFileLoaded": "{name} carregado"
+    "toastFileLoaded": "{name} carregado",
+    "repositories": "Repositórios externos",
+    "manageRepositories": "Gerenciar repositórios",
+    "close": "Fechar",
+    "repositoryHint": "Adicione até 8 URLs HTTPS catalog.json. Remover um repositório preserva as assinaturas existentes.",
+    "repositoryName": "Nome do repositório",
+    "repositoryUrl": "URL do catálogo",
+    "addRepository": "Adicionar repositório",
+    "removeRepository": "Remover",
+    "removeRepositoryNamed": "Remover repositório {name}",
+    "removeRepositoryHint": "Remover este repositório? As assinaturas e configurações existentes serão mantidas.",
+    "repositoryStale": "Falha ao atualizar; exibindo entradas em cache.",
+    "thirdParty": "Externo",
+    "colReading": "Leitura",
+    "sourceAvailabilityColumn": "Disponibilidade da origem"
   },
   "notificationPolicy": {
     "mode": "Modo de notificação",

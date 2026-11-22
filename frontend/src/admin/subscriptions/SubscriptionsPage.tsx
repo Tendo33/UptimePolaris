@@ -6,7 +6,7 @@ import { Button, Checkbox, DropdownItem, DropdownMenu, DropdownSection, Dropdown
 import clsx from 'clsx';
 import { Archive, ArchiveRestore, CircleAlert, CircleCheck, CircleDashed, Download, FileCode2, Layers, Link2, MoreHorizontal, Pause, Play, Plus, RefreshCw, Rss, Search, TriangleAlert, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
+import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router';
 import useSWR from 'swr';
 import { useFormatter, useTranslations } from 'use-intl';
 import type { Subscription } from '../../../../shared/subscriptions';
@@ -14,22 +14,54 @@ import { EmptyState } from '../components/ConsolePrimitives';
 import { SearchArt } from '../components/illustrations';
 import { StatBand, StatCell } from '../components/SummaryStats';
 import { AdminPage } from '../layout/AdminPage';
+import { usePresentation } from '../settings/presentation-api';
+import { AnimatePresence, motion, useIsPresent } from 'framer-motion';
+import { CONTENT_TRANSITION, NAV_TRANSITION } from '@/lib/motion';
+import { useReducedMotion } from '@/lib/useReducedMotion';
 import { subscriptionsApi } from './api';
-import { MonitorSources } from './MonitorSources';
-import { CategorySwitch, Failure, Loading, Pagination, Status, subscriptionHealth, SubscriptionTabs, Tag, useDuration } from './Parts';
-import { SubscriptionConfigEditor } from './SubscriptionConfigEditor';
+import { CategorySwitch, Failure, Loading, Pagination, Status, subscriptionHealth, SubscriptionTabs, SubscriptionContent, Tag, useDuration } from './Parts';
 import { SubscriptionCreate } from './SubscriptionCreate';
 import { SubscriptionDetail } from './SubscriptionDetail';
-import { SubscriptionLibrary } from './SubscriptionLibrary';
+import { SubscriptionLibrary, SubscriptionLibraryActions } from './SubscriptionLibrary';
+import { SubscriptionRepositories } from './SubscriptionRepositories';
 
 export function SubscriptionsPage() {
   const { id, templateId } = useParams();
-  const pathname = window.location.pathname;
+  const { pathname } = useLocation();
   if (pathname.endsWith('/new')) return <SubscriptionCreate />;
-  if (pathname.includes('/library')) return <SubscriptionLibrary templateId={templateId} />;
-  if (id && pathname.endsWith('/config')) return <SubscriptionConfigEditor id={id} />;
+  if (templateId) return <SubscriptionLibrary templateId={templateId} />;
   if (id) return <SubscriptionDetail key={id} id={id} />;
-  return <SubscriptionList />;
+  return <SubscriptionWorkspace />;
+}
+
+function SubscriptionWorkspace() {
+  const t = useTranslations('admin.subscriptions');
+  const library = useLocation().pathname.endsWith('/library');
+  const catalog = useSWR(library ? 'console:subscription-catalog' : null, subscriptionsApi.catalog, { shouldRetryOnError: false });
+  const [repositoriesOpen, setRepositoriesOpen] = useState(false);
+  const [busy, setBusy] = useState(false), [error, setError] = useState<unknown>();
+  const refresh = async () => {
+    setBusy(true); setError(undefined);
+    try { await catalog.mutate(await subscriptionsApi.refreshCatalog(), false); }
+    catch (cause) { setError(cause); }
+    finally { setBusy(false); }
+  };
+  return <AdminPage title={t(library ? 'library' : 'title')} description={t(library ? 'libraryDescription' : 'description')} actions={library
+    ? <SubscriptionLibraryActions busy={busy} onRefresh={() => void refresh()} onManage={() => setRepositoriesOpen(true)} />
+    : <SubscriptionListActions />}>
+    <SubscriptionTabs />
+    {library ? <Failure error={error} retry={() => void refresh()} /> : null}
+    {library ? <SubscriptionLibrary embedded /> : <SubscriptionList embedded />}
+    {library && repositoriesOpen ? <SubscriptionRepositories repositories={catalog.data?.repositories ?? []} onChanged={async () => { await catalog.mutate(); }} onClose={() => setRepositoriesOpen(false)} /> : null}
+  </AdminPage>;
+}
+
+function SubscriptionListActions() {
+  const t = useTranslations('admin.subscriptions');
+  return <>
+    <Button as={Link} to="/admin/subscriptions/new?source=link" variant="bordered" startContent={<Link2 size={15} />}>{t('importLink')}</Button>
+    <Button as={Link} to="/admin/subscriptions/new" color="primary" startContent={<Plus size={16} />}>{t('add')}</Button>
+  </>;
 }
 
 const REFRESH_MS = 30000;
@@ -43,14 +75,17 @@ type RowOp = 'pause' | 'resume' | 'archive' | 'restore';
 */
 const GRID = 'grid grid-cols-[1.25rem_minmax(0,1fr)_auto] gap-x-3 gap-y-2 lg:grid-cols-[1.25rem_minmax(0,1.5fr)_minmax(0,1fr)_minmax(0,1.1fr)_7rem_4.75rem] lg:items-center lg:gap-x-5';
 
-function SubscriptionList() {
+function SubscriptionList({ embedded = false }: { embedded?: boolean }) {
   const t = useTranslations('admin.subscriptions');
   const [search, setSearch] = useSearchParams();
-  const query = search.toString();
+  const feature = usePresentation();
+  const effective = new URLSearchParams(search);
+  if (feature.data && !feature.data.config.aiEnabled) effective.set('category', 'website');
+  const query = effective.toString();
   const category = search.get('category') || 'all';
   const health = search.get('health') || 'all';
   const archived = search.get('archived') === 'true';
-  const resource = useSWR(['console:subscriptions', query], () => subscriptionsApi.list(query), { refreshInterval: REFRESH_MS, shouldRetryOnError: false });
+  const resource = useSWR(feature.data ? ['console:subscriptions', query] : null, () => subscriptionsApi.list(query), { refreshInterval: REFRESH_MS, shouldRetryOnError: false, keepPreviousData: true });
   const [selected, setSelected] = useState(new Set<string>());
   const [error, setError] = useState<unknown>();
   const [busy, setBusy] = useState<string | null>(null);
@@ -58,7 +93,7 @@ function SubscriptionList() {
   const lock = useRef(false);
   useEffect(() => { setSelected(new Set()); }, [query]);
 
-  const rows = resource.data?.items ?? [];
+  const rows = (resource.data?.items ?? []).filter(row => (feature.data?.config.aiEnabled || row.category !== 'model') && (category === 'all' || row.category === category));
   const filtered = Boolean(search.get('q')) || health !== 'all';
   const updateQuery = (key: string, value: string) => {
     const next = new URLSearchParams(search);
@@ -99,18 +134,12 @@ function SubscriptionList() {
   const failedCount = results.filter(result => result.error).length;
 
   return (
-    <AdminPage
+    <SubscriptionContent embedded={embedded}
       title={t('title')}
       description={t('description')}
-      actions={
-        <>
-          <Button as={Link} to="/admin/subscriptions/new?source=link" variant="bordered" startContent={<Link2 size={15} />}>{t('importLink')}</Button>
-          <Button as={Link} to="/admin/subscriptions/new" color="primary" startContent={<Plus size={16} />}>{t('add')}</Button>
-        </>
-      }
+      actions={<SubscriptionListActions />}
     >
-      <SubscriptionTabs counts={counts ? { mine: counts.total } : undefined} />
-      {category === 'website' || category === 'model' ? <MonitorSources category={category} active="subscription" /> : null}
+      {!embedded ? <SubscriptionTabs counts={counts ? { mine: counts.total } : undefined} /> : null}
 
       {counts && counts.total > 0 ? (
         <StatBand className="mb-5 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5">
@@ -199,7 +228,7 @@ function SubscriptionList() {
                 <span className="text-right">{t('colActions')}</span>
               </div>
               <ul className="divide-y divide-[var(--polaris-line-soft)]">
-                {rows.map(row => (
+                <AnimatePresence initial={false}>{rows.map(row => (
                   <SubscriptionRow
                     key={row.id}
                     row={row}
@@ -210,7 +239,7 @@ function SubscriptionList() {
                     onSync={() => void sync(row)}
                     onAction={op => void act(row, op)}
                   />
-                ))}
+                ))}</AnimatePresence>
               </ul>
             </>
           )}
@@ -224,7 +253,7 @@ function SubscriptionList() {
           {resource.data ? <div className="min-w-0 flex-1"><Pagination total={resource.data.total} nextOffset={resource.data.nextOffset} /></div> : null}
         </div>
       </section>
-    </AdminPage>
+    </SubscriptionContent>
   );
 }
 
@@ -242,6 +271,8 @@ function SubscriptionRow({ row, selected, locked, rowBusy, onSelect, onSync, onA
   const ago = useTimeAgo();
   const duration = useDuration();
   const navigate = useNavigate();
+  const present = useIsPresent();
+  const reduced = useReducedMotion();
   const health = subscriptionHealth(row);
   const tone = stateTone(health);
   const { runtime } = row;
@@ -249,10 +280,10 @@ function SubscriptionRow({ row, selected, locked, rowBusy, onSelect, onSync, onA
   const syncing = runtime.phase !== 'idle';
   const isArchived = row.archivedAt !== null;
   const now = Math.floor(Date.now() / 1000);
-  const href = `/admin/subscriptions/${row.id}`;
+  const href = `/admin/subscriptions/${encodeURIComponent(row.id)}`;
 
   return (
-    <li className={clsx('px-4 py-3.5 transition-colors sm:px-5', selected ? 'bg-[var(--polaris-hover)]' : 'hover:bg-[var(--polaris-hover)]', isArchived && 'opacity-75')}>
+    <motion.li layout={reduced ? false : 'position'} inert={!present} aria-hidden={!present || undefined} initial={{ opacity: reduced ? 1 : 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ opacity: reduced ? { duration: 0 } : CONTENT_TRANSITION, layout: NAV_TRANSITION }} className={clsx('px-4 py-3.5 transition-colors sm:px-5', selected ? 'bg-[var(--polaris-hover)]' : 'hover:bg-[var(--polaris-hover)]', isArchived && 'opacity-75')}>
       <div className={GRID}>
         <div className="col-start-1 row-start-1 flex items-center">
           <Checkbox size="sm" aria-label={t('selectItem', { name: row.name })} isSelected={selected} isDisabled={locked} onValueChange={onSelect} />
@@ -265,7 +296,7 @@ function SubscriptionRow({ row, selected, locked, rowBusy, onSelect, onSync, onA
               <Link to={href} className="min-w-0 truncate text-[14px] font-medium text-[var(--polaris-ink)] underline-offset-4 hover:underline">{row.name}</Link>
               {row.isPublic ? null : <Tag className="hidden sm:inline-flex">{t('private')}</Tag>}
               {row.configUpdate?.changed ? (
-                <Link to={`${href}/config`} className="shrink-0">
+                <Link to={`${href}?tab=config`} className="shrink-0">
                   <Tag tone={row.configUpdate.conflict ? 'warning' : 'primary'} title={t(row.configUpdate.conflict ? 'versionConflict' : 'updateAvailable', { version: row.configUpdate.version || row.templateVersion })}>
                     <Download size={11} />{row.configUpdate.version || t('update')}
                   </Tag>
@@ -322,7 +353,7 @@ function SubscriptionRow({ row, selected, locked, rowBusy, onSelect, onSync, onA
             <DropdownMenu aria-label={t('moreNamed', { name: row.name })}>
               <DropdownSection showDivider>
                 <DropdownItem key="open" startContent={<Layers size={15} />} onPress={() => navigate(href)}>{t('items')}</DropdownItem>
-                <DropdownItem key="config" startContent={<FileCode2 size={15} />} onPress={() => navigate(`${href}/config`)}>{t('config')}</DropdownItem>
+                <DropdownItem key="config" startContent={<FileCode2 size={15} />} onPress={() => navigate(`${href}?tab=config`)}>{t('config')}</DropdownItem>
               </DropdownSection>
               {isArchived ? (
                 <DropdownSection>
@@ -338,6 +369,6 @@ function SubscriptionRow({ row, selected, locked, rowBusy, onSelect, onSync, onA
           </Dropdown>
         </div>
       </div>
-    </li>
+    </motion.li>
   );
 }

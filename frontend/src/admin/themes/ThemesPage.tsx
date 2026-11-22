@@ -641,6 +641,7 @@ function VersionRow({ theme, version, definition, storageReady, presentation, bu
   const canApply =
     definition.target === 'monitor' ||
     (definition.target === 'ai' ? presentation?.config.aiEnabled : presentation?.config.agentEnabled);
+  if (!canApply) return null;
   return (
     <div
       key={`${version.versionKey}:${definition.id}`}

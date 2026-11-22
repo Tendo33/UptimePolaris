@@ -10,6 +10,8 @@ import { decryptSubscriptionSecrets, encryptSubscriptionSecrets } from './creden
 import { SubscriptionStore } from './store';
 import { ExternalBudgetExceeded, type ExternalRequestBudget } from '../http/request-budget';
 import { validateSubscriptionDestination } from './egress';
+import { parseSubscriptionCatalog } from '../../../../../shared/subscription-catalog';
+import { repositoryEntries, type StoredSubscriptionRepository } from './repositories';
 
 export interface StoredSubscriptionConfig extends SubscriptionConfig { ciphertext: string }
 export interface StoredSubscriptionPreview extends SubscriptionPreview { owner: string; ciphertext: string; subscriptionId?: string; revision?: string }
@@ -143,16 +145,7 @@ export async function subscriptionCatalog(store: SubscriptionStore, refresh = fa
     await validateSubscriptionDestination(new URL(`${OFFICIAL_SUBSCRIPTION_ROOT}catalog.json`));
     const response = await fetch(`${OFFICIAL_SUBSCRIPTION_ROOT}catalog.json`, { redirect: 'manual', signal: AbortSignal.timeout(10000), headers: { accept: 'application/json' } });
     if (!response.ok) throw new SubscriptionError('subscription_catalog_unavailable', 502);
-    const value = (await readSubscriptionJson(response, SUBSCRIPTION_LIMITS.catalogBytes)).value as { schemaVersion?: number; entries?: unknown[] };
-    if (value.schemaVersion !== 1 || !Array.isArray(value.entries) || value.entries.length > SUBSCRIPTION_LIMITS.catalogEntries) throw new SubscriptionError('subscription_catalog_invalid', 502);
-    const ids = new Set<string>();
-    const entries = value.entries.map(raw => {
-      const entry = raw as SubscriptionCatalogEntry;
-      if (!entry || typeof entry.id !== 'string' || !/^[a-z0-9-]{1,64}$/.test(entry.id) || ids.has(entry.id) || typeof entry.name !== 'string' || typeof entry.description !== 'string' || typeof entry.version !== 'string' || !/^\d+\.\d+\.\d+$/.test(entry.version) || !['template', 'site'].includes(entry.kind) || !Array.isArray(entry.categories) || !entry.categories.length || entry.categories.some(category => !['website', 'model'].includes(category)) || typeof entry.path !== 'string' || !/^(templates|sites)\/[a-z0-9-]+\/\d+\.\d+\.\d+\.json$/.test(entry.path) || !Array.isArray(entry.capabilities) || !Array.isArray(entry.limitations)) throw new SubscriptionError('subscription_catalog_invalid', 502);
-      ids.add(entry.id);
-      const versions = Array.isArray(entry.versions) ? entry.versions.filter(value => value && typeof value.version === 'string' && /^\d+\.\d+\.\d+$/.test(value.version) && value.path === `${entry.path.split('/').slice(0, -1).join('/')}/${value.version}.json`) : [];
-      return { id: entry.id, name: entry.name.slice(0, 120), description: entry.description.slice(0, 2000), categories: entry.categories, kind: entry.kind, version: entry.version, path: entry.path, capabilities: entry.capabilities.filter(capability => typeof capability === 'string'), verifiedAt: typeof entry.verifiedAt === 'string' ? entry.verifiedAt : null, limitations: entry.limitations.filter(item => typeof item === 'string'), versions, minimumAppVersion: typeof entry.minimumAppVersion === 'string' ? entry.minimumAppVersion : undefined, origin: 'official' as const };
-    });
+    const entries = parseSubscriptionCatalog((await readSubscriptionJson(response, SUBSCRIPTION_LIMITS.catalogBytes)).value);
     await store.putDocument('catalog', 'official', { entries, fetchedAt: now });
     return { entries, fetchedAt: now, stale: false, error: null };
   } catch {
@@ -162,6 +155,14 @@ export async function subscriptionCatalog(store: SubscriptionStore, refresh = fa
 }
 
 export async function catalogDescriptor(store: SubscriptionStore, id: string): Promise<{ descriptor: SubscriptionDescriptor; sourceUrl: string | null; origin: 'official' | 'local' }> {
+  if (/^repo-[a-f0-9]{32}:/.test(id)) {
+    const repository = await store.document<StoredSubscriptionRepository>('repository', id.split(':')[0]);
+    const entry = repository && repositoryEntries(repository).find(entry => entry.id === id);
+    if (!entry?.sourceUrl) throw new SubscriptionError('not_found', 404);
+    const descriptor = await cachedRemoteDescriptor(store, entry.sourceUrl);
+    if (descriptor.id !== id.split(':')[1] || descriptor.version !== entry.version) throw new SubscriptionError('subscription_version_conflict', 409);
+    return { descriptor, sourceUrl: entry.sourceUrl, origin: 'local' };
+  }
   if (id.startsWith('local-')) {
     const local = await store.document<{ descriptor: SubscriptionDescriptor; sourceUrl: string | null }>('library', id);
     if (!local) throw new SubscriptionError('not_found', 404);

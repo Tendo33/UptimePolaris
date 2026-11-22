@@ -15,6 +15,12 @@ Uptime Polaris 能读别的站点公开的网站状态和模型状态，汇总�
 
 仓库连不上时，页面继续用缓存和内置的 Kuma 模板。已有订阅跑的是本地保存的描述文件，不依赖每轮重新下载仓库。
 
+### 添加第三方仓库
+
+在订阅仓库标题右侧点“管理仓库”，打开仓库列表。填写名称和 HTTPS `catalog.json` 地址，再点“添加仓库”。最多添加 8 个；GitHub 的 `blob` 文件链接会自动转为原始文件地址。“刷新目录”会同时更新官方与第三方仓库，失败时保留上次成功读取的条目并标记缓存状态。
+
+第三方仓库使用与官方相同的 `schemaVersion: 1` 目录格式。目录中的 `entries` 每项包含 `id`、`name`、`description`、`categories`、`kind`、`version`、`path`、`capabilities` 和 `limitations`。`path` 是相对目录地址，例如 `templates/json-website/1.0.0.json`，版本必须与 `version` 相同。只添加你信任的仓库；配置不会自动应用，仍需预览确认。移除仓库不会删除已有订阅及其保存的配置。
+
 ## 导入自定义接口
 
 支持 HTTPS 链接、上传 JSON 和粘贴 JSON。普通的 GitHub 文件链接会自动换成分支上的原始文件地址；其他网页请直接给 JSON 直链。导入的文件存在本地配置库，之后能反复拿来建订阅。移除本地配置不会删掉已经建好的订阅。
@@ -87,6 +93,12 @@ New subscriptions are private, with monitor and sync alerts off. The first read 
 Public website and model pages group items by subscription, and each group folds. With **Settings → Site → Sync monitor icons** enabled, sources also get their favicons; missing ones keep the default glyph. Icon requests read public HTTPS addresses and carry no subscription credentials.
 
 When the library is unreachable, the page keeps using its cache and the built-in Kuma template. Existing subscriptions run on locally saved descriptors and do not re-download the library each cycle.
+
+### Add a third-party repository
+
+Select **Manage repositories** beside the library title to open the repository list. Enter a name and an HTTPS `catalog.json` URL, then select **Add repository**. You can add up to eight. GitHub `blob` links are converted to raw-file URLs. **Refresh catalog** updates official and third-party sources; failed updates retain cached entries. Removing a repository keeps existing subscriptions and their saved configurations.
+
+Use the official `schemaVersion: 1` catalog format. Each `entries` item needs `id`, `name`, `description`, `categories`, `kind`, `version`, `path`, `capabilities` and `limitations`. Paths such as `templates/json-website/1.0.0.json` are relative to the catalog URL, and their version must match `version`. Add sources you trust: configuration changes still require a preview and explicit application.
 
 ### Import a custom interface
 

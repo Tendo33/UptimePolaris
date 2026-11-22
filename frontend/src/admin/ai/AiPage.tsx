@@ -10,7 +10,6 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router';
 import { useTranslations } from 'use-intl';
 import type { AiChannel, AiModel } from '../../../../shared/ai-management';
 import { EmptyState } from '../components/ConsolePrimitives';
-import { MonitorSources } from '../subscriptions/MonitorSources';
 import { AdminPage } from '../layout/AdminPage';
 import { updatePresentation, usePresentation } from '../settings/presentation-api';
 import { useConsoleRefreshInterval } from '../useConsoleData';
@@ -291,7 +290,7 @@ export function AiPage() {
       back={channelId ? { href: '/admin/ai', label: t('back') } : undefined}
       actions={actions}
     >
-      <MonitorSources category="model" active="local" /><div className="flex min-h-0 flex-1 flex-col gap-5">
+      <div className="flex min-h-0 flex-1 flex-col gap-5">
         {resource.error && !revoked ? (
           <div role="alert" className="flex items-center gap-3 rounded-xl border border-danger/20 bg-danger/[0.04] px-4 py-2.5 text-[13px] text-danger-600">
             <span className="min-w-0 flex-1">{describe(resource.error)}</span>

@@ -1,10 +1,10 @@
 import { requestJson } from '@/api/client';
 import { ApiError } from '@/api/errors';
 import useSWR from 'swr';
-import type { Subscription, SubscriptionCatalogEntry, SubscriptionConfig, SubscriptionDescriptor, SubscriptionItem, SubscriptionPreview, SubscriptionSummary } from '../../../../shared/subscriptions';
+import type { Subscription, SubscriptionCatalogEntry, SubscriptionConfig, SubscriptionDescriptor, SubscriptionItem, SubscriptionPreview, SubscriptionSummary, SubscriptionRepository } from '../../../../shared/subscriptions';
 
 export type Page<T> = { items: T[]; total: number; nextOffset: number | null };
-export type Catalog = { entries: SubscriptionCatalogEntry[]; fetchedAt: number | null; stale: boolean; error: string | null };
+export type Catalog = { entries: SubscriptionCatalogEntry[]; fetchedAt: number | null; stale: boolean; error: string | null; repositories?: SubscriptionRepository[] };
 export type Run = { id: string; state: string; phase: string; startedAt: number; finishedAt: number | null; updatedItems: number; requests: number; error: string | null };
 const root = '/api/admin/subscriptions';
 const path = (id: string) => `${root}/${encodeURIComponent(id)}`;
@@ -51,6 +51,8 @@ export const subscriptionsApi = {
   run: (id: string) => requestJson<{ run: Run }>(`/api/admin/subscription-runs/${encodeURIComponent(id)}`),
   runs: (id: string) => requestJson<{ runs: Run[] }>(`${path(id)}/runs`),
   catalog: () => requestJson<Catalog>('/api/admin/subscription-catalog'),
+  addRepository: (input: { name: string; url: string }) => write<{ repository: SubscriptionRepository }>('/api/admin/subscription-repositories', 'POST', input),
+  removeRepository: (id: string) => write<{ ok: true }>(`/api/admin/subscription-repositories/${encodeURIComponent(id)}`, 'DELETE'),
   refreshCatalog: async () => { await write<Catalog>('/api/admin/subscription-catalog/refresh', 'POST'); return requestJson<Catalog>('/api/admin/subscription-catalog'); },
   removeConfig: (id: string) => write<{ ok: boolean }>(`/api/admin/subscription-configs/${encodeURIComponent(id)}`, 'DELETE'),
   template: (id: string) => requestJson<{ descriptor: SubscriptionDescriptor; sourceUrl: string }>(`/api/admin/subscription-catalog/${encodeURIComponent(id)}`),

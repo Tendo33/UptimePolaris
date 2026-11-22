@@ -633,7 +633,7 @@
     "groupFeatures": "オプション機能",
     "groupFeaturesDesc": "必要な管理機能を有効にします。無効にしても設定は保持されます。",
     "agentManagement": "Agent 管理",
-    "agentManagementHint": "管理画面に Agent 管理を表示します。既存の Agent の報告、監視チェック、マシンの公開設定には影響しません。"
+    "agentManagementHint": "マシンページを有効にすると Agent 管理が表示されます。無効にしても設定は保持され、既存の Agent の報告や監視チェックは停止しません。"
   },
   "toast": {
     "saved": "保存しました",
@@ -1005,9 +1005,9 @@
     "configConflict": "この Agent の設定が変更されました。最新の設定を読み込んでから続行してください。",
     "reloadConfig": "下書きを破棄して再読み込み",
     "deleteInUse": "このマシンを使用する監視を削除または変更してから、マシンを削除してください。",
-    "featureDisabled": "Agent 管理は有効になっていません",
-    "enableFeature": "Agent 管理を有効にする",
-    "openFeatureSettings": "機能設定"
+    "featureDisabled": "マシンページが無効です",
+    "enableFeature": "マシンページを有効にする",
+    "openFeatureSettings": "表示設定"
   },
   "quick": {
     "lastPush": "最終受信",
@@ -1553,7 +1553,7 @@
     "locale": "言語",
     "auto": "自動",
     "historyHours": "履歴の期間（時間）",
-    "enableAgentsHint": "/servers で公開マシンのリソースと状態を表示します。専用ドメインも使えます。無効にしても設定は保持されます。",
+    "enableAgentsHint": "マシンページと Agent 管理を有効にします。公開マシンは /servers で確認できます。無効にしても設定は保持されます。",
     "retry": "再試行",
     "monitorDomains": "監視ページのドメイン",
     "agentDomains": "サーバーページのドメイン",
@@ -2153,7 +2153,8 @@
       "subscription_sync_failed": "取得元を読み取れません。URL を確認して再試行してください。",
       "subscription_preview_failed": "取得元を読み取れません。URL を確認して再試行してください。",
       "subscription_redirect_invalid": "取得元を読み取れません。URL を確認して再試行してください。",
-      "subscription_config_unavailable": "この項目は存在しません。登録一覧に戻ってください。"
+      "subscription_config_unavailable": "この項目は存在しません。登録一覧に戻ってください。",
+      "subscription_repository_exists": "このURLのリポジトリは追加済みです。"
     },
     "changed": {
       "requests": "リクエスト",
@@ -2286,7 +2287,21 @@
     "toastApplied": "新しい設定を適用しました",
     "toastRefreshed": "カタログを更新しました（{count} 件）",
     "toastConfigRemoved": "ローカル設定を削除しました",
-    "toastFileLoaded": "{name} を読み込みました"
+    "toastFileLoaded": "{name} を読み込みました",
+    "repositories": "外部リポジトリ",
+    "manageRepositories": "リポジトリ管理",
+    "close": "閉じる",
+    "repositoryHint": "HTTPS の catalog.json URL を最大8件追加できます。削除しても既存の購読は保持されます。",
+    "repositoryName": "リポジトリ名",
+    "repositoryUrl": "カタログURL",
+    "addRepository": "追加",
+    "removeRepository": "削除",
+    "removeRepositoryNamed": "リポジトリ {name} を削除",
+    "removeRepositoryHint": "このリポジトリを削除しますか？既存の購読と保存済み設定は保持されます。",
+    "repositoryStale": "更新に失敗しました。キャッシュを表示しています。",
+    "thirdParty": "外部",
+    "colReading": "測定値",
+    "sourceAvailabilityColumn": "提供元の稼働率"
   },
   "notificationPolicy": {
     "mode": "通知方法",

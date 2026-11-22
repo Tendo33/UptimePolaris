@@ -2,7 +2,7 @@ import { useBackendCapabilities } from '@/api/backend';
 import { Segmented } from '@/components/ui/Segmented';
 import { Button, Input } from '@heroui/react';
 import clsx from 'clsx';
-import { ArrowUpRight, BadgeCheck, Bot, Braces, Check, ChevronRight, FileJson, Globe, KeyRound, LayoutTemplate, Plus, RefreshCw, Search, ShieldAlert, Trash2, X } from 'lucide-react';
+import { ArrowUpRight, BadgeCheck, Bot, Braces, Check, ChevronRight, Database, FileJson, Globe, KeyRound, LayoutTemplate, Plus, RefreshCw, Search, ShieldAlert, Trash2, X } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import useSWR, { type SWRResponse } from 'swr';
@@ -12,44 +12,53 @@ import type { SubscriptionCatalogEntry } from '../../../../shared/subscriptions'
 import { EmptyState } from '../components/ConsolePrimitives';
 import { SearchArt } from '../components/illustrations';
 import { AdminPage } from '../layout/AdminPage';
+import { usePresentation } from '../settings/presentation-api';
+import { AnimatePresence, motion, useIsPresent } from 'framer-motion';
+import { CONTENT_TRANSITION } from '@/lib/motion';
+import { useReducedMotion } from '@/lib/useReducedMotion';
 import { subscriptionsApi, type Catalog } from './api';
-import { CategorySwitch, Failure, FieldGroup, Note, Pagination, SubscriptionTabs, Tag, Timestamp } from './Parts';
+import { CategorySwitch, Failure, FieldGroup, Note, Pagination, SubscriptionTabs, SubscriptionContent, Tag, Timestamp } from './Parts';
 
 const PAGE = 48;
 
-export function SubscriptionLibrary({ templateId }: { templateId?: string }) {
+export function SubscriptionLibraryActions({ busy, onRefresh, onManage }: { busy: boolean; onRefresh: () => void; onManage?: () => void }) {
   const t = useTranslations('admin.subscriptions');
+  return <>
+    <Button as="a" href={OFFICIAL_SUBSCRIPTION_REPOSITORY} target="_blank" rel="noreferrer" variant="light" endContent={<ArrowUpRight size={14} />}>{t('officialRepository')}</Button>
+    {onManage ? <Button variant="bordered" startContent={<Database size={15} />} onPress={onManage}>{t('manageRepositories')}</Button> : null}
+    <Button variant="bordered" isLoading={busy} onPress={onRefresh} startContent={busy ? undefined : <RefreshCw size={14} />}>{t('refresh')}</Button>
+  </>;
+}
+
+export function SubscriptionLibrary({ templateId, embedded = false }: { templateId?: string; embedded?: boolean }) {
+  const t = useTranslations('admin.subscriptions');
+  const aiEnabled = usePresentation().data?.config.aiEnabled === true;
   const [search, setSearch] = useSearchParams();
   const catalog = useSWR('console:subscription-catalog', subscriptionsApi.catalog, { shouldRetryOnError: false });
   const [busy, setBusy] = useState(false), [error, setError] = useState<unknown>();
   const refresh = async () => { setBusy(true); setError(undefined); try { await catalog.mutate(await subscriptionsApi.refreshCatalog(), false); } catch (cause) { setError(cause); } finally { setBusy(false); } };
 
-  const actions = (
-    <>
-      <Button as="a" href={OFFICIAL_SUBSCRIPTION_REPOSITORY} target="_blank" rel="noreferrer" variant="light" endContent={<ArrowUpRight size={14} />}>{t('officialRepository')}</Button>
-      <Button variant="bordered" isLoading={busy} onPress={() => void refresh()} startContent={busy ? undefined : <RefreshCw size={14} />}>{t('refresh')}</Button>
-    </>
-  );
+  const actions = <SubscriptionLibraryActions busy={busy} onRefresh={() => void refresh()} />;
 
   if (templateId) return <TemplateDetail templateId={templateId} catalog={catalog} actions={actions} error={error} />;
 
   const set = (key: string, value: string) => { const next = new URLSearchParams(search); if (!value || value === 'all') next.delete(key); else next.set(key, value); next.delete('offset'); setSearch(next, { replace: true }); };
   const offset = Math.max(0, Number(search.get('offset')) || 0);
   const category = search.get('category') || 'all', kind = search.get('kind') || 'all', origin = search.get('origin') || 'all', q = (search.get('q') || '').toLowerCase();
-  const entries = catalog.data?.entries ?? [];
+  const entries = (catalog.data?.entries ?? []).map(entry => ({ ...entry, categories: entry.categories.filter(category => aiEnabled || category !== 'model') })).filter(entry => entry.categories.length);
   const rows = entries.filter(entry => (category === 'all' || entry.categories.includes(category as 'website' | 'model')) && (kind === 'all' || entry.kind === kind) && (origin === 'all' || entry.origin === origin) && `${entry.name} ${entry.description}`.toLowerCase().includes(q));
   const filtered = category !== 'all' || kind !== 'all' || origin !== 'all' || Boolean(q);
 
   return (
-    <AdminPage title={t('library')} description={t('libraryDescription')} actions={actions}>
-      <SubscriptionTabs counts={catalog.data ? { library: entries.length } : undefined} />
+    <SubscriptionContent embedded={embedded} title={t('library')} description={t('libraryDescription')} actions={actions}>
+      {!embedded ? <SubscriptionTabs counts={catalog.data ? { library: entries.length } : undefined} /> : null}
       <Failure error={error || catalog.error} retry={() => void refresh()} />
       {catalog.data?.stale ? <Note tone="warn" className="mb-4">{t('cachedCatalog')} · <Timestamp value={catalog.data.fetchedAt} /></Note> : null}
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <CategorySwitch all value={category} onChange={value => set('category', value)} />
         <Segmented label={t('kind')} value={kind} onChange={value => set('kind', value)} options={['all', 'site', 'template'].map(key => ({ value: key, label: key === 'all' ? t('allKinds') : t(key) }))} />
-        <Segmented label={t('origin')} value={origin} onChange={value => set('origin', value)} options={['all', 'official', 'local'].map(key => ({ value: key, label: key === 'all' ? t('allOrigins') : t(key) }))} />
+        <Segmented label={t('origin')} value={origin} onChange={value => set('origin', value)} options={['all', 'official', 'third-party', 'local'].map(key => ({ value: key, label: key === 'all' ? t('allOrigins') : key === 'third-party' ? t('thirdParty') : t(key) }))} />
         <Input
           size="sm"
           className="w-full sm:ml-auto sm:w-64"
@@ -73,7 +82,7 @@ export function SubscriptionLibrary({ templateId }: { templateId?: string }) {
       ) : (
         <>
           <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {rows.slice(offset, offset + PAGE).map(entry => <TemplateCard key={entry.id} entry={entry} />)}
+            <AnimatePresence initial={false}>{rows.slice(offset, offset + PAGE).map(entry => <TemplateCard key={entry.id} entry={entry} />)}</AnimatePresence>
             <li>
               <Link to="/admin/subscriptions/new?source=json" className="flex h-full min-h-44 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-[var(--polaris-line)] p-5 text-center text-[var(--polaris-ink-3)] transition-colors hover:border-[var(--polaris-ink-4)] hover:bg-[var(--polaris-hover)] hover:text-[var(--polaris-ink)]">
                 <FileJson size={22} aria-hidden="true" />
@@ -85,7 +94,7 @@ export function SubscriptionLibrary({ templateId }: { templateId?: string }) {
           <div className="py-4"><Pagination total={rows.length} pageSize={PAGE} nextOffset={offset + PAGE < rows.length ? offset + PAGE : null} /></div>
         </>
       )}
-    </AdminPage>
+    </SubscriptionContent>
   );
 }
 
@@ -106,14 +115,16 @@ function CategoryGlyphs({ categories }: { categories: SubscriptionCatalogEntry['
 
 function TemplateCard({ entry }: { entry: SubscriptionCatalogEntry }) {
   const t = useTranslations('admin.subscriptions');
+  const reduced = useReducedMotion();
+  const present = useIsPresent();
   const href = `/admin/subscriptions/library/${encodeURIComponent(entry.id)}`;
   return (
-    <li className="polaris-card group relative flex min-h-44 flex-col p-5 transition-shadow hover:shadow-[0_6px_20px_-12px_rgb(0_0_0/0.25)]">
+    <motion.li inert={!present} aria-hidden={!present || undefined} layout={reduced ? false : 'position'} initial={{ opacity: reduced ? 1 : 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={reduced ? { duration: 0 } : CONTENT_TRANSITION} className="polaris-card group relative flex min-h-44 flex-col p-5 transition-shadow hover:shadow-[0_6px_20px_-12px_rgb(0_0_0/0.25)]">
       <div className="flex items-start gap-3">
         <CategoryGlyphs categories={entry.categories} />
         <div className="ml-auto flex flex-wrap justify-end gap-1">
           {entry.installedCount ? <Tag tone="success"><Check size={11} />{t('installed')}</Tag> : null}
-          <Tag tone={entry.origin === 'official' ? 'primary' : 'default'}>{entry.origin === 'official' ? <BadgeCheck size={11} /> : null}{t(entry.origin)}</Tag>
+          <Tag tone={entry.origin === 'official' ? 'primary' : 'default'}>{entry.origin === 'official' ? <BadgeCheck size={11} /> : null}{entry.repositoryName || t(entry.origin === 'third-party' ? 'thirdParty' : entry.origin)}</Tag>
         </div>
       </div>
       <div className="mt-3 flex min-w-0 items-baseline gap-2">
@@ -129,7 +140,7 @@ function TemplateCard({ entry }: { entry: SubscriptionCatalogEntry }) {
           {t(entry.kind === 'site' ? 'add' : 'configureAdd')}
         </Button>
       </div>
-    </li>
+    </motion.li>
   );
 }
 
@@ -232,7 +243,7 @@ function TemplateDetail({ templateId, catalog, actions, error }: { templateId: s
               {[
                 [t('category'), descriptor.categories.map(category => t(category)).join(' / ')],
                 [t('kind'), entry ? t(entry.kind) : '—'],
-                [t('origin'), entry ? t(entry.origin) : '—'],
+                [t('origin'), entry?.repositoryName || (entry ? t(entry.origin === 'third-party' ? 'thirdParty' : entry.origin) : '—')],
                 [t('verified'), entry?.verifiedAt || t('notVerified')],
                 [t('mode'), t(descriptor.observations.mode === 'heartbeat' ? 'modeHeartbeat' : 'modeSnapshot')],
               ].map(([label, value]) => (

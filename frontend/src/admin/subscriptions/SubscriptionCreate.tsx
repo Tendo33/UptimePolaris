@@ -43,6 +43,7 @@ export function SubscriptionCreate() {
   const [sourceGroup, setSourceGroup] = useState('');
   const lock = useRef(false), requestId = useRef(crypto.randomUUID()), done = useRef(false);
   const feature = usePresentation(), catalog = useSWR(source === 'official' ? 'console:subscription-catalog' : null, subscriptionsApi.catalog, { shouldRetryOnError: false });
+  useEffect(() => { if (feature.data && !feature.data.config.aiEnabled && category === 'model') setCategory('website'); }, [feature.data, category]);
   const allowNavigation = useDraftWarning(step > 0 && !done.current);
   useEffect(() => { setOffset(0); }, [query]);
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'smooth' }); }, [step]);
@@ -72,7 +73,7 @@ export function SubscriptionCreate() {
   const visible = preview?.items.filter(item => (!sourceGroup || item.group === sourceGroup) && `${item.name} ${item.group ?? ''} ${item.sourceItemId}`.toLowerCase().includes(query.toLowerCase())) ?? [];
   const selectable = visible.filter(item => preview && selectableSubscriptionItem(item, preview.issues));
   const modelDisabled = category === 'model' && feature.data?.config.aiEnabled !== true;
-  const entries: SubscriptionCatalogEntry[] = catalog.data?.entries ?? [{ id: 'uptime-kuma', name: 'Uptime Kuma', description: '', version: '', categories: ['website'], kind: 'template', origin: 'official', path: '', capabilities: [], verifiedAt: null, limitations: [] }];
+  const entries: SubscriptionCatalogEntry[] = (catalog.data?.entries ?? [{ id: 'uptime-kuma', name: 'Uptime Kuma', description: '', version: '', categories: ['website'] as SubscriptionCategory[], kind: 'template' as const, origin: 'official' as const, path: '', capabilities: [], verifiedAt: null, limitations: [] }]).filter(entry => feature.data?.config.aiEnabled || entry.categories.includes('website'));
   const entry = entries.find(item => item.id === templateId);
   const canContinue = source === 'official' ? Boolean(templateId) : source === 'link' ? Boolean(url.trim()) : Boolean(json.trim());
   const intervalOptions = [60, 300, 900, 3600].filter(value => value >= limits.minimumIntervalSec && value <= limits.maximumIntervalSec);
@@ -100,7 +101,7 @@ export function SubscriptionCreate() {
               <FieldGroup title={t('category')} icon={<ListChecks />}>
                 <ChoiceGroup label={t('category')} value={category} onChange={value => setCategory(value as SubscriptionCategory)} disabled={busy} columns={2} options={[
                   { value: 'website', icon: <Globe size={18} />, title: t('website'), hint: t('categoryWebsiteHint') },
-                  { value: 'model', icon: <Bot size={18} />, title: t('model'), hint: t('categoryModelHint'), badge: feature.data?.config.aiEnabled === false ? t('aiOff') : undefined },
+                  ...(feature.data?.config.aiEnabled ? [{ value: 'model', icon: <Bot size={18} />, title: t('model'), hint: t('categoryModelHint') }] : []),
                 ]} />
               </FieldGroup>
 

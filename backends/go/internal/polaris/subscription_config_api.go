@@ -75,12 +75,23 @@ func subscriptionCredentialBindings(descriptor, parameters Object) (Object, erro
 	return result, nil
 }
 func (a *App) subscriptionConfigRoutes() {
+	a.subscriptionRepositoryRoutes()
 	a.route("GET /api/admin/subscription-catalog", false, func(w http.ResponseWriter, r *http.Request) error {
 		catalog, err := a.subscriptionCatalog(r.Context(), false)
 		if err != nil {
 			return err
 		}
 		catalog = clone(catalog)
+		repositories, err := a.subscriptionRepositories(r.Context(), false)
+		if err != nil {
+			return err
+		}
+		views := []Object{}
+		for _, repository := range repositories {
+			catalog["entries"] = append(array(catalog["entries"]), repositoryEntries(repository)...)
+			views = append(views, repositoryView(repository))
+		}
+		catalog["repositories"] = views
 		local, err := a.store.list(r.Context(), "subscription_library")
 		if err != nil {
 			return err
@@ -108,6 +119,9 @@ func (a *App) subscriptionConfigRoutes() {
 			entry["installedCount"] = 0
 			for _, config := range installed {
 				matches := config["origin"] == "official" && entry["origin"] == "official" && object(config["descriptor"])["id"] == entry["id"]
+				if entry["origin"] == "third-party" {
+					matches = config["sourceUrl"] == entry["sourceUrl"]
+				}
 				if entry["origin"] == "local" {
 					for _, imported := range local {
 						if imported["id"] == entry["id"] {
@@ -128,6 +142,15 @@ func (a *App) subscriptionConfigRoutes() {
 		if err != nil {
 			return err
 		}
+		repositories, err := a.subscriptionRepositories(r.Context(), true)
+		if err != nil {
+			return err
+		}
+		views := []Object{}
+		for _, repository := range repositories {
+			views = append(views, repositoryView(repository))
+		}
+		catalog["repositories"] = views
 		respond(w, 200, catalog)
 		return nil
 	})
@@ -187,7 +210,7 @@ func (a *App) subscriptionConfigRoutes() {
 		}
 		descriptor, address, origin := object(input["descriptor"]), str(input, "sourceUrl"), "local"
 		if input["templateId"] != nil {
-			id, err := subscriptionText(input["templateId"], 64)
+			id, err := subscriptionText(input["templateId"], 128)
 			if err != nil {
 				return err
 			}
@@ -195,9 +218,8 @@ func (a *App) subscriptionConfigRoutes() {
 			if err != nil {
 				return err
 			}
-			origin = "official"
-			if strings.HasPrefix(id, "local-") {
-				origin = "local"
+			if !(strings.HasPrefix(id, "repo-") && strings.Contains(id, ":")) && !strings.HasPrefix(id, "local-") {
+				origin = "official"
 			}
 		}
 		preview, err := a.subscriptionPreview(r.Context(), descriptor, object(input["parameters"]), address, origin, a.subscriptionOwner(r), Object{"background": true})

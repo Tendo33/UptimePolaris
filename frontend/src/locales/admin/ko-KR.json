@@ -633,7 +633,7 @@
     "groupFeatures": "선택 기능",
     "groupFeaturesDesc": "필요한 관리 기능을 켜세요. 꺼도 기존 설정은 유지됩니다.",
     "agentManagement": "Agent 관리",
-    "agentManagementHint": "관리 화면에 Agent 관리 메뉴를 표시합니다. 기존 Agent 보고, 모니터 검사 및 머신 공개 설정에는 영향을 주지 않습니다."
+    "agentManagementHint": "머신 페이지를 켜면 Agent 관리가 표시됩니다. 꺼도 설정은 유지되며 기존 Agent 보고와 모니터 검사는 중단되지 않습니다."
   },
   "toast": {
     "saved": "저장했습니다",
@@ -1005,9 +1005,9 @@
     "configConflict": "이 Agent의 설정이 변경되었습니다. 최신 설정을 불러온 후 계속하세요.",
     "reloadConfig": "초안을 버리고 다시 불러오기",
     "deleteInUse": "이 머신을 사용하는 모니터를 삭제하거나 변경한 후 머신을 삭제하세요.",
-    "featureDisabled": "Agent 관리가 꺼져 있습니다",
-    "enableFeature": "Agent 관리 켜기",
-    "openFeatureSettings": "기능 설정"
+    "featureDisabled": "머신 페이지가 꺼져 있습니다",
+    "enableFeature": "머신 페이지 켜기",
+    "openFeatureSettings": "표시 설정"
   },
   "quick": {
     "lastPush": "마지막 수신",
@@ -1553,7 +1553,7 @@
     "locale": "언어",
     "auto": "자동",
     "historyHours": "기록 기간(시간)",
-    "enableAgentsHint": "/servers에서 공개 머신의 리소스와 상태를 표시하며 별도 도메인도 연결할 수 있습니다. 꺼도 설정은 유지됩니다.",
+    "enableAgentsHint": "머신 페이지와 Agent 관리를 켭니다. 공개 머신은 /servers에서 볼 수 있으며 꺼도 설정은 유지됩니다.",
     "retry": "다시 시도",
     "monitorDomains": "모니터링 페이지 도메인",
     "agentDomains": "서버 페이지 도메인",
@@ -2153,7 +2153,8 @@
       "subscription_sync_failed": "원본을 읽을 수 없습니다. URL을 확인하고 다시 시도하세요.",
       "subscription_preview_failed": "원본을 읽을 수 없습니다. URL을 확인하고 다시 시도하세요.",
       "subscription_redirect_invalid": "원본을 읽을 수 없습니다. URL을 확인하고 다시 시도하세요.",
-      "subscription_config_unavailable": "이 항목은 더 이상 없습니다. 구독 목록으로 돌아가세요."
+      "subscription_config_unavailable": "이 항목은 더 이상 없습니다. 구독 목록으로 돌아가세요.",
+      "subscription_repository_exists": "이 주소의 저장소가 이미 있습니다."
     },
     "changed": {
       "requests": "요청",
@@ -2286,7 +2287,21 @@
     "toastApplied": "새 구성을 적용했습니다",
     "toastRefreshed": "카탈로그를 새로 고쳤습니다 ({count}개 구성)",
     "toastConfigRemoved": "로컬 구성을 제거했습니다",
-    "toastFileLoaded": "{name}을(를) 불러왔습니다"
+    "toastFileLoaded": "{name}을(를) 불러왔습니다",
+    "repositories": "외부 저장소",
+    "manageRepositories": "저장소 관리",
+    "close": "닫기",
+    "repositoryHint": "HTTPS catalog.json 주소를 최대 8개 추가할 수 있습니다. 제거해도 기존 구독은 유지됩니다.",
+    "repositoryName": "저장소 이름",
+    "repositoryUrl": "카탈로그 URL",
+    "addRepository": "저장소 추가",
+    "removeRepository": "제거",
+    "removeRepositoryNamed": "저장소 {name} 제거",
+    "removeRepositoryHint": "이 저장소를 제거할까요? 기존 구독과 저장된 설정은 유지됩니다.",
+    "repositoryStale": "새로 고침에 실패해 캐시를 표시합니다.",
+    "thirdParty": "외부",
+    "colReading": "측정값",
+    "sourceAvailabilityColumn": "원본 가용성"
   },
   "notificationPolicy": {
     "mode": "알림 방식",

@@ -84,7 +84,6 @@ export function App({ httpStatus }: { httpStatus?: number }) {
                   <Route path="subscriptions/new" element={<SubscriptionsPage />} />
                   <Route path="subscriptions/library" element={<SubscriptionsPage />} />
                   <Route path="subscriptions/library/:templateId" element={<SubscriptionsPage />} />
-                  <Route path="subscriptions/:id/config" element={<SubscriptionsPage />} />
                   <Route path="subscriptions/:id" element={<SubscriptionsPage />} />
                   <Route path="groups" element={<GroupsPage />} />
                   <Route path="notifications" element={<NotificationsPage />} />

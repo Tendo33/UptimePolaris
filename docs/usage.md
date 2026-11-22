@@ -52,7 +52,7 @@ Worker 的检查间隔为 60–86400 秒，超时为 1000–60000 毫秒。Go �
 
 点击左上角的版本号可检查 GitHub 仓库的正式版本标签，并打开更新内容。有新版本时，版本号旁会显示“新版本”；选择“忽略此版本”后，等下一个版本再提醒。Worker 通过本站接口查询并缓存结果 6 小时，手动重新检查仅复用最近 1 分钟的结果。查询失败会保留上次结果，限流和超时会分别提示，也可直接打开发布页面查看。
 
-Agent 管理默认隐藏。在“设置 → 可选功能”开启后，侧栏、移动端导航和命令面板才显示对应入口；关闭后保留配置，不影响已有探针上报、检查或机器公开设置。机器公开页仍在展示设置中单独控制。
+机器展示页默认关闭。在“设置 → 展示设置”开启后，侧栏、移动端导航和命令面板显示 Agent 管理入口；关闭后隐藏入口和机器公开页，保留配置，不影响已有探针上报和监控检查。
 
 首页的指标卡分别显示运行中监控的平均可用率、最近的证书或域名到期时间，以及当天发生的故障次数。第一次使用时会出现“开始使用”清单，列出添加监控、设置站点名称、配置通知和接入 Agent 四项。每一步只在部署里确实存在对应内容后才算完成，不是点过按钮就算；清单可以关闭，关闭状态按浏览器保存。
 
@@ -300,7 +300,7 @@ Worker accepts intervals of 60–86,400 seconds and timeouts of 1,000–60,000 m
 
 ### Console features and version checks
 
-Agent management is hidden until enabled under **Settings → Optional features**. Disabling hides its console and command-palette entries without stopping existing Agent reporting or checks, or changing public visibility. The public machine-page switch remains separate. The status island shows AI statistics only after models are added and keeps Agent offline alerts visible. Worker version checks use the same-origin API with a six-hour cache; manual checks reuse only results from the last minute.
+Agent management is shown when the machine page is enabled under **Settings → Presentation**. Disabling hides the management entries and public machine page while retaining configuration and allowing existing Agent reporting and checks to continue. The status island shows AI statistics only after models are added and keeps Agent offline alerts visible. Worker version checks use the same-origin API with a six-hour cache; manual checks reuse only results from the last minute.
 
 ### AI monitoring
 

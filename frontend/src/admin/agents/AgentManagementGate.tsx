@@ -5,14 +5,13 @@ import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { useTranslations } from 'use-intl';
 import { AdminPage } from '../layout/AdminPage';
-import { settingsApi } from '../settings/api';
-import { useAgentManagement } from './useAgentManagement';
+import { updatePresentation, usePresentation } from '../settings/presentation-api';
 
 export function AgentManagementGate({ children }: { children: ReactNode }) {
   const t = useTranslations('admin.agents');
   const settings = useTranslations('admin.settings');
   const describe = useApiErrorMessage();
-  const feature = useAgentManagement();
+  const feature = usePresentation();
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<unknown>(null);
   const enable = async () => {
@@ -20,12 +19,11 @@ export function AgentManagementGate({ children }: { children: ReactNode }) {
     setSaving(true);
     setSaveError(null);
     try {
-      await settingsApi.updateSettings({ 'features.agentManagement': true });
-      await feature.mutate();
+      await updatePresentation(config => ({ ...config, agentEnabled: true }));
     } catch (error) { setSaveError(error); }
     finally { setSaving(false); }
   };
-  if (feature.enabled) return children;
+  if (feature.data?.config.agentEnabled === true) return children;
   return <AdminPage title={t('title')} description={t('description')}>
     <section className="polaris-card mx-auto flex w-full max-w-xl flex-col items-center px-6 py-12 text-center">
       <Server size={24} className="mb-5 text-[var(--polaris-ink-3)]" aria-hidden="true" />
@@ -35,7 +33,7 @@ export function AgentManagementGate({ children }: { children: ReactNode }) {
         : feature.error ? <div role="alert" className="mt-5 text-small text-danger"><p>{describe(feature.error)}</p><Button size="sm" variant="light" onPress={() => void feature.mutate().catch(() => undefined)}>{t('refresh')}</Button></div>
         : <div className="mt-6 flex flex-wrap justify-center gap-2">
           <Button color="primary" isLoading={saving} onPress={() => void enable()}>{t('enableFeature')}</Button>
-          <Button as={Link} to="/admin/settings#settings-features" variant="bordered" startContent={<Settings2 size={15} />}>{t('openFeatureSettings')}</Button>
+          <Button as={Link} to="/admin/settings#settings-presentation" variant="bordered" startContent={<Settings2 size={15} />}>{t('openFeatureSettings')}</Button>
         </div>}
       {saveError ? <p role="alert" className="mt-3 text-small text-danger">{describe(saveError)}</p> : null}
     </section>

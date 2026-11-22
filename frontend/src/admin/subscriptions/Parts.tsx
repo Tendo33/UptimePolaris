@@ -2,6 +2,8 @@ import { ApiError } from '@/api/errors';
 import { useApiErrorMessage } from '@/api/useApiErrorMessage';
 import { stateTone } from '@/components/subscriptions/observation';
 import { Segmented } from '@/components/ui/Segmented';
+import { usePresentation } from '../settings/presentation-api';
+import { AdminPage } from '../layout/AdminPage';
 import { StatusDot, TONE_TEXT } from '@/components/ui/StatusDot';
 import { Select } from '@/components/ui/MotionOverlays';
 import { Button, Input, SelectItem, Skeleton, Switch } from '@heroui/react';
@@ -15,6 +17,10 @@ import type { Subscription, SubscriptionDescriptor } from '../../../../shared/su
 const TAB = 'relative -mb-px inline-flex h-10 items-center gap-1.5 border-b-2 px-0.5 text-[13px] font-medium transition-colors';
 const TAB_ON = 'border-[var(--polaris-ink)] text-[var(--polaris-ink)]';
 const TAB_OFF = 'border-transparent text-[var(--polaris-ink-3)] hover:text-[var(--polaris-ink)]';
+
+export function SubscriptionContent({ embedded, children, actions, ...props }: Parameters<typeof AdminPage>[0] & { embedded?: boolean }) {
+  return embedded ? <>{children}</> : <AdminPage {...props} actions={actions}>{children}</AdminPage>;
+}
 
 export function SubscriptionTabs({ counts }: { counts?: { mine?: number; library?: number } }) {
   const t = useTranslations('admin.subscriptions');
@@ -49,10 +55,10 @@ export function Failure({ error, retry, className }: { error: unknown; retry?: (
 }
 
 /** A quiet note, for hints that must be read before acting. / 操作前需要阅读的提示。 */
-export function Note({ tone = 'info', children, className }: { tone?: 'info' | 'warn'; children: ReactNode; className?: string }) {
+export function Note({ tone = 'info', children, className, align = 'start' }: { tone?: 'info' | 'warn'; children: ReactNode; className?: string; align?: 'start' | 'center' }) {
   return (
-    <div className={clsx('flex gap-2.5 rounded-xl border px-3.5 py-3 text-[12.5px] leading-relaxed', tone === 'warn' ? 'border-warning/30 bg-warning/[0.07] text-warning-800 dark:text-warning-600' : 'border-[var(--polaris-line)] bg-[var(--polaris-well)] text-[var(--polaris-ink-2)]', className)}>
-      {tone === 'warn' ? <AlertCircle size={15} className="mt-px shrink-0" aria-hidden="true" /> : <Info size={15} className="mt-px shrink-0 text-[var(--polaris-ink-4)]" aria-hidden="true" />}
+    <div className={clsx('flex gap-2.5 rounded-xl border px-3.5 py-3 text-[12.5px] leading-relaxed', align === 'center' ? 'items-center' : 'items-start', tone === 'warn' ? 'border-warning/30 bg-warning/[0.07] text-warning-800 dark:text-warning-600' : 'border-[var(--polaris-line)] bg-[var(--polaris-well)] text-[var(--polaris-ink-2)]', className)}>
+      {tone === 'warn' ? <AlertCircle size={15} className={clsx('shrink-0', align === 'start' && 'mt-px')} aria-hidden="true" /> : <Info size={15} className={clsx('shrink-0 text-[var(--polaris-ink-4)]', align === 'start' && 'mt-px')} aria-hidden="true" />}
       <div className="min-w-0 flex-1">{children}</div>
     </div>
   );
@@ -181,7 +187,10 @@ export function useDraftWarning(dirty: boolean) {
 
 export function CategorySwitch({ value, onChange, all = false }: { value: string; onChange: (value: string) => void; all?: boolean }) {
   const t = useTranslations('admin.subscriptions');
-  return <Segmented label={t('category')} value={value} onChange={onChange} options={(all ? ['all', 'website', 'model'] : ['website', 'model']).map(category => ({ value: category, label: t(category) }))} />;
+  const config = usePresentation().data?.config;
+  const aiEnabled = config?.aiEnabled === true;
+  useEffect(() => { if (config && !aiEnabled && value === 'model') onChange(all ? 'all' : 'website'); }, [config, aiEnabled, value, all, onChange]);
+  return <Segmented label={t('category')} value={!aiEnabled && value === 'model' ? all ? 'all' : 'website' : value} onChange={onChange} options={(all ? ['all', 'website', 'model'] : ['website', 'model']).filter(category => category !== 'model' || aiEnabled).map(category => ({ value: category, label: t(category) }))} />;
 }
 
 export function DetailTabs({ id, active, counts }: { id: string; active: string; counts?: Partial<Record<'items' | 'runs', number>> }) {
@@ -189,7 +198,7 @@ export function DetailTabs({ id, active, counts }: { id: string; active: string;
   return (
     <nav aria-label={t('title')} className="mb-5 flex flex-wrap gap-x-6 border-b border-[var(--polaris-line)]">
       {(['items', 'runs', 'config', 'settings'] as const).map(tab => (
-        <Link key={tab} aria-current={tab === active ? 'page' : undefined} to={`/admin/subscriptions/${id}${tab === 'config' ? '/config' : `?tab=${tab}`}`} className={clsx(TAB, tab === active ? TAB_ON : TAB_OFF)}>
+        <Link key={tab} aria-current={tab === active ? 'page' : undefined} to={`/admin/subscriptions/${encodeURIComponent(id)}?tab=${tab}`} className={clsx(TAB, tab === active ? TAB_ON : TAB_OFF)}>
           {t(tab)}
           {tab !== 'config' && tab !== 'settings' && counts?.[tab] !== undefined ? <span className="polaris-num rounded-full bg-[var(--polaris-well)] px-1.5 text-[12px] text-[var(--polaris-ink-3)]">{counts[tab]}</span> : null}
         </Link>

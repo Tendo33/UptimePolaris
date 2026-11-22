@@ -442,8 +442,10 @@ curl --fail-with-body -X POST \
 
 | 方法与路径 | 用途 |
 | --- | --- |
-| `GET /api/admin/subscription-catalog` | 官方与本地配置目录 |
-| `POST /api/admin/subscription-catalog/refresh` | 刷新官方目录，受限频保护 |
+| `GET /api/admin/subscription-catalog` | 官方、第三方与本地配置目录，另返回 `repositories` 状态 |
+| `POST /api/admin/subscription-catalog/refresh` | 刷新官方和第三方目录；失败保留缓存 |
+| `POST /api/admin/subscription-repositories` | 传 `{name,url}` 添加 HTTPS `catalog.json` 仓库，最多 8 个 |
+| `DELETE /api/admin/subscription-repositories/:id` | 移除仓库，不影响已有订阅 |
 | `GET /api/admin/subscription-catalog/:templateId` | 读取配置描述 |
 | `POST /api/admin/subscription-configs/import` | 传 `{url}` 或 `{descriptor}` 导入本地配置 |
 | `DELETE /api/admin/subscription-configs/:configId` | 移除本地库条目 |
@@ -464,6 +466,8 @@ curl --fail-with-body -X POST \
 | `PUT /api/admin/subscriptions/:id/config` | 传 `revision`、`previewId` 应用预览 |
 
 `category` 是 `website` 或 `model`。创建还可传 `intervalSec`、`staleAfterSec`、`isPublic`、`autoSubscribe`、网站 `groupId` 和 `notifications`。预览和同步返回 202，需轮询到状态不再为 `running`。预览不修改历史和通知；同步会更新状态。重复创建使用相同 `requestId` 可避免产生两个订阅。
+
+第三方目录条目的 `origin` 为 `third-party`，包含 `repositoryId`、`repositoryName`、`sourceUrl`；`id` 带仓库命名空间，调用配置读取和预览时原样传入，不使用描述文件内部 ID 替换。`repositories` 包含 `id`、`name`、`url`、`fetchedAt`、`stale`、`error`。重复地址返回 `subscription_repository_exists`（409）。
 
 订阅列表另返回 `summary`，包含 `total`、`items`、`healthy`、`partial`、`failed`、`paused`、`archived`。汇总遵循 `category` 和 `archived`，不受搜索、状态筛选或分页影响；`items` 是已订阅且未移除的条目数。列表与详情都返回当前 `statusCounts`。
 

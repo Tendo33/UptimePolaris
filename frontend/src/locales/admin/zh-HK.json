@@ -633,7 +633,7 @@
     "groupFeatures": "可選功能",
     "groupFeaturesDesc": "按需要開啟控制台功能，關閉後保留現有設定。",
     "agentManagement": "Agent 管理",
-    "agentManagementHint": "開啟後顯示探針管理入口。此開關不影響現有探針回報、監控檢查或機器公開設定。"
+    "agentManagementHint": "開啟機器展示頁後才會顯示 Agent 管理入口。關閉後保留設定，不影響現有探針回報和監控檢查。"
   },
   "toast": {
     "saved": "已儲存",
@@ -1005,9 +1005,9 @@
     "configConflict": "此 Agent 的設定已變更。請載入最新設定後繼續。",
     "reloadConfig": "捨棄草稿並重新載入",
     "deleteInUse": "請先刪除或更換使用此機器的監控，再刪除機器。",
-    "featureDisabled": "尚未開啟 Agent 管理",
-    "enableFeature": "開啟 Agent 管理",
-    "openFeatureSettings": "功能設定"
+    "featureDisabled": "機器展示頁尚未開啟",
+    "enableFeature": "開啟機器展示頁",
+    "openFeatureSettings": "展示設定"
   },
   "quick": {
     "lastPush": "最近上報",
@@ -1553,7 +1553,7 @@
     "locale": "語言",
     "auto": "自動",
     "historyHours": "歷史時長（小時）",
-    "enableAgentsHint": "透過 /servers 展示公開機器的資源及狀態，也可綁定獨立網域。關閉後保留設定。",
+    "enableAgentsHint": "開啟機器展示頁及 Agent 管理，公開機器可透過 /servers 存取；關閉後保留設定。",
     "retry": "重試",
     "monitorDomains": "監控狀態頁網域",
     "agentDomains": "機器展示頁網域",
@@ -2153,7 +2153,8 @@
       "subscription_sync_failed": "無法讀取來源，請檢查地址后重試。",
       "subscription_preview_failed": "無法讀取來源，請檢查地址后重試。",
       "subscription_redirect_invalid": "無法讀取來源，請檢查地址后重試。",
-      "subscription_config_unavailable": "此條目已不存在，請返回訂閱列表。"
+      "subscription_config_unavailable": "此條目已不存在，請返回訂閱列表。",
+      "subscription_repository_exists": "已加入相同網址的倉庫。"
     },
     "changed": {
       "requests": "請求",
@@ -2286,7 +2287,21 @@
     "toastApplied": "已套用新配置",
     "toastRefreshed": "訂閱倉庫已重新整理，共 {count} 份配置",
     "toastConfigRemoved": "已移除本地配置",
-    "toastFileLoaded": "已讀取 {name}"
+    "toastFileLoaded": "已讀取 {name}",
+    "repositories": "第三方倉庫",
+    "manageRepositories": "管理倉庫",
+    "close": "關閉",
+    "repositoryHint": "最多可加入 8 個 HTTPS catalog.json 網址。移除倉庫不會刪除現有訂閱。",
+    "repositoryName": "倉庫名稱",
+    "repositoryUrl": "目錄網址",
+    "addRepository": "加入倉庫",
+    "removeRepository": "移除",
+    "removeRepositoryNamed": "移除倉庫 {name}",
+    "removeRepositoryHint": "移除此倉庫？現有訂閱及已儲存設定會保留。",
+    "repositoryStale": "倉庫更新失敗，正顯示快取項目。",
+    "thirdParty": "第三方",
+    "colReading": "讀數",
+    "sourceAvailabilityColumn": "來源可用率"
   },
   "notificationPolicy": {
     "mode": "通知方式",

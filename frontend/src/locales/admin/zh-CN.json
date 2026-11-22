@@ -633,7 +633,7 @@
     "groupFeatures": "可选功能",
     "groupFeaturesDesc": "按需开启控制台功能，关闭后保留已有配置。",
     "agentManagement": "Agent 管理",
-    "agentManagementHint": "开启后显示探针管理入口。此开关不影响已有探针上报、监控检查或机器公开设置。"
+    "agentManagementHint": "开启机器展示页后，才会显示 Agent 管理入口。关闭后保留设置，不影响已有探针上报和监控检查。"
   },
   "toast": {
     "saved": "已保存",
@@ -1005,9 +1005,9 @@
     "configConflict": "此 Agent 的配置已更改。请加载最新配置后继续。",
     "reloadConfig": "放弃草稿并重新加载",
     "deleteInUse": "请先删除或更换使用此机器的监控，再删除机器。",
-    "featureDisabled": "尚未开启 Agent 管理",
-    "enableFeature": "开启 Agent 管理",
-    "openFeatureSettings": "功能设置"
+    "featureDisabled": "机器展示页尚未开启",
+    "enableFeature": "开启机器展示页",
+    "openFeatureSettings": "展示设置"
   },
   "quick": {
     "lastPush": "最近上报",
@@ -1553,7 +1553,7 @@
     "locale": "语言",
     "auto": "自动",
     "historyHours": "历史时长（小时）",
-    "enableAgentsHint": "通过 /servers 展示公开机器的资源和状态，也可绑定单独域名。关闭后保留设置。",
+    "enableAgentsHint": "开启机器展示页和 Agent 管理，公开机器可通过 /servers 访问；关闭后保留配置。",
     "retry": "重试",
     "monitorDomains": "监控状态页域名",
     "agentDomains": "机器展示页域名",
@@ -2153,7 +2153,8 @@
       "subscription_sync_failed": "无法读取来源，请检查地址后重试。",
       "subscription_preview_failed": "无法读取来源，请检查地址后重试。",
       "subscription_redirect_invalid": "无法读取来源，请检查地址后重试。",
-      "subscription_config_unavailable": "此条目已不存在，请返回订阅列表。"
+      "subscription_config_unavailable": "此条目已不存在，请返回订阅列表。",
+      "subscription_repository_exists": "已添加相同地址的仓库。"
     },
     "changed": {
       "requests": "请求",
@@ -2286,7 +2287,21 @@
     "toastApplied": "已应用新配置",
     "toastRefreshed": "订阅仓库已刷新，共 {count} 份配置",
     "toastConfigRemoved": "已移除本地配置",
-    "toastFileLoaded": "已读取 {name}"
+    "toastFileLoaded": "已读取 {name}",
+    "repositories": "第三方仓库",
+    "manageRepositories": "管理仓库",
+    "close": "关闭",
+    "repositoryHint": "可添加最多 8 个 HTTPS catalog.json 地址。移除仓库不会删除已有订阅。",
+    "repositoryName": "仓库名称",
+    "repositoryUrl": "目录地址",
+    "addRepository": "添加仓库",
+    "removeRepository": "移除",
+    "removeRepositoryNamed": "移除仓库 {name}",
+    "removeRepositoryHint": "移除此仓库？已有订阅及保存的配置会保留。",
+    "repositoryStale": "仓库刷新失败，正在显示缓存条目。",
+    "thirdParty": "第三方",
+    "colReading": "读数",
+    "sourceAvailabilityColumn": "来源可用率"
   },
   "notificationPolicy": {
     "mode": "通知方式",

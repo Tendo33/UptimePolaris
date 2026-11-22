@@ -7,11 +7,13 @@ import { toPageConfig } from '@/config/api';
 import { usePublicConfig } from '@/config/usePublicConfig';
 import { useParams } from 'react-router';
 import { RouteError, RouteLoading } from './RouteStates';
+import { ApiError } from '@/api/errors';
 
 export function StatusPageRoute() {
   const { pageId } = useParams<{ pageId?: string }>();
   const { data, error, mutate, key } = usePublicConfig(pageId);
-  if (!data) return error ? <RouteError code="render" error={error} onRetry={() => { void mutate(); }} /> : <RouteLoading />;
+  if (!data) return error instanceof ApiError && error.status === 404 ? <RouteError code="notFound" /> : error ? <RouteError code="render" error={error} onRetry={() => { void mutate(); }} /> : <RouteLoading />;
+  if (!data.presentation.configured || !data.presentation.enabled) return <RouteError code="notFound" />;
   const config = toPageConfig(data);
 
   return (

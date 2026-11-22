@@ -11,7 +11,7 @@ export function AdminLayout() {
 
   return (
     <AdminShell>
-      <RouteTransition routeKey={pathname}>
+      <RouteTransition routeKey={/^\/admin\/subscriptions(?:\/library)?$/.test(pathname) ? '/admin/subscriptions' : pathname}>
         {/* Keep the outgoing outlet on its own location until its exit finishes. / 退出动画结束前，让旧路由内容保留原位置。 */}
         <UNSAFE_LocationContext.Provider value={locationContext}>
           <Suspense fallback={<RouteLoading embedded />}>{outlet}</Suspense>
