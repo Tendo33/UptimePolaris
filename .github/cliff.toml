@@ -1,0 +1,40 @@
+# 发布说明由提交信息生成，按 Conventional Commits 分组。
+# Release notes are generated from commit messages, grouped by Conventional Commits type.
+
+[changelog]
+header = """
+{% if version %}## {{ version }} - {{ timestamp | date(format="%Y-%m-%d") }}{% endif %}
+"""
+body = """
+{% for group, commits in commits | group_by(attribute="group") %}
+### {{ group }}
+
+{% for commit in commits %}
+- {{ commit.message | split(pat="\n") | first | trim }}{% if commit.scope %} (`{{ commit.scope }}`){% endif %}
+{%- endfor %}
+
+{% endfor %}
+"""
+trim = true
+render_always = true
+
+[git]
+conventional_commits = true
+filter_unconventional = true
+split_commits = true
+protect_breaking_commits = true
+tag_pattern = "v[0-9]*"
+sort_commits = "oldest"
+commit_parsers = [
+  { message = "^feat", group = "新功能 / Features" },
+  { message = "^fix", group = "修复 / Fixes" },
+  { message = "^perf", group = "性能 / Performance" },
+  { message = "^refactor", group = "重构 / Refactor" },
+  { message = "^docs", group = "文档 / Documentation" },
+  { message = "^test", group = "测试 / Tests" },
+  { message = "^ci", group = "构建与 CI / Build and CI" },
+  { message = "^style", group = "样式 / Style" },
+  { message = "^chore\\(release\\)", skip = true },
+  { message = "^chore", group = "维护 / Maintenance" },
+  { message = "^revert", group = "回滚 / Reverts" },
+]

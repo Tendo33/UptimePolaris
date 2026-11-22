@@ -18,7 +18,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
+      # Tags and the previous release commit are needed to scope the notes.
+      # 生成说明需要 tag 和上一个发布提交，因此取完整历史。
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -86,11 +90,27 @@ jobs:
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.version=${{ github.ref_name }}
             org.opencontainers.image.revision=${{ github.sha }}
+      # Commits go straight to the default branch, so GitHub's label-based
+      # generator produces an empty body. Group the commit messages instead.
+      # 提交直接进默认分支，GitHub 按标签生成的说明是空的，改为按提交信息分组。
+      - name: Generate release notes
+        uses: orhun/git-cliff-action@v4
+        id: cliff
+        with:
+          config: .github/cliff.toml
+          args: --latest
+        env:
+          OUTPUT: RELEASE_NOTES.md
+          GITHUB_REPO: ${{ github.repository }}
+      - name: Show release notes
+        run: cat RELEASE_NOTES.md
       - name: Create and publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          gh release create "$GITHUB_REF_NAME" --verify-tag --draft --generate-notes release/*
+          gh release create "$GITHUB_REF_NAME" --verify-tag --draft \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file RELEASE_NOTES.md release/*
           gh release edit "$GITHUB_REF_NAME" --draft=false
