@@ -4,7 +4,7 @@
 
 监控多起来以后，一轮到期的检查会超出一个 Worker 调用能处理的量。Queue 把这批检查拆成多次调用，普通主动监控和 AI 模型共用。它不会提高单次调用的外部请求上限，检查照样按次计费，每次消费仍有请求、执行时间和 Analytics Engine 点数预算。
 
-这个功能只有 Worker 版本有，默认关闭。不开的时候还是原来的定时检查，初始化、Go 后端、Push 和 Agent 上报都不受影响。开起来之后，如果绑定丢了或者发送失败，程序不会偷偷退回直接检查，要么把队列恢复好，要么在后台把分批检查关掉。
+这个功能只有 Worker 版本有，默认关闭。不开的时候还是原来的定时检查，初始化、Go 后端、Push 和 Agent 上报都不受影响。开起来之后，绑定丢失或发送失败会显示为失败，需要恢复队列，或在后台关掉分批检查。
 
 每分钟的 Cron 继续保留。入队、Push 超时、Agent 状态和通知都还靠它，Queue 不接管这部分。
 
@@ -16,7 +16,7 @@
 4. 保存并部署，然后进后台“设置 → 运维操作”，运行 Queue 连接检查。
 5. 检查会发一条不碰监控目标的探测消息，等消费者确认。通过之后再启用分批检查。只配了 producer、没配 consumer 是过不了的。
 
-一条消息不等于一个监控：程序会让每条消息带最多 10 项任务，所以批大小设成 1，一次调用也能跑好几项检查。别把批大小调到 100 去提高吞吐，那只是把更多任务挤进同一次调用，预算还是一份。
+一条消息不等于一个监控：程序会让每条消息带最多 10 项任务，所以批大小设成 1，一次调用也能跑好几项检查。调大批大小只是把更多任务挤进同一次调用，预算不变。
 
 Fork 和按钮部署会保留 `CHECK_QUEUE` 和属于当前 Worker 的消费者配置，包括等待、重试、并发和死信队列。读不到现有配置就停止部署，免得误删绑定。部署本身不建队列、不补消费者，也不接管别的 Worker 的消费者。
 
@@ -65,16 +65,16 @@ Queue 至少投递一次。程序会识别已经跑完的任务，但如果消�
 
 ## 观察积压与恢复
 
-后台显示最近入队时间、最近处理时间、待处理任务数和最早待处理的时间。看到这些再结合 Cloudflare 的队列指标，才知道消息是不是在被消费；光看 producer 绑上了没有意义。
+后台显示最近入队时间、最近处理时间、待处理任务数和最早待处理的时间。结合 Cloudflare 的队列指标，可以判断消息是否在被消费。
 
-程序最多同时存 1000 项待处理任务，每项有效期 15 分钟。过期任务不会变成检查结果，还没到期的监控等下一轮入队。超时时间长的任务可能分几次消费，不会为了塞进一次调用就去改配置里的请求超时。
+程序最多同时存 1000 项待处理任务，每项有效期 15 分钟。过期任务不会变成检查结果，还没到期的监控等下一轮入队。超时时间长的任务可能分几次消费，不会为了塞进一次调用去改配置里的请求超时。
 
 - 检查不通过：确认 producer 和 consumer 指向同一个队列、消费者是当前 Worker，保存部署后重新检查。
 - 积压一直涨：看消费者报错、目标响应时间、请求预算和 Cloudflare 用量，也可以把监控间隔调长。
-- 模型限流或额度不足：照常按渠道冷却处理，别靠立即重投递绕过退避。
-- 暂停、删除或改动了监控：旧任务不会用旧配置盖掉新状态，没执行的任务也不会记成成功或故障。
+- 模型限流或额度不足：按渠道冷却处理，立即重投递会绕过退避，加重限流。
+- 暂停、删除或改动了监控：未执行的任务不会记成成功或故障，旧任务也不会覆盖新状态。
 
-想退回直接检查，先在后台关掉分批检查，再动绑定。队列里可能还有没消费完的消息，删队列不能代替关功能。
+想退回直接检查，先在后台关掉分批检查，再动绑定。队列里可能还有没消费完的消息，所以删队列不能代替关功能。
 
 ## English
 
@@ -92,7 +92,7 @@ Keep the per-minute Cron. It still handles enqueueing, Push timeouts, Agent stat
 4. Save and deploy, then run the Queue connection check under settings and operations in the console.
 5. The check sends a probe that does not touch monitoring targets and waits for the consumer to confirm it. Enable batched checks only after it passes. A producer without a consumer cannot pass.
 
-One message is not one monitor: the application puts up to 10 tasks in each message, so a batch size of 1 still runs several checks in one invocation. Do not raise the batch size to 100 for throughput; that only packs more tasks into the same invocation with the same budget.
+One message is not one monitor: the application puts up to 10 tasks in each message, so a batch size of 1 still runs several checks in one invocation. Raising the batch size only packs more tasks into the same invocation, with the same budget.
 
 Fork and button deployments keep `CHECK_QUEUE` and the current Worker's consumer settings, including timeout, retries, concurrency and dead-letter queue. Deployment stops when those settings cannot be read, so bindings are not dropped. It does not create queues, add missing consumers or take over another Worker's consumer.
 
@@ -108,10 +108,10 @@ Delivery is at least once. The application recognises tasks that already finishe
 
 ### Backlog and recovery
 
-The console reports last enqueue and processing times, pending tasks and the oldest pending task. Read those alongside Cloudflare's Queue metrics; a bound producer on its own proves nothing about consumption.
+The console reports last enqueue and processing times, pending tasks and the oldest pending task. Read those alongside Cloudflare's Queue metrics to see whether messages are being consumed.
 
 The application holds up to 1000 pending tasks, each valid for 15 minutes. Expired tasks do not become check results, and monitors still due are enqueued on the next cycle. Long-timeout tasks may take several invocations rather than having their configured request timeout shortened.
 
-If verification fails, confirm that the producer and the current Worker's consumer use the same Queue, save, deploy and verify again. If backlog keeps growing, look at consumer errors, target duration, request budgets and platform usage, and consider longer intervals. Rate limits and quota failures keep their cooldown instead of retrying immediately. Paused, deleted or changed monitors do not have old tasks overwrite current state, and unexecuted tasks never become successes or failures.
+If verification fails, confirm that the producer and the current Worker's consumer use the same Queue, save, deploy and verify again. If backlog keeps growing, look at consumer errors, target duration, request budgets and platform usage, and consider longer intervals. Rate limits and quota failures keep their cooldown; immediate redelivery would bypass the backoff. Paused, deleted or changed monitors do not have old tasks overwrite current state, and unexecuted tasks never become successes or failures.
 
 To go back to direct checks, turn batching off in the console before touching bindings. Messages may still be in the Queue; deleting the Queue is not the same as turning the feature off.

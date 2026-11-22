@@ -26,7 +26,7 @@
 
 主题选项引用的监控或机器，必须位于对应页面的公开范围内。AI 主题的目标类型为 `ai`，可声明 `public.config`、`public.ai-models` 和 `public.ai-history`。网站和 AI 主题还可声明 `public.subscriptions`、`public.subscription-history`，读取对应类别的公开订阅和条目历史。
 
-通过 `polarisTheme.read('subscriptions', { category: 'website', limit: 50, offset: 0 })` 读取订阅；模型类别使用 `model`。通过 `polarisTheme.read('subscription-history', { id: '条目 ID' })` 读取历史。自定义状态页可传 `pageId`。数据仍遵守公开开关、功能开关和页面范围；请保留来源、有效性和时间含义，避免把快照合并成本地 SLA。详见[订阅指南](subscriptions.md)。
+通过 `polarisTheme.read('subscriptions', { category: 'website', limit: 50, offset: 0 })` 读取订阅；模型类别使用 `model`。通过 `polarisTheme.read('subscription-history', { id: '条目 ID' })` 读取历史。自定义状态页可传 `pageId`。数据仍遵守公开开关、功能开关和页面范围；展示时保留来源和有效性，快照类数据不能当作本站的探测结果。详见[订阅指南](subscriptions.md)。
 
 ## 预览
 

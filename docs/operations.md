@@ -25,7 +25,7 @@ Worker 的默认调度在部署配置里保持一致：
 
 监控自己的间隔决定什么时候到期，不是每次 Cron 都会对所有监控发请求。实际吞吐还受请求预算、并发、超时和目标响应影响。
 
-监控多到一轮检查跑不完时，可以绑定并启用 [Worker Queue](queue.md) 拆成多次调用。producer 和 consumer 都要配，并在后台跑一次往返检查。不开就还是原来的调度。Queue 不会放宽单次调用的限制，队列和消费调用都会增加用量；积压是队列的问题，不是目标出了故障。
+监控多到一轮检查跑不完时，可以绑定并启用 [Worker Queue](queue.md) 拆成多次调用。producer 和 consumer 都要配，并在后台跑一次往返检查。不开就还是原来的调度。Queue 不会放宽单次调用的限制，队列和消费调用都会增加用量。
 
 Worker 生产环境由 Cloudflare 调度。
 
@@ -172,7 +172,7 @@ A Worker invocation can write at most 250 AE points. When a tick exceeds that li
 
 Go runs scheduling inside its process, checks for due work each second, and attempts incremental aggregation and cleanup at startup and every minute. Stopping the process also stops scheduling. For either backend, inspect recent check times and job logs as well as HTTP health.
 
-When one cycle of checks no longer fits in a single invocation, bind and enable [Worker Queue](queue.md#english) to split it. Configure both producer and consumer and run the round-trip check in the console. Without it, the original scheduler continues. Queues do not raise per-invocation limits, and both the queue and consumer invocations add cost; a growing backlog is a queue problem, not a target failure.
+When one cycle of checks no longer fits in a single invocation, bind and enable [Worker Queue](queue.md#english) to split it. Configure both producer and consumer and run the round-trip check in the console. Without it, the original scheduler continues. Queues do not raise per-invocation limits, and both the queue and consumer invocations add cost.
 
 ### Upgrade
 

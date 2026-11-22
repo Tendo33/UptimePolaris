@@ -221,7 +221,7 @@ pa uninstall
 
 系统安装要提权执行，例如 `sudo pa uninstall`；Windows 用管理员 PowerShell 运行 `pa uninstall`。`--dry-run` 只列出将删除的内容，`--yes` 跳过确认。
 
-受管理的服务一旦停止就会终止当前进程，Windows 也无法删除正在运行的程序，所以确认后剩余步骤交给脱离的辅助脚本完成，日志写到程序旁的 `uninstall.log`。卸载只删除带本次安装标记的服务定义，遇到未完成的安装事务会先拒绝。Docker 安装由宿主机上的 Compose 项目管理，程序内会拒绝卸载，并提示在宿主机执行 `docker compose down`。
+确认后剩余步骤由脱离的后台进程完成，日志写到系统临时目录下的 `polaris-uninstall-<服务名>.log`。卸载只处理带本次安装标记的服务定义；有未完成的安装事务时会先拒绝。Docker 安装由宿主机上的 Compose 项目管理，程序内会拒绝卸载，并提示在宿主机执行 `docker compose down`。
 
 也可以用安装脚本卸载，权限、模式、服务名和安装目录要和安装时一致：
 
@@ -295,7 +295,7 @@ The console's **Check for updates** reads the Agent release manifest on the Go o
 
 The Agent can uninstall itself with `pa uninstall`, which unregisters the terminal command, stops and deletes the service, and removes the binary and configuration. Use `--dry-run` to print the plan and `--yes` to skip confirmation. On a system installation run it with elevation, for example `sudo pa uninstall`, and on Windows from an elevated PowerShell.
 
-Because stopping a supervised service terminates the process and Windows cannot delete a running binary, the remaining steps run in a detached helper that logs to `uninstall.log` next to the binary. Only service definitions carrying this installation's marker are deleted, and an unfinished install transaction blocks the command. Docker installations belong to the Compose project on the host; the command refuses them and prints the `docker compose down` to run there.
+After confirmation the remaining steps run in a detached helper and log to `polaris-uninstall-<service>.log` in the temporary directory. Only service definitions carrying this installation's marker are touched, and an unfinished install transaction blocks the command. Docker installations belong to the Compose project on the host; the command refuses them and prints the `docker compose down` to run there.
 
 The install scripts also uninstall, with the original scope, service name and directory: `install.sh --uninstall` or `install.ps1 -Uninstall`. Removing the host program does not delete console monitors; deleting a console entry does not uninstall the host program.
 

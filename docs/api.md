@@ -230,7 +230,7 @@ AI 管理接口使用相同的管理员会话或 Bearer Token。写请求来自 
 
 渠道的 `protocol` 必填，可选值为 `openai`（Chat Completions）、`openai_responses`、`anthropic` 和 `gemini`。`baseUrl` 填写含版本路径的接口前缀，生成路径由所选协议追加。Gemini 的 `modelId` 使用不含 `models/` 的模型名称，仅支持英文字母、数字、点、下划线和连字符，且必须以字母或数字开头。无效名称或向 Gemini 切换时已有模型名称不合要求，返回 400 `invalid_ai_model_id`。地址和模型示例见 [AI 模型监控](ai-monitoring.md#添加渠道和模型)。
 
-渠道写入可带 `headers` 字符串键值对象，不限制条数，编码后的 JSON 不超过 64 KiB。头名称忽略大小写，不可重复；值不超过 2048 个可打印 ASCII 字符。认证、路由、Cookie 和连接控制类请求头不能覆盖，非法内容返回 400 `invalid_ai_headers`。更新时省略 `headers` 保留原值，`{}` 清除。列表和写入响应只返回 `headerNames`；管理员读取 `GET /api/admin/ai/channels/:id` 时另返回解密后的 `headers`，用于再次编辑。API Key 和密文始终不返回。
+渠道写入可带 `headers` 字符串键值对象，不限制条数，编码后的 JSON 不超过 64 KiB。头名称忽略大小写，不可重复；值不超过 2048 个可打印 ASCII 字符。认证、路由、Cookie 和连接控制类请求头不能覆盖，非法内容返回 400 `invalid_ai_headers`。更新时省略 `headers` 保留原值，`{}` 清除。列表和写入响应只返回 `headerNames`；管理员读取 `GET /api/admin/ai/channels/:id` 时另返回解密后的 `headers`，用于再次编辑。
 
 渠道写入可带 `notificationChannelIds`，最多选择 32 个已有通知渠道 ID，适用于该 AI 渠道下的所有模型。更新时省略则保留；`[]` 使用全局规则，向未限定分组的已启用渠道发送。非空数组只向指定渠道发送。渠道读取返回该字段，模型不包含该字段。普通监控通过 `options_json.notificationChannelIds` 使用相同选择规则；留空时按原有通知分组范围匹配。
 
@@ -285,7 +285,7 @@ AI 管理接口使用相同的管理员会话或 Bearer Token。写请求来自 
 | `POST /api/admin/check-queue/probe` | 提交 `{ revision }`，发送往返探测消息；202 响应仅表示已接受，不代表消费者已确认 |
 | `PUT /api/admin/check-queue` | 提交 `{ revision, enabled }`，显式启用或关闭分批检查 |
 
-三个接口直接返回 `CheckQueueStatus` 对象，不套 `status` 字段。`verification.state` 为 `never`、`pending`、`passed`、`timed_out` 或 `failed`；探测不调用监控目标。客户端读取状态，直到消费者确认或到达 `verification.expiresAt`，不要把 POST 返回成功当成检测通过。
+三个接口直接返回 `CheckQueueStatus` 对象，不套 `status` 字段。`verification.state` 为 `never`、`pending`、`passed`、`timed_out` 或 `failed`；探测不调用监控目标。`POST .../probe` 的 202 表示消息已接受，消费者确认后才变为 `passed`，并以 `verification.expiresAt` 为超时上限。
 
 只有 `canEnable=true` 才能启用；已通过的检测超过有效期后需重新检测。修改携带最新 `revision`，409 `revision_conflict` 时重新读取。`schema` 为 `missing` 或 `unavailable` 时不能修改 Queue 配置，普通未启用 Queue 的监控不因此新增部署前提。
 

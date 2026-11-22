@@ -27,7 +27,7 @@
 
 请求头可以用键值行或 JSON 编辑，条数不限。值加密保存，再打开渠道编辑器会带回已保存的值，不需要重填。删光所有行或提交空对象就清除了。整个 JSON 不超过 64 KiB，名称不超过 64 个字符，单个值不超过 2048 个可打印 ASCII 字符。认证头、`Content-Type`、`Host`、`Cookie` 和连接控制类请求头不能覆盖。API Key 还是填在专用字段，保存后不回显。
 
-基础地址支持 HTTP、HTTPS、本机和内网，例如 `http://127.0.0.1:11434/v1`，或者容器网络里的 `http://ollama:11434/v1`。`localhost` 指向执行检查的后端，不是浏览器所在的电脑：Go 能连到服务器访问得到的内网服务，云端 Worker 连不到你的本机，要填它能访问的地址。
+基础地址支持 HTTP、HTTPS、本机和内网，例如 `http://127.0.0.1:11434/v1`，或者容器网络里的 `http://ollama:11434/v1`。`localhost` 指服务器自己，不是你的电脑；本地模型服务要填服务器能访问到的地址。
 
 HTTP 会明文传输密钥，公网服务请用 HTTPS。文件路径、URL 里的凭据、查询参数和片段都不支持，云元数据地址也会被拒绝。
 
@@ -67,9 +67,9 @@ OpenAI 协议用 Bearer 认证；Anthropic 用 `x-api-key` 和 `anthropic-versio
 
 模型列表显示定时检查的结果、检查时间和完整响应耗时，不是首字延迟。认证失败、没有权限、模型或接口不可用、已知限流、已知额度不足、超时和无效响应分别有各自的标签。原因不明的 HTTP 429 只显示请求或额度受限。
 
-渠道的连接结果和模型结果分开算。暂停、改配置等下次检查、请求预算用完、密钥不可用、渠道冷却、结果过期，这些情况不会显示成正常，也不会记成一次模型故障。过期时仍能看到上次实际检查的时间和结果。
+渠道的连接结果和模型结果分开算。暂停、等待下次检查、结果过期等没有实际执行检查的情况显示为待确认，不算模型故障；过期时仍能看到上次实际检查的时间和结果。
 
-后台和公开页的可用性条显示最近最多 60 次定时检查。手动检查和没执行的轮次不计入，空位也不会补成正常。改名称、公开设置或通知渠道不会清空状态条；只有探测配置变了，才从新配置的检查重新积累。
+后台和公开页的可用性条显示最近最多 60 次定时检查。手动检查和没执行的轮次不参与统计。改名称、公开设置或通知渠道不影响已有状态条；修改地址、模型 ID 等探测配置后，从新配置的检查重新积累。
 
 “检查记录”能切换最近 7、30、90 个 UTC 自然日，包含当天。可用率 = 成功次数 ÷ 实际检查次数，没执行的检查不进分母，缺的时段也不补。Worker 的明细来自 Analytics Engine，可能有延迟，也可能是采样数据；每日汇总是精确计数。明细暂时读不到时，已有的汇总和状态条照常显示。
 
@@ -103,7 +103,7 @@ POLARIS_AI_KEY_FILE=/run/secrets/polaris-ai-key
 
 POSIX 上文件权限设为 `0600`，只让运行账号读写。Windows 上收紧 DACL，只给运行账号和 SYSTEM 需要的权限，不能用符号链接。这个文件单独备份，不要提交到 Git。SQLite 换到 PostgreSQL 时保留原来的 `ai-credential.key`，把它当作目标实例的显式密钥文件。
 
-恢复时把数据库和加密材料一起恢复。文件丢了不会自动生成一个新的来冒充原密钥，先从备份恢复。实在恢复不了，就配置新的受保护材料，再一个个换掉渠道 API Key。别用轮换 Worker `ADMIN_TOKEN` 的方式修 AI 密钥：它还保护初始化时的选库记录。
+恢复时把数据库和加密材料一起恢复。文件丢失时从备份恢复；无法恢复就只能配置新的密钥材料，再逐个替换渠道 API Key。轮换 Worker `ADMIN_TOKEN` 不能解决密钥丢失，它同时保护初始化时的选库记录。
 
 ## English
 
@@ -122,7 +122,7 @@ Turn on **AI monitoring** under presentation settings the first time you use it.
 
 Custom headers cover cases like gateway authentication or an OpenAI organization ID. Edit them as key/value rows or JSON, with no limit on the number of entries. Values are encrypted, and reopening the channel editor brings them back so you don't retype them. Delete every row or submit an empty object to clear them. The whole JSON is capped at 64 KiB, names at 64 characters, and each value at 2048 printable ASCII characters. Authentication, `Content-Type`, `Host`, `Cookie` and connection-control headers cannot be overridden. The API key stays in its own field and is not shown after saving.
 
-Base URLs accept HTTP, HTTPS, local and private hosts, such as `http://127.0.0.1:11434/v1` or `http://ollama:11434/v1` on a container network. `localhost` means the machine running the check, not your browser: Go reaches services its server can see, while a cloud Worker cannot reach your computer and needs an address it can open. HTTP sends the key in clear text, so use HTTPS for public services. File paths, credentials in the URL, query parameters and fragments are not supported, and cloud metadata addresses are rejected.
+Base URLs accept HTTP, HTTPS, local and private hosts, such as `http://127.0.0.1:11434/v1` or `http://ollama:11434/v1` on a container network. `localhost` means the server itself, not your computer; a local model service needs an address the server can reach. HTTP sends the key in clear text, so use HTTPS for public services. File paths, credentials in the URL, query parameters and fragments are not supported, and cloud metadata addresses are rejected.
 
 | Protocol | Example base URL | Appended generation path | Example model ID |
 | --- | --- | --- | --- |
@@ -147,9 +147,9 @@ OpenAI protocols use Bearer authentication. Anthropic uses `x-api-key` and `anth
 
 The model list shows scheduled results, check times and full-response duration, not time to first token. Authentication, permission, missing model or endpoint, known rate limits, known quota exhaustion, timeouts and invalid responses each get their own label. An unexplained HTTP 429 only says the request or quota was limited.
 
-Channel connection results are separate from model results. Paused models, models waiting for a check after a config change, runs skipped for lack of request budget, unavailable keys, channel cooldowns and stale results never appear healthy and are not counted as model failures. Stale results still show the last actual check time and outcome.
+Channel connection results are separate from model results. Paused models, models waiting for their next check and stale results show as unconfirmed rather than as failures; stale results still show the last actual check time and outcome.
 
-Status rails in the console and on the public page show up to 60 scheduled checks. Manual checks and skipped rounds are excluded, and gaps are not filled in as healthy. Renaming a model, changing its visibility or changing notification channels keeps the current rail; only probe configuration changes start a fresh rail.
+Status rails in the console and on the public page show up to 60 scheduled checks. Manual checks and rounds that did not run are left out. Renaming a model, changing its visibility or changing notification channels keeps the current rail; changing the URL, model ID or other probe settings starts a fresh one.
 
 **Check history** covers 7, 30 or 90 UTC calendar days including today. Availability is successes divided by actual checks; skipped checks stay out of the denominator and gaps are not filled. Worker details come from Analytics Engine and may arrive late or be sampled, while daily summaries are exact counts. When details are temporarily unavailable, existing summaries and rails stay visible.
 
@@ -177,4 +177,4 @@ A saved API key is never shown again. Editing a channel keeps the current key un
 
 A Go key file holds **32 raw random bytes**, not a password, hex string or Base64 text. Provision it with your secret tooling, for example by mounting it at `/run/secrets/polaris-ai-key`, then set `POLARIS_AI_KEY_FILE` to that path. On POSIX the file must be readable only by the runtime account (`0600`). On Windows, restrict the DACL to the runtime account and SYSTEM, and do not use symlinks. Back the file up on its own and keep it out of Git. When moving from SQLite to PostgreSQL, keep the original `ai-credential.key` and use it as the explicit key file on the new instance.
 
-Restore the database and its encryption material together. A missing file is never silently replaced with a fresh key: restore the backup first. If recovery is impossible, provision new protected material and replace every channel API key. Do not rotate the Worker's `ADMIN_TOKEN` to fix AI keys; it also protects the setup database-selection records.
+Restore the database and its encryption material together. If the file is lost, restore it from backup; without a backup, provision new key material and replace every channel API key. Rotating the Worker's `ADMIN_TOKEN` does not recover lost keys, and it also protects the setup database-selection records.
