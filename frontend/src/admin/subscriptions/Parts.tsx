@@ -244,7 +244,7 @@ function ParameterLinkField({ descriptor, name, field, page, parameters, onChang
       labelPlacement="outside"
       inputMode="url"
       autoCapitalize="none"
-      spellCheck={false}
+      spellCheck="false"
       value={value}
       onValueChange={update}
       onBlur={() => setTouched(true)}
