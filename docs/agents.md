@@ -125,7 +125,7 @@ polaris-agent run --config /path/to/config.json
 | `--no-path` | 只生成包装器，不改 PATH 或 Shell profile |
 | `--dry-run` | 查看注册或移除动作 |
 
-`command unregister` 只移除这次安装登记的命令和路径修改，不等于卸载 Agent。注册器会检查文件归属，遇到其他程序占用 `pa` 或目标命令时拒绝覆盖。包装器只保存程序和配置路径，不包含机器 Token。安装元数据 `install.json` 和配置放在一起，管理和卸载都要用到，不要删除。
+`command unregister` 只移除这次安装登记的命令和路径修改，不等于卸载 Agent；完整卸载用 `pa uninstall`。注册器会检查文件归属，遇到其他程序占用 `pa` 或目标命令时拒绝覆盖。包装器只保存程序和配置路径，不包含机器 Token。安装元数据 `install.json` 和配置放在一起，管理和卸载都要用到，不要删除。
 
 ## 本地配置
 
@@ -179,13 +179,16 @@ CLI 参数和环境变量的显式覆盖，在远程修改时仍然优先。远�
 | 动作 | 用途 |
 | --- | --- |
 | `re_report` | 请求尽快重新上报 |
-| `check_update` | 检查可用版本 |
 | `restart` | 在具备退出后重启能力的服务管理器下重启 |
 | `upgrade` | 下载并应用受支持的升级 |
 
 指令入队只代表服务端接受了任务，还要看执行记录和回执。这里没有任意 Shell 命令执行功能。`restart` 和 `upgrade` 只允许在 Agent 确认为 `service_tier: A` 的托管环境执行；手动运行等环境会拒绝这类可能导致机器永久停报的动作。
 
 ## 更新与回滚
+
+控制台的“检查更新”由 Go 或 Worker 后端查询 Agent 发布清单，刷新整份机器列表的版本状态，不向探针下发检查指令，也不要求探针在线或开启远程指令。成功结果自动缓存 5 分钟，手动检查在 60 秒内复用同一结果。
+
+发现新版本后，可对在线且支持指令的机器点“升级”。后端再次确认存在更新，才下发 `upgrade`；探针负责下载、校验并执行安全重启。关闭远程指令时仍可检查版本，但不能远程升级。
 
 ```sh
 pa update
@@ -206,25 +209,33 @@ POSIX 安装脚本重新安装时，会在替换配置和程序前保存私有�
 
 脚本提示遗留锁时，先确认没有安装器还在运行，再按提示处理空 gate 或失效 PID 锁。锁是保护并发安装用的，不是普通缓存，不能随手删。
 
-`run`、`update` 和 `rollback` 不支持 `--dry-run`，不要把它当成所有命令通用的安全开关。
+`run`、`update` 和 `rollback` 不支持 `--dry-run`，不要把它当成所有命令通用的安全开关。`uninstall` 和服务的启停一样支持 `--dry-run`。
 
 ## 卸载
 
-卸载由安装脚本执行，没有 `pa uninstall` 子命令。先从 Agent 仓库下载脚本，再传卸载选项：
+Agent 可以卸载自己。`pa uninstall` 会注销终端命令，停止并删除服务，然后删除程序文件和配置：
+
+```sh
+pa uninstall
+```
+
+系统安装要提权执行，例如 `sudo pa uninstall`；Windows 用管理员 PowerShell 运行 `pa uninstall`。`--dry-run` 只列出将删除的内容，`--yes` 跳过确认。
+
+受管理的服务一旦停止就会终止当前进程，Windows 也无法删除正在运行的程序，所以确认后剩余步骤交给脱离的辅助脚本完成，日志写到程序旁的 `uninstall.log`。卸载只删除带本次安装标记的服务定义，遇到未完成的安装事务会先拒绝。Docker 安装由宿主机上的 Compose 项目管理，程序内会拒绝卸载，并提示在宿主机执行 `docker compose down`。
+
+也可以用安装脚本卸载，权限、模式、服务名和安装目录要和安装时一致：
 
 ```sh
 curl -fsSL 'https://raw.githubusercontent.com/XingLingQAQ/Polaris-Agent/main/install.sh' -o install.sh
 sh install.sh --uninstall
 ```
 
-Windows 下载实际执行的脚本：
-
 ```powershell
 Invoke-WebRequest 'https://raw.githubusercontent.com/XingLingQAQ/Polaris-Agent/main/install.ps1' -OutFile install.ps1
 & ./install.ps1 -Uninstall
 ```
 
-权限、模式、服务名和安装目录要和安装时一致；自定义安装要传回对应选项。卸载器按安装归属检查服务、程序、注册命令和配置。卸载主机程序不会删除控制台的监控条目，后台删除条目也不会远程卸载机器程序。
+卸载主机程序不会删除控制台的监控条目，后台删除条目也不会远程卸载机器程序。
 
 ## 数据与连接
 
@@ -262,7 +273,7 @@ For installation and reinstallation, the command downloads the script from the A
 
 System mode is available on Linux, macOS and Windows. User mode uses Linux `systemd --user`, macOS launchd in the logged-in user's session, or Windows Task Scheduler. The macOS user service stops at logout. Manual mode prepares files for foreground operation. Linux Docker mode uses Compose; its default system view is the container view unless host resources are explicitly mounted and permitted.
 
-Use `pa start`, `pa stop`, `pa restart`, `pa status`, `pa logs`, `pa logs -f` or `pa logs -n 200` for supported installations. System services may require administrator privileges. `pa restart --dry-run` previews a service operation; `run`, `update` and `rollback` do not support that flag. `polaris-agent run --config /path/to/config.json` runs in the foreground; do not start a second instance alongside an existing service.
+Use `pa start`, `pa stop`, `pa restart`, `pa status`, `pa logs`, `pa logs -f` or `pa logs -n 200` for supported installations. System services may require administrator privileges. `pa restart --dry-run` previews a service operation and `pa uninstall --dry-run` previews an uninstall; `run`, `update` and `rollback` do not support that flag. `polaris-agent run --config /path/to/config.json` runs in the foreground; do not start a second instance alongside an existing service.
 
 The installer normally registers `pa` and `polaris-agent`. `polaris-agent command status`, `command register` and `command unregister` manage the wrappers. Registration refuses to overwrite files owned by another program. Keep `install.json` with the configuration for management and uninstall.
 
@@ -272,15 +283,21 @@ Configuration precedence is CLI flags, then `POLARIS_AGENT_*` environment variab
 
 `security.allowAgentCommands` is off by default. Remote configuration has seven fields: `sample_interval_secs`, `report_interval_secs`, the four filter lists and `auto_update`. Submit the complete configuration with the current `expected_revision`; each filter has at most 32 entries of at most 256 characters without control characters. Reload and merge after `agent_config_conflict`. A saved desired revision is not proof of application: wait for a matching Agent report. Explicit CLI or environment overrides take precedence and can cause the Agent to reject the entire remote version.
 
-Supported actions are `re_report`, `check_update`, `restart` and `upgrade`. The Agent must be online and advertise command support. Restart and upgrade require a supervised `service_tier: A` installation. Queued commands are not confirmation of execution; inspect the command record and receipt. Arbitrary shell execution is not supported.
+Supported actions are `re_report`, `restart` and `upgrade`. The Agent must be online and advertise command support. Restart and upgrade require a supervised `service_tier: A` installation. Queued commands are not confirmation of execution; inspect the command record and receipt. Arbitrary shell execution is not supported.
 
 ### Update, rollback and uninstall
+
+The console's **Check for updates** reads the Agent release manifest on the Go or Worker backend and refreshes version status across the fleet. It sends no check command and works while Agents are offline or remote commands are disabled. Successful results are cached for five minutes; manual checks reuse a result for 60 seconds. **Upgrade** still requires an online Agent with command support and remote commands enabled. The backend confirms that a newer version exists before queuing `upgrade`; the Agent downloads, verifies and applies it.
 
 `pa update` downloads a stable release and verifies file integrity. Downloads use fixed GitHub HTTPS addresses independently of the site's `endpoint` scheme. The machine needs access to the GitHub API and release assets. Managed Linux, macOS and Windows installations can opt into automatic updates, which are checked after a successful report at most once a day. Check the service, logs, reported version and latest report after updating. Docker installations update by rebuilding and replacing the container.
 
 `pa rollback` requires the previous binary on the machine; it does not revert server data or configuration. A Windows managed update attempts to restore the previous binary if restarting the scheduled task fails. POSIX reinstallers keep private recovery records; after an interruption, stop the service and rerun the installer with the original privileges, mode, service name and directory. Preserve the transaction directory if a backup is missing.
 
-Uninstall uses the scripts in the Agent GitHub repository, not `pa uninstall`. Download `install.sh` and run it with `--uninstall`, or download `install.ps1` and run it with `-Uninstall`. Use the original installation scope, service name and directory. Removing the host program does not delete console monitors; deleting a console entry does not uninstall the host program.
+The Agent can uninstall itself with `pa uninstall`, which unregisters the terminal command, stops and deletes the service, and removes the binary and configuration. Use `--dry-run` to print the plan and `--yes` to skip confirmation. On a system installation run it with elevation, for example `sudo pa uninstall`, and on Windows from an elevated PowerShell.
+
+Because stopping a supervised service terminates the process and Windows cannot delete a running binary, the remaining steps run in a detached helper that logs to `uninstall.log` next to the binary. Only service definitions carrying this installation's marker are deleted, and an unfinished install transaction blocks the command. Docker installations belong to the Compose project on the host; the command refuses them and prints the `docker compose down` to run there.
+
+The install scripts also uninstall, with the original scope, service name and directory: `install.sh --uninstall` or `install.ps1 -Uninstall`. Removing the host program does not delete console monitors; deleting a console entry does not uninstall the host program.
 
 ### Data and connectivity
 
