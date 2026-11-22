@@ -54,7 +54,7 @@ export function AgentVersionPopover({ agent, latestVersion, onCommandsLoaded, on
       if (mounted.current) setBusy(null);
     }
   };
-  const last = history?.commands[0];
+  const last = history?.commands.find(command => command.action === 'upgrade');
 
   return (
     <Popover isOpen={open} onOpenChange={setOpen} placement="bottom-start" showArrow>
@@ -72,8 +72,10 @@ export function AgentVersionPopover({ agent, latestVersion, onCommandsLoaded, on
         </div>
         <div className="space-y-1 text-tiny text-default-600">
           <p>{t('fieldVersion')} · <span className="font-mono">{agent.version ?? '—'}</span></p>
-          <p>{adminT('agent.latestVersion', { version: latestVersion ?? '—' })}</p>
+          <p>{adminT('agent.latestVersion', { version: updateCheck.result?.latestVersion ?? latestVersion ?? '—' })}</p>
         </div>
+        {updateCheck.result ? <p role="status" className="text-tiny text-default-500">{t('commandCheckUpdate')} · {t('commandOk')}</p> : null}
+        {updateCheck.error ? <p role="alert" className="text-tiny text-danger">{t('commandCheckUpdate')} · {apiErrorMessage(updateCheck.error)}</p> : null}
         {!history && !error ? <p role="status" className="text-tiny text-default-500">{t('loading')}</p> : null}
         {reason ? <p className="text-tiny text-default-500">{reason}</p> : null}
         {active ? <p role="status" className="flex items-center gap-1.5 text-tiny text-primary"><Loader2 size={12} className="animate-spin motion-reduce:animate-none" />{t(`command_${active.action}`)} · {t(active.state === 'pending' ? 'commandQueued' : active.action === 'upgrade' ? 'updateInProgress' : 'commandPending')}</p> : null}

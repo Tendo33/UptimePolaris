@@ -53,6 +53,7 @@ const releaseFixture = {
         })) };
       export async function latestAgentRelease() { return manifest; }
       export function cachedAgentRelease() { return manifest; }
+      export function agentReleaseFailureReason() { return 'github_unavailable'; }
       export function releaseUrl(_manifest, file) { return 'https://example.invalid/' + file; }
     ` }));
   },
@@ -328,10 +329,19 @@ try {
   console.log('PASS Agent probe setting: read-only detail shows disabled status, failed save retains switch value for retry');
 
   await db.prepare('UPDATE agents SET active=1 WHERE id=?').bind(agent.id).run();
+  await db.prepare("INSERT INTO agent_commands(id,agent_id,action,queued_at,state,ok,completed_at) VALUES(?,?,'check_update',?,'completed',0,?)").bind('old-update-check',agent.id,Math.floor(Date.now()/1000)-60,Math.floor(Date.now()/1000)-59).run();
   await reload();
   const versionButton = `[...document.querySelectorAll('tbody button[aria-label]')].find(button=>button.getAttribute('aria-label').includes('Renamed fixture')&&button.getBoundingClientRect().height>0)`;
   await evaluate(versionButton+'.click()');
   await until(`[...document.querySelectorAll('button')].some(button=>button.textContent.trim()===${JSON.stringify(catalog.agents.commandUpgrade)}&&!button.disabled)`);
+  const checkFailed = catalog.agents.commandCheckUpdate + ' · ' + catalog.agents.commandFailed;
+  const checkSucceeded = catalog.agents.commandCheckUpdate + ' · ' + catalog.agents.commandOk;
+  assert.equal(await evaluate(`document.body.textContent.includes(${JSON.stringify(checkFailed)})`),false);
+  await click(catalog.agents.commandCheckUpdate);
+  await until(`[...document.querySelectorAll('[role=status]')].some(node=>node.textContent===${JSON.stringify(checkSucceeded)})`);
+  assert.equal(await evaluate(`document.body.textContent.includes(${JSON.stringify(checkFailed)})`),false);
+  assert.equal((await db.prepare("SELECT ok FROM agent_commands WHERE id='old-update-check'").first()).ok,0);
+  assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM agent_commands WHERE agent_id=? AND action='check_update'").bind(agent.id).first()).n,1);
   await writeFile('artifacts/tmp/agent-upgrade-desktop.png',Buffer.from((await command('Page.captureScreenshot',{format:'png'})).data,'base64'));
   await click(catalog.agents.commandUpgrade);
   await until(`document.body.textContent.includes(${JSON.stringify(catalog.agents.commandQueued)})`);
@@ -339,9 +349,10 @@ try {
   await db.prepare("UPDATE agent_commands SET state='leased',lease_token='fixture',lease_until=?,attempts=1 WHERE agent_id=? AND action='upgrade' AND state='pending'").bind(Math.floor(Date.now()/1000)+60,agent.id).run();
   await until(`document.body.textContent.includes(${JSON.stringify(catalog.agents.updateInProgress)})`);
   assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM agent_commands WHERE agent_id=? AND action='upgrade'").bind(agent.id).first()).n,1);
-  await db.prepare("UPDATE agent_commands SET state='completed',ok=1,completed_at=? WHERE agent_id=?").bind(Math.floor(Date.now()/1000),agent.id).run();
+  await db.prepare("UPDATE agent_commands SET state='completed',ok=1,completed_at=? WHERE agent_id=? AND action='upgrade'").bind(Math.floor(Date.now()/1000),agent.id).run();
   await db.prepare("UPDATE machine_live SET version='0.4.0',reported_at=? WHERE agent_id=?").bind(Math.floor(Date.now()/1000),agent.id).run();
-  await until(`document.body.textContent.includes(${JSON.stringify(catalog.agents.commandOk)}) && document.querySelector('tbody').textContent.includes('0.4.0')`);
+  const upgradeSucceeded = catalog.agents.command_upgrade + ' · ' + catalog.agents.commandOk;
+  await until(`[...document.querySelectorAll('[role=status]')].some(node=>node.textContent===${JSON.stringify(upgradeSucceeded)}) && document.querySelector('tbody').textContent.includes('0.4.0')`);
   console.log('PASS Agent upgrade: version popover queues one command and reflects completion and refreshed version');
   await reload();
   await openEdit();

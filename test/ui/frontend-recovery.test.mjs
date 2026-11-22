@@ -153,3 +153,54 @@ console.log('frontend recovery: maintenance invalid draft and valid recovery pas
   assert.doesNotMatch(src, /<MotionConfig/, 'the status island inherits the shared motion preference');
 }
 console.log('frontend recovery: status island full-motion default passed');
+
+{
+  const src = source('frontend/src/admin/agents/useAgentUpdateCheck.ts');
+  const part = src.slice(src.indexOf('export function useAgentUpdateCheck')).replace('export function', 'function');
+  const states = [], effects = [], messages = [];
+  let cursor = 0, resolve, reject, refreshes = 0;
+  const refreshFailure = new Error('fleet refresh failed');
+  const checkFailure = new Error('release unavailable');
+  const useState = initial => {
+    const i = cursor++;
+    if (!(i in states)) states[i] = initial;
+    return [states[i], value => { states[i] = typeof value === 'function' ? value(states[i]) : value; }];
+  };
+  const useRef = initial => { const i = cursor++; return states[i] ??= { current: initial }; };
+  const useEffect = fn => { const i = cursor++; if (!(i in states)) { states[i] = true; effects.push(fn); } };
+  const hook = compile(part, 'useAgentUpdateCheck', {
+    useState, useRef, useEffect,
+    useTranslations: () => (key, values) => values ? `${key}:${values.version}` : key,
+    useApiErrorMessage: () => error => error.message,
+    toast: { success: text => messages.push(['success', text]), error: text => messages.push(['error', text]) },
+    agentsApi: { checkUpdate: () => new Promise((yes, no) => { resolve = yes; reject = no; }) },
+  });
+  const onUpdated = async () => { refreshes++; throw refreshFailure; };
+  const render = () => { cursor = 0; const out = hook(onUpdated); effects.splice(0).forEach(fn => fn()); return out; };
+  let api = render();
+  let pending = api.check();
+  assert.equal(render().checking, true);
+  resolve({ latestVersion: '0.2.1' });
+  await pending;
+  api = render();
+  assert.deepEqual(api.result, { latestVersion: '0.2.1' });
+  assert.equal(api.error, null, 'fleet refresh failures must not become update check failures');
+  assert.equal(api.checking, false);
+  assert.deepEqual(messages, [['success', 'versionChecked:0.2.1'], ['error', refreshFailure.message]]);
+  pending = api.check();
+  assert.equal(render().result, null);
+  reject(checkFailure);
+  await pending;
+  api = render();
+  assert.equal(api.error, checkFailure);
+  assert.equal(api.result, null);
+  assert.equal(refreshes, 1, 'failed checks must not refresh the fleet');
+  pending = api.check();
+  assert.equal(render().error, null, 'retry clears the previous check failure');
+  resolve({ latestVersion: '0.2.1' });
+  await pending;
+  api = render();
+  assert.equal(api.error, null);
+  assert.deepEqual(api.result, { latestVersion: '0.2.1' });
+}
+console.log('frontend recovery: backend Agent update checks are independent of fleet refresh failures');

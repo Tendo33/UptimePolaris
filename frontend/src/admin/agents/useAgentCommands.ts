@@ -31,10 +31,11 @@ export function useAgentCommands({ agentId, enabled, mode, onCommandsLoaded, onU
       try {
         const response = await agentsApi.listCommands(agentId, 20, controller.signal);
         if (controller.signal.aborted) return;
-        setHistory(response);
+        const commands = mode === 'version' ? response.commands.filter(row => row.action !== 'check_update') : response.commands;
+        setHistory({ ...response, commands });
         setError(null);
         callbacks.current.onCommandsLoaded(agentId, response.commands);
-        const pending = response.commands.some(row => row.state === 'pending' || row.state === 'leased');
+        const pending = commands.some(row => row.state === 'pending' || row.state === 'leased');
         const completed = mode === 'version' && pendingState.current.hadPending && !pending;
         pendingState.current.hadPending = pending;
         if (completed) callbacks.current.onUpdated?.();
