@@ -20,8 +20,20 @@ type Object map[string]any
 type Store struct {
 	db       *sql.DB
 	postgres bool
-	mu       sync.Mutex
+	mu       *sync.Mutex
 	queries  atomic.Uint64
+}
+
+// 同一个数据库可能被多个 Store 打开（多实例、测试内的两个服务）。
+// 进程内的写事务共用一把锁，否则各持一把锁时读-判-写会同时通过。
+// The same database can be opened by several Stores (multiple instances, two
+// servers in one test). Writes in one process share a lock per database;
+// separate locks would let read-check-write pass twice.
+var storeLocks sync.Map
+
+func lockFor(databaseURL string) *sync.Mutex {
+	value, _ := storeLocks.LoadOrStore(databaseURL, &sync.Mutex{})
+	return value.(*sync.Mutex)
 }
 
 type databaseOpenError struct{ connection bool }
@@ -58,7 +70,7 @@ func openStore(ctx context.Context, databaseURL string, newPostgres bool) (*Stor
 	} else {
 		db.SetMaxOpenConns(12)
 	}
-	s := &Store{db: db, postgres: pg}
+	s := &Store{db: db, postgres: pg, mu: lockFor(databaseURL)}
 	if err = db.PingContext(ctx); err != nil {
 		db.Close()
 		return nil, &databaseOpenError{connection: true}
