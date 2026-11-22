@@ -5,6 +5,7 @@ package polaris
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -16,6 +17,18 @@ import (
 type releaseTransport func(*http.Request) (*http.Response, error)
 
 func (f releaseTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
+func TestAgentReleaseFailureReason(t *testing.T) {
+	for _, code := range []string{"github_timeout", "github_rate_limited", "release_not_found", "invalid_release_manifest", "invalid_release_redirect"} {
+		if got := agentReleaseFailureReason(errors.New(code)); got != code {
+			t.Fatalf("reason for %s: %s", code, got)
+		}
+	}
+	if got := agentReleaseFailureReason(errors.New("private details")); got != "github_unavailable" {
+		t.Fatalf("unexpected details exposed: %s", got)
+	}
+}
+
 func TestAgentReleaseContract(t *testing.T) {
 	original := releaseClient.Transport
 	defer func() {

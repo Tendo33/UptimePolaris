@@ -68,7 +68,7 @@ export function AgentCommandsDialog({ agent, onClose, onCommandsLoaded, onUpdate
           <span className="pr-6 text-[13px] font-normal text-[var(--polaris-ink-3)]">{agent.name}</span>
         </DrawerHeader>
         <DrawerBody className="gap-5 px-6 py-5">
-          <Button variant="bordered" startContent={<SearchCheck size={15} />} isLoading={updateCheck.checking} isDisabled={updateCheck.checking} onPress={() => void updateCheck.check()}>{t('commandCheckUpdate')}</Button>
+          <Button variant="bordered" startContent={<SearchCheck size={15} />} isLoading={updateCheck.checking} isDisabled={updateCheck.checking} onPress={() => void updateCheck.check()}>{updateCheck.checking ? adminT('versionStatus.checking') : t('commandCheckUpdate')}</Button>
           {!history && !error ? <div role="status" className="flex items-center gap-2 py-6 text-small text-default-500"><Loader2 size={16} className="animate-spin" />{t('loading')}</div> : null}
           {error ? <div role="alert" className="polaris-well space-y-2 px-4 py-3 text-[13px] text-danger-600"><p>{errorMessage(error)}</p><Button size="sm" variant="light" onPress={refresh}>{adminT('action.retry')}</Button></div> : null}
           {blocked ? <p className="polaris-well px-4 py-3 text-[13px] leading-relaxed text-[var(--polaris-ink-3)]">{blocked}</p> : null}
@@ -94,7 +94,7 @@ export function AgentCommandsDialog({ agent, onClose, onCommandsLoaded, onUpdate
                 return <li key={row.id} className="flex gap-3 px-4 py-3">
                   <span className="mt-0.5 shrink-0 text-[var(--polaris-ink-4)]"><Icon size={15} className={pending ? 'animate-spin' : undefined} /></span>
                   <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2"><span className="text-[13px] font-medium">{t(`command_${row.action}`)}</span><StatusPill tone={pending ? 'pending' : ok ? 'up' : row.state === 'expired' ? 'idle' : 'down'} label={t(pending ? 'commandPending' : ok ? 'commandOk' : row.state === 'expired' ? 'commandExpired' : 'commandFailed')} /></div>
+                    <div className="flex flex-wrap items-center gap-2"><span className="text-[13px] font-medium">{t(`command_${row.action}`)}</span><StatusPill tone={pending ? 'pending' : ok ? 'up' : row.state === 'expired' ? 'idle' : 'down'} label={t(row.state === 'pending' ? 'commandQueued' : pending ? 'commandPending' : ok ? 'commandOk' : row.state === 'expired' ? 'commandExpired' : 'commandFailed')} /></div>
                     <time dateTime={new Date(row.queued_at * 1000).toISOString()} className="polaris-num mt-1 block text-[11.5px] text-[var(--polaris-ink-4)]">{new Date(row.queued_at * 1000).toLocaleString(locale, { dateStyle: 'short', timeStyle: 'short' })}</time>
                     {row.message ? <p className="mt-1.5 break-words text-[12px] leading-relaxed text-[var(--polaris-ink-3)]">{row.message}</p> : null}
                   </div>

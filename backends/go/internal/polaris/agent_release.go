@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	"errors"
 	"io"
 	"math"
 	"net/http"
@@ -63,6 +64,15 @@ func agentReleaseURL(tag, file string) string {
 	return "https://github.com/" + releaseRepository + "/releases/download/" + tag + "/" + file
 }
 
+func agentReleaseFailureReason(err error) string {
+	switch err.Error() {
+	case "github_timeout", "github_rate_limited", "release_not_found", "github_unavailable", "invalid_release_redirect", "release_response_too_large", "empty_release_response", "invalid_release_manifest":
+		return err.Error()
+	default:
+		return "github_unavailable"
+	}
+}
+
 func requestAgentManifest() (Object, string, error) {
 	latest := "https://github.com/" + releaseRepository + "/releases/latest/download/manifest.json"
 	base := "https://github.com/" + releaseRepository + "/releases/download/"
@@ -93,6 +103,9 @@ func requestAgentManifest() (Object, string, error) {
 		req.Header.Set("Accept", "application/json")
 		res, err := releaseClient.Do(req)
 		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+				return nil, "", failure("github_timeout", 502)
+			}
 			return nil, "", failure("github_unavailable", 502)
 		}
 		if res.StatusCode >= 300 && res.StatusCode < 400 {
@@ -126,6 +139,9 @@ func requestAgentManifest() (Object, string, error) {
 		}
 		raw, err := io.ReadAll(io.LimitReader(res.Body, limit+1))
 		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+				return nil, "", failure("github_timeout", 502)
+			}
 			return nil, "", failure("github_unavailable", 502)
 		}
 		if len(raw) > limit {

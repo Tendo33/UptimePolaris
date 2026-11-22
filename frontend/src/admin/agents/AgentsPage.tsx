@@ -91,6 +91,7 @@ function batchEligibility(agent: FleetAgent): 'ok' | 'offline' | 'unsupported' |
 
 type BatchResultRow = { id: string; name: string; ok: boolean; error?: string };
 type BatchResultState = { action: BatchCommandAction; rows: BatchResultRow[] };
+type UpgradeProgress = { queuedAt: number; state: 'pending' | 'leased' };
 
 /** 展示 Agent 清单与状态，协调筛选、批量命令和详情操作。 / Display the Agent fleet and status, coordinating filters, batch commands, and details. */
 export function AgentsPage() {
@@ -125,7 +126,7 @@ function AgentFleetPage() {
   const [deleting, setDeleting] = useState(false);
   const deletingRef = useRef(false);
   const [deleteErrors, setDeleteErrors] = useState<Record<string, string>>({});
-  const [inProgress, setInProgress] = useState<Record<string, number>>({});
+  const [inProgress, setInProgress] = useState<Record<string, UpgradeProgress>>({});
   const [clock, setClock] = useState(() => Math.floor(Date.now() / 1000));
   const [params, setParams] = useSearchParams();
 
@@ -220,8 +221,9 @@ function AgentFleetPage() {
         delete next[id];
         return next;
       }
-      if (prev[id] === pending.queued_at) return prev;
-      return { ...prev, [id]: pending.queued_at };
+      const state: UpgradeProgress['state'] = pending.state === 'leased' ? 'leased' : 'pending';
+      if (prev[id]?.queuedAt === pending.queued_at && prev[id]?.state === state) return prev;
+      return { ...prev, [id]: { queuedAt: pending.queued_at, state } };
     });
   }, []);
 
@@ -232,7 +234,7 @@ function AgentFleetPage() {
       const now = Math.floor(Date.now() / 1000);
       setClock(now);
       setInProgress((prev) => {
-        const kept = Object.entries(prev).filter(([, ts]) => now - ts < 300);
+        const kept = Object.entries(prev).filter(([, progress]) => now - progress.queuedAt < 300);
         return kept.length === Object.keys(prev).length ? prev : Object.fromEntries(kept);
       });
     }, 30_000);
@@ -292,7 +294,7 @@ function AgentFleetPage() {
         const now = Math.floor(Date.now() / 1000);
         setInProgress((prev) => {
           const next = { ...prev };
-          for (const row of okRows) next[row.id] = now;
+          for (const row of okRows) next[row.id] = { queuedAt: now, state: 'pending' };
           return next;
         });
       }
@@ -335,7 +337,7 @@ function AgentFleetPage() {
   };
 
   return (
-    <AdminPage title={t('title')} description={t('description')} actions={<Button variant="bordered" startContent={<SearchCheck size={15} />} isLoading={updateCheck.checking} isDisabled={updateCheck.checking} onPress={() => void updateCheck.check()}>{t('commandCheckUpdate')}</Button>}>
+    <AdminPage title={t('title')} description={t('description')} actions={<Button variant="bordered" startContent={<SearchCheck size={15} />} isLoading={updateCheck.checking} isDisabled={updateCheck.checking} onPress={() => void updateCheck.check()}>{updateCheck.checking ? adminT('versionStatus.checking') : t('commandCheckUpdate')}</Button>}>
       <div className="flex min-h-0 flex-1 flex-col gap-4">
         {/*
           Summary strip. Six tiles, each with the shape that answers its own
@@ -422,7 +424,7 @@ function AgentFleetPage() {
               isLoading={updateCheck.checking}
               onPress={() => void updateCheck.check()}
             >
-              {t('commandCheckUpdate')}
+              {updateCheck.checking ? adminT('versionStatus.checking') : t('commandCheckUpdate')}
             </Button>
             {hasUpgrade ? <Button
               size="sm"
@@ -676,7 +678,7 @@ function AgentFleetPage() {
                           selected={selected.has(agent.id)}
                           onToggle={() => toggleOne(agent.id)}
                           busy={busy === agent.id}
-                          updating={inProgress[agent.id] !== undefined && clock - inProgress[agent.id] < 300}
+                          updating={inProgress[agent.id] !== undefined && clock - inProgress[agent.id].queuedAt < 300 ? inProgress[agent.id].state : null}
                           onEdit={() => setEditing(agent)}
                           latestVersion={summary?.latestVersion ?? null}
                           onCommandsLoaded={noteCommands}
@@ -853,7 +855,7 @@ function AgentRow({
   selected: boolean;
   onToggle: () => void;
   busy: boolean;
-  updating: boolean;
+  updating: UpgradeProgress['state'] | null;
   onEdit: () => void;
   latestVersion: string | null;
   onCommandsLoaded: (id: string, commands: AgentCommandRecord[]) => void;
@@ -954,7 +956,7 @@ function AgentRow({
         {updating ? (
           <span className="mt-1 flex items-center gap-1 text-[11px] text-primary">
             <Loader2 size={10} className="animate-spin" />
-            {t('updateInProgress')}
+            {updating === 'leased' ? t('updateInProgress') : `${t('command_upgrade')} · ${t('commandQueued')}`}
           </span>
         ) : null}
       </td>

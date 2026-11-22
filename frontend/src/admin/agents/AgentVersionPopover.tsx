@@ -29,7 +29,8 @@ export function AgentVersionPopover({ agent, latestVersion, onCommandsLoaded, on
   const issuing = useRef(false);
   const mounted = useRef(true);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
-  const pending = history?.commands.some((command) => command.state === 'pending' || command.state === 'leased') === true;
+  const active = history?.commands.find(command => command.state === 'pending' || command.state === 'leased');
+  const pending = active !== undefined;
   const behind = agent.version_state === 'behind';
   const reason = history && !history.enabled ? t('commandsHint')
     : !agent.capabilities.includes('commands') ? t('commandUnsupported')
@@ -75,11 +76,11 @@ export function AgentVersionPopover({ agent, latestVersion, onCommandsLoaded, on
         </div>
         {!history && !error ? <p role="status" className="text-tiny text-default-500">{t('loading')}</p> : null}
         {reason ? <p className="text-tiny text-default-500">{reason}</p> : null}
-        {pending ? <p role="status" className="flex items-center gap-1.5 text-tiny text-primary"><Loader2 size={12} className="animate-spin motion-reduce:animate-none" />{t('updateInProgress')}</p> : null}
+        {active ? <p role="status" className="flex items-center gap-1.5 text-tiny text-primary"><Loader2 size={12} className="animate-spin motion-reduce:animate-none" />{t(`command_${active.action}`)} · {t(active.state === 'pending' ? 'commandQueued' : active.action === 'upgrade' ? 'updateInProgress' : 'commandPending')}</p> : null}
         {last && !pending ? <p role="status" className={clsx('text-tiny', last.state === 'completed' && last.ok === 0 ? 'text-danger' : 'text-default-500')}>{t(`command_${last.action}`)} · {t(last.state === 'expired' ? 'commandExpired' : last.ok === 1 ? 'commandOk' : 'commandFailed')}</p> : null}
         {error ? <div role="alert" className="space-y-1 text-tiny text-danger"><p>{apiErrorMessage(error)}</p><Button size="sm" variant="light" onPress={refresh}>{adminT('action.retry')}</Button></div> : null}
         <div className="flex flex-wrap gap-2 border-t border-[var(--polaris-line)] pt-3">
-          <Button size="sm" variant="flat" startContent={<SearchCheck size={14} />} isLoading={updateCheck.checking} isDisabled={updateCheck.checking} onPress={() => void updateCheck.check()}>{t('commandCheckUpdate')}</Button>
+          <Button size="sm" variant="flat" startContent={<SearchCheck size={14} />} isLoading={updateCheck.checking} isDisabled={updateCheck.checking} onPress={() => void updateCheck.check()}>{updateCheck.checking ? adminT('versionStatus.checking') : t('commandCheckUpdate')}</Button>
           <Button size="sm" color="warning" variant="flat" startContent={<ArrowUpCircle size={14} />} isLoading={busy === 'upgrade'} isDisabled={disabled || !behind || !latestVersion} onPress={() => void issue('upgrade')}>{t('commandUpgrade')}</Button>
         </div>
       </PopoverContent>

@@ -124,6 +124,12 @@ try {
   assert.equal(apiErrorMessageKey(new ApiError('agent_config_invalid', 400)), 'error.invalidRequest');
   assert.equal(apiErrorMessageKey(new ApiError('agent_config_conflict', 409)), 'error.conflict');
   assert.equal(apiErrorMessageKey(new ApiError('agent_config_unsupported', 409)), 'admin.agents.configUnreported');
+  for (const [reason, key] of Object.entries({
+    github_timeout: 'updateTimedOut', github_rate_limited: 'updateRateLimited', release_not_found: 'updateReleaseMissing',
+    invalid_release_redirect: 'updateManifestInvalid', invalid_release_manifest: 'updateManifestInvalid',
+    release_response_too_large: 'updateManifestInvalid', empty_release_response: 'updateManifestInvalid',
+    github_unavailable: 'updateCheckFailed', unknown: 'updateCheckFailed',
+  })) assert.equal(apiErrorMessageKey(new ApiError('agent_update_unavailable', 502, { reason })), `admin.agents.${key}`);
   assert.equal(apiErrorMessageKey(new Error('private target and stack')), 'error.requestFailed');
 
   /* 输入校验错误应提示修改输入，并保留可供调用方处理的业务码。

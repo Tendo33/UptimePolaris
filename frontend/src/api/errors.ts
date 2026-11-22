@@ -110,6 +110,17 @@ const ERROR_KEYS: Record<string, string> = {
 
 export function apiErrorMessageKey(error: unknown): string {
   const code = error instanceof ApiError ? error.code : error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  if (code === 'agent_update_unavailable' && error instanceof ApiError) {
+    switch (error.details?.reason) {
+      case 'github_rate_limited': return 'admin.agents.updateRateLimited';
+      case 'github_timeout': return 'admin.agents.updateTimedOut';
+      case 'release_not_found': return 'admin.agents.updateReleaseMissing';
+      case 'invalid_release_redirect':
+      case 'release_response_too_large':
+      case 'empty_release_response':
+      case 'invalid_release_manifest': return 'admin.agents.updateManifestInvalid';
+    }
+  }
   if (Object.hasOwn(ERROR_KEYS, code)) return ERROR_KEYS[code];
   if (code.startsWith('manifest_') || code === 'invalid_zip' || code === 'too_many_files') return 'error.themePackage';
   if (/^(telegram|feishu|slack|discord|webhook|apprise|serverchan)_/.test(code) || code === 'unsupported_type') return `admin.notify.error.${code}`;

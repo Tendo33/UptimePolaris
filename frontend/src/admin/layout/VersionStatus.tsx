@@ -89,8 +89,8 @@ export function VersionStatus() {
     setDismissed(null);
   };
 
-  const state = failed ? 'failed' : available ? 'available' : latest ? 'latest' : 'none';
-  const Icon = state === 'failed' ? AlertCircle : state === 'available' ? Sparkles : CircleCheck;
+  const state = checking ? 'checking' : failed ? 'failed' : available ? 'available' : latest ? 'latest' : 'none';
+  const Icon = state === 'checking' ? RefreshCw : state === 'failed' ? AlertCircle : state === 'available' ? Sparkles : CircleCheck;
 
   return (
     <Popover placement="bottom-start" offset={8}>
@@ -129,12 +129,12 @@ export function VersionStatus() {
               state === 'available' ? 'border-transparent bg-[var(--polaris-accent)] text-white' : state === 'failed' ? 'border-danger/20 bg-danger/[0.06] text-danger-600' : state === 'latest' ? 'border-success/25 bg-success/[0.08] text-success-700' : 'border-[var(--polaris-line)] bg-[var(--polaris-well)] text-[var(--polaris-ink-3)]',
             )}
           >
-            <Icon size={17} />
+            <Icon size={17} className={checking ? 'animate-spin motion-reduce:animate-none' : undefined} />
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-[14px] font-semibold">{t('title')}</p>
-            <p role={failed ? 'alert' : 'status'} className={clsx('mt-0.5 text-[12.5px] leading-snug', failed ? 'text-danger-600' : 'text-[var(--polaris-ink-3)]')}>
-              {failed ? t(failureKey) : checking && !latest ? t('checking') : available ? label : !latest ? t('noTags') : comparable ? t('currentLatest') : t('latest', { version: latest })}
+            <p role={failed && !checking ? 'alert' : 'status'} className={clsx('mt-0.5 text-[12.5px] leading-snug', failed && !checking ? 'text-danger-600' : 'text-[var(--polaris-ink-3)]')}>
+              {checking ? t('checking') : failed ? t(failureKey) : available ? label : !latest ? t('noTags') : comparable ? t('currentLatest') : t('latest', { version: latest })}
             </p>
           </div>
         </div>

@@ -14,7 +14,7 @@ export const taxonomyApi = {
 };
 
 export const agentsApi = {
-  checkUpdate: () => request<{ latestVersion: string }>('/api/admin/agents/check-update', { method: 'POST' }),
+  checkUpdate: (signal?: AbortSignal) => request<{ latestVersion: string }>('/api/admin/agents/check-update', { method: 'POST', signal }),
   createAgent: (input: { name: string; probe_enabled: boolean; is_public?: boolean }) => request<{ id: string; token: string }>('/api/admin/agents', { method: 'POST', body: JSON.stringify(input) }),
   setVisibility: (ids: string[], is_public: boolean) => request<{ok:true;updated:number;is_public:boolean}>('/api/admin/agents/visibility',{method:'POST',body:JSON.stringify({ids,is_public})}),
   configuration: (id: string) => request<AgentConfigurationState>(`/api/admin/agents/${encodeURIComponent(id)}/config`),

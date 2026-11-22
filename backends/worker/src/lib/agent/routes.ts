@@ -7,7 +7,7 @@ import { loadFleetWithSummary } from './fleet';
 import { handleGetAgentConfiguration, handleSaveAgentConfiguration } from './runtime-config';
 import { agentPresentationEnabled } from '../presentation/store';
 import { visibilityRevisionWrite } from '../public/cache';
-import { latestAgentRelease } from './release';
+import { agentReleaseFailureReason, latestAgentRelease } from './release';
 
 /** 管理 Agent 清单、运行配置、命令及详情的接口。 / Endpoints for managing the Agent fleet, runtime configuration, commands, and details. */
 export const agentRoutes = new Hono<{ Bindings: Env }>();
@@ -19,8 +19,8 @@ agentRoutes.post('/api/admin/agents/check-update', async c => {
   try {
     const release = await latestAgentRelease(true);
     return c.json({ latestVersion: release.version });
-  } catch {
-    return c.json({ error: 'agent_update_unavailable' }, 502);
+  } catch (error) {
+    return c.json({ error: 'agent_update_unavailable', reason: agentReleaseFailureReason(error) }, 502);
   }
 });
 

@@ -12,7 +12,7 @@ let pending: Promise<VersionCheck> | undefined;
 let blockedUntil = 0;
 
 class VersionError extends Error {
-  constructor(public code: string, public retryAfter = 0) { super(code); }
+  constructor(public code: string, public retryAfter = 0, public upstreamStatus = 0) { super(code); }
 }
 
 async function fetchVersion(): Promise<VersionCheck> {
@@ -27,13 +27,13 @@ async function fetchVersion(): Promise<VersionCheck> {
       const retry = Number(response.headers.get('retry-after'));
       const reset = Number(response.headers.get('x-ratelimit-reset')) * 1000;
       blockedUntil = Math.max(Date.now() + (retry > 0 ? retry : 60) * 1000, Number.isFinite(reset) ? reset : 0);
-      throw new VersionError('version_rate_limited', Math.ceil((blockedUntil - Date.now()) / 1000));
+      throw new VersionError('version_rate_limited', Math.ceil((blockedUntil - Date.now()) / 1000), response.status);
     }
-    if (!response.ok) throw new VersionError('version_unavailable');
-    const tags: unknown = await response.json().catch(() => { throw new VersionError('version_invalid_response'); });
-    if (!Array.isArray(tags)) throw new VersionError('version_invalid_response');
+    if (!response.ok) throw new VersionError('version_unavailable', 0, response.status);
+    const tags: unknown = await response.json().catch(() => { throw new VersionError('version_invalid_response', 0, response.status); });
+    if (!Array.isArray(tags)) throw new VersionError('version_invalid_response', 0, response.status);
     for (const row of tags) {
-      if (typeof row?.name !== 'string') throw new VersionError('version_invalid_response');
+      if (typeof row?.name !== 'string') throw new VersionError('version_invalid_response', 0, response.status);
       if (STABLE_TAG.test(row.name) && (!tag || compareVersions(row.name, tag) > 0)) tag = row.name;
     }
     if (!response.headers.get('link')?.includes('rel="next"')) return { tag, checkedAt: Date.now() };
@@ -67,7 +67,10 @@ versionRoutes.get('/api/admin/version', async c => {
   catch (error) {
     const code = error instanceof VersionError ? error.code : error instanceof Error && ['TimeoutError', 'AbortError'].includes(error.name) ? 'version_timeout' : 'version_unavailable';
     const retryAfter = error instanceof VersionError ? error.retryAfter : 0;
+    const upstreamStatus = error instanceof VersionError ? error.upstreamStatus : 0;
+    const errorType = error instanceof Error && ['TypeError', 'AbortError', 'TimeoutError'].includes(error.name) ? error.name : 'Error';
+    console.warn(JSON.stringify({ event: 'version_check_failed', code, errorType, ...(upstreamStatus ? { upstreamStatus } : {}) }));
     if (retryAfter) c.header('retry-after', String(retryAfter));
-    return c.json({ error: code, ...(retryAfter ? { retryAfter } : {}) }, code === 'version_rate_limited' ? 429 : 502);
+    return c.json({ error: code, ...(retryAfter ? { retryAfter } : {}), ...(upstreamStatus ? { upstreamStatus } : {}) }, code === 'version_rate_limited' ? 429 : 502);
   }
 });

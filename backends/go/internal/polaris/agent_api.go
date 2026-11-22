@@ -66,7 +66,8 @@ func (a *App) agentRoutes() {
 		w.Header().Set("Cache-Control", "private, no-store")
 		release, err := readAgentRelease(true)
 		if err != nil {
-			return failure("agent_update_unavailable", 502)
+			respond(w, 502, Object{"error": "agent_update_unavailable", "reason": agentReleaseFailureReason(err)})
+			return nil
 		}
 		respond(w, 200, Object{"latestVersion": release["version"]})
 		return nil

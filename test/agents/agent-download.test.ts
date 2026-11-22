@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
 import { agentCapabilities, agentReleaseManifest, downloadAgentArtifact } from '../../backends/worker/src/lib/agent/download';
-import { AGENT_RELEASE_REPOSITORY } from '../../backends/worker/src/lib/agent/release';
+import { agentReleaseFailureReason, AGENT_RELEASE_REPOSITORY } from '../../backends/worker/src/lib/agent/release';
+
+assert.equal(agentReleaseFailureReason(new DOMException('deadline', 'TimeoutError')), 'github_timeout');
+assert.equal(agentReleaseFailureReason(new Error('github_rate_limited')), 'github_rate_limited');
+assert.equal(agentReleaseFailureReason(new Error('private details')), 'github_unavailable');
 
 const tag = 'v0.2.0';
 const version = '0.2.0';

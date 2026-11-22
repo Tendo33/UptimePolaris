@@ -10,6 +10,12 @@ export interface AgentManifest { repository: string; tag: string; version: strin
 let cached: { value: AgentManifest; until: number; checkedAt: number } | undefined;
 let pending: Promise<AgentManifest> | undefined;
 
+export function agentReleaseFailureReason(error: unknown): string {
+  if (error instanceof Error && ['AbortError', 'TimeoutError'].includes(error.name)) return 'github_timeout';
+  const code = error instanceof Error ? error.message : '';
+  return ['github_rate_limited', 'release_not_found', 'github_unavailable', 'invalid_release_redirect', 'release_response_too_large', 'empty_release_response', 'invalid_release_manifest'].includes(code) ? code : 'github_unavailable';
+}
+
 const releaseBase = `https://github.com/${AGENT_RELEASE_REPOSITORY}/releases/download/`;
 const latestManifest = `https://github.com/${AGENT_RELEASE_REPOSITORY}/releases/latest/download/manifest.json`;
 

@@ -334,6 +334,9 @@ try {
   await until(`[...document.querySelectorAll('button')].some(button=>button.textContent.trim()===${JSON.stringify(catalog.agents.commandUpgrade)}&&!button.disabled)`);
   await writeFile('artifacts/tmp/agent-upgrade-desktop.png',Buffer.from((await command('Page.captureScreenshot',{format:'png'})).data,'base64'));
   await click(catalog.agents.commandUpgrade);
+  await until(`document.body.textContent.includes(${JSON.stringify(catalog.agents.commandQueued)})`);
+  assert.equal(await evaluate(`document.body.textContent.includes(${JSON.stringify(catalog.agents.updateInProgress)})`), false);
+  await db.prepare("UPDATE agent_commands SET state='leased',lease_token='fixture',lease_until=?,attempts=1 WHERE agent_id=? AND action='upgrade' AND state='pending'").bind(Math.floor(Date.now()/1000)+60,agent.id).run();
   await until(`document.body.textContent.includes(${JSON.stringify(catalog.agents.updateInProgress)})`);
   assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM agent_commands WHERE agent_id=? AND action='upgrade'").bind(agent.id).first()).n,1);
   await db.prepare("UPDATE agent_commands SET state='completed',ok=1,completed_at=? WHERE agent_id=?").bind(Math.floor(Date.now()/1000),agent.id).run();
