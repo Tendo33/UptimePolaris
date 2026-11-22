@@ -13,6 +13,18 @@ const deferred = () => { let resolve, reject; const promise = new Promise((yes, 
 const findAll = (node, predicate) => !node || typeof node !== 'object' ? [] : [
   ...(predicate(node) ? [node] : []), ...(node.props?.children ?? []).flat(Infinity).flatMap(child => findAll(child, predicate)),
 ];
+// Function components in the tree are expanded so a wrapper like the agent
+// management gate does not hide the page below it.
+// 展开函数类型的节点，避免管理开关这类包装组件挡住下面的页面。
+const expand = (node, depth = 0) => {
+  if (!node || typeof node !== 'object' || depth > 20) return node;
+  if (typeof node.type === 'function') {
+    const rendered = node.type(node.props ?? {});
+    return expand(rendered, depth + 1);
+  }
+  if (!node.props?.children) return node;
+  return { ...node, props: { ...node.props, children: node.props.children.flat(Infinity).map(child => expand(child, depth)) } };
+};
 const text = node => typeof node === 'string' ? node : (node?.props?.children ?? []).flat(Infinity).map(text).join(' ');
 const find = (tree, type, label) => findAll(tree, node => node.type === type && (!label || node.props.label === label || node.props['aria-label'] === label || text(node) === label))[0];
 const modeSelect = tree => find(tree, 'Select', 'admin.agent.installMode');
@@ -70,6 +82,13 @@ function fixture(component = 'AddAgentPanel') {
       agentsApi: { createAgent: async input => { creations.push(input); return { id: 'regression-agent', token: 'fixture-token' }; }, listAgents: async () => ({ agents: [], summary: null }) },
       taxonomyApi: { assign: async () => {} },
     },
+    // Agent management sits behind the machine-page setting, so these tests
+    // stub the gate open and cover the enabled page.
+    // Agent 管理受机器页设置控制，这里让 gate 直接放行，验证已启用时的页面。
+    './AgentManagementGate': { AgentManagementGate: ({ children }) => React.createElement('Gate', null, children) },
+    './useAgentUpdateCheck': { useAgentUpdateCheck: () => ({ checking: false, check: async () => {} }) },
+    '@/components/ui/toast': { toast: { success: () => {}, error: () => {} } },
+    '../settings/presentation-api': { usePresentation: () => ({ data: { config: { agentEnabled: true } } }), updatePresentation: async () => {} },
     'react-router': { useNavigate: () => () => {}, useSearchParams: () => [new URLSearchParams(), () => {}] },
   };
   const Component = load(`frontend/src/admin/agents/${component === 'TaxonomyFields' ? 'Taxonomy' : component}.tsx`, modules, window)[component];
@@ -83,7 +102,7 @@ function fixture(component = 'AddAgentPanel') {
   const render = () => {
     for (let pass = 0; pass < 15; pass++) {
       cursor = 0; pending = []; dirty = false;
-      const tree = Component(props);
+      const tree = expand(Component(props));
       pending.forEach(effect => effect());
       if (!dirty) return tree;
     }
