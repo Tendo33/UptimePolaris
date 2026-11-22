@@ -177,8 +177,10 @@ func TestPresentationPreviewAndMaintenanceSemantics(t *testing.T) {
 	config["domains"] = []Object{{"hostname": "status.example", "page": "monitor"}, {"hostname": "servers.example", "page": "agent"}}
 	code, result = s.request(t, "PUT", "/api/admin/presentation", Object{"config": config, "revision": state["revision"]}, true)
 	expectStatus(t, code, 200, result)
+	// 未匹配映射的域名落到监控页，映射到 agent 的域名才切换页面。
+	// An unmatched host falls back to the monitor page; only a mapped host switches.
 	code, result = s.request(t, "GET", "/api/public/monitors", nil, false)
-	expectStatus(t, code, 404, result)
+	expectStatus(t, code, 200, result)
 	code, result = s.request(t, "PUT", "/api/admin/settings", Object{"maintenance.enabled": true, "maintenance.title": "Maintenance fixture", "maintenance.description": "Back shortly"}, true)
 	expectStatus(t, code, 200, result)
 	code, result = s.request(t, "GET", "/api/public/maintenance", nil, false)

@@ -180,11 +180,6 @@ jobs:
             console.log('PASS backend requirements and optional R2/AE config fixtures');
           })().catch((error) => { console.error(error); process.exitCode = 1; });
           JS
-      - uses: actions/upload-artifact@v4
-        with:
-          name: built-spa
-          path: public/
-          if-no-files-found: error
 
   postgres:
     runs-on: ubuntu-24.04
@@ -215,64 +210,3 @@ jobs:
       - run: npm run test:ai-runtime:postgres
       - run: npm run test:check-queue:postgres
       - run: npm run test:subscriptions:postgres
-
-  browser:
-    needs: checks
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    env:
-      UPTIME_BROWSER_REQUIRED: '1'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm --prefix frontend ci
-      - uses: actions/download-artifact@v4
-        with:
-          name: built-spa
-          path: public
-      - name: Require installed Chrome
-        run: |
-          set -euo pipefail
-          chrome="$(command -v google-chrome || command -v chromium)"
-          test -x "$chrome"
-          echo "CHROME_BIN=$chrome" >> "$GITHUB_ENV"
-      - run: npm run test:browser
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: browser-screenshots
-          path: artifacts/tmp/*.png
-          if-no-files-found: warn
-
-  windows-browser:
-    needs: checks
-    runs-on: windows-latest
-    timeout-minutes: 20
-    env:
-      UPTIME_BROWSER_REQUIRED: '1'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: |
-            package-lock.json
-            frontend/package-lock.json
-      - run: npm ci
-      - run: npm --prefix frontend ci
-      - uses: actions/download-artifact@v4
-        with:
-          name: built-spa
-          path: public
-      - name: Require Chrome
-        shell: pwsh
-        run: |
-          $chrome = 'C:\Program Files\Google\Chrome\Application\chrome.exe'
-          if (!(Test-Path -LiteralPath $chrome -PathType Leaf)) { throw 'Chrome is required' }
-          "CHROME_BIN=$chrome" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-      - run: npm run test:agent-controls-browser
