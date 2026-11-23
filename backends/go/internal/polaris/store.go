@@ -59,7 +59,12 @@ func openStore(ctx context.Context, databaseURL string, newPostgres bool) (*Stor
 		if strings.Contains(databaseURL, "?") {
 			separator = "&"
 		}
-		databaseURL += separator + "_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)"
+		// _txlock=immediate makes BEGIN take the write lock up front, so a
+		// read-check-write in another process cannot interleave between the read
+		// and the write. Without it those transactions race across processes.
+		// _txlock=immediate 让 BEGIN 直接取得写锁，其他进程的读-判-写无法插进
+		// 读取和写入之间；否则跨进程会并发通过同一比较。
+		databaseURL += separator + "_txlock=immediate&_pragma=busy_timeout(10000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)"
 	}
 	db, err := sql.Open(driver, databaseURL)
 	if err != nil {
