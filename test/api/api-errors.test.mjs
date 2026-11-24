@@ -257,41 +257,53 @@ const versionWorker = await build({
 });
 let versionMode = 'redirect';
 const versionCalls = [];
+const latestRelease = 'https://github.com/XingLingQAQ/UptimePolaris/releases/latest/download/polaris-update.json';
+const taggedRelease = 'https://github.com/XingLingQAQ/UptimePolaris/releases/download/v0.2.1/polaris-update.json';
+const releaseAsset = 'https://release-assets.githubusercontent.com/fixture/polaris-update.json';
 const versionFixture = new Miniflare({
   modules: true, script: versionWorker.outputFiles[0].text, compatibilityDate: '2025-01-01',
   outboundService(request) {
     const url = new URL(request.url);
-    assert.equal(url.origin, 'https://api.github.com');
-    assert.equal(url.pathname, '/repos/XingLingQAQ/UptimePolaris/tags');
-    versionCalls.push(url.searchParams.get('page'));
-    if (versionMode === 'redirect') return new Response(null, { status: 302, headers: { location: 'https://unexpected.example/tags' } });
-    if (versionMode === 'invalid') return Response.json({ message: 'not a tag list' });
-    if (url.searchParams.get('page') === '1') return Response.json([
-      { name: 'v1.0.0-rc.1' }, { name: 'v0.2.1' }, { name: '0.2.0' },
-    ], { headers: { link: '<https://api.github.com/repos/XingLingQAQ/UptimePolaris/tags?per_page=100&page=2>; rel="next"' } });
-    assert.equal(url.searchParams.get('page'), '2');
-    return Response.json([{ name: 'v0.10.0' }, { name: 'v0.3.0' }]);
+    assert.notEqual(url.hostname, 'api.github.com');
+    versionCalls.push(url.href);
+    if (url.href === latestRelease) {
+      const location = versionMode === 'redirect' ? 'https://unexpected.example/polaris-update.json'
+        : versionMode === 'wrong_repo' ? taggedRelease.replace('UptimePolaris', 'Polaris-Agent')
+        : versionMode === 'prerelease' ? taggedRelease.replace('v0.2.1', 'v0.3.0-rc.1')
+        : versionMode === 'cdn_first' ? releaseAsset
+        : taggedRelease;
+      return new Response(null, { status: 302, headers: { location } });
+    }
+    if (url.href === taggedRelease) return new Response(null, { status: 302, headers: { location: releaseAsset } });
+    assert.equal(url.href, releaseAsset);
+    if (versionMode === 'invalid') return new Response('{');
+    if (versionMode === 'large') return new Response('x'.repeat(65537));
+    return Response.json({ version: versionMode === 'mismatch' ? '0.3.0' : '0.2.1', protocol: 1, storage: 'documents-v1' });
   },
 });
 try {
   const check = () => versionFixture.dispatchFetch('https://fixture.test/api/admin/version?refresh=1');
-  const redirect = await check();
-  assert.equal(redirect.status, 502);
-  assert.deepEqual(await redirect.json(), { error: 'version_unavailable', upstreamStatus: 302 });
-  assert.deepEqual(versionCalls, ['1'], 'upstream redirects must not be followed');
-  versionMode = 'invalid';
-  const invalid = await check();
-  assert.equal(invalid.status, 502);
-  assert.equal((await invalid.json()).error, 'version_invalid_response');
+  for (const mode of ['redirect', 'wrong_repo', 'prerelease', 'cdn_first', 'invalid', 'mismatch', 'large']) {
+    versionMode = mode;
+    const start = versionCalls.length;
+    const failure = await check();
+    assert.equal(failure.status, 502, mode);
+    assert.equal((await failure.json()).error, 'version_invalid_response', mode);
+    if (['redirect', 'wrong_repo', 'prerelease', 'cdn_first'].includes(mode)) {
+      assert.deepEqual(versionCalls.slice(start), [latestRelease], 'unsafe redirects must be rejected before fetching');
+    }
+  }
   versionMode = 'good';
+  const start = versionCalls.length;
   const success = await check();
   assert.equal(success.status, 200, 'version checks must use a redirect mode supported by workerd');
   const result = await success.json();
-  assert.equal(result.tag, 'v0.10.0');
+  assert.equal(result.tag, 'v0.2.1');
+  assert.deepEqual(versionCalls.slice(start), [latestRelease, taggedRelease, releaseAsset]);
   assert.ok(Number.isFinite(result.checkedAt));
   assert.match(success.headers.get('cache-control'), /no-store/);
   const count = versionCalls.length;
   assert.deepEqual(await (await check()).json(), result);
   assert.equal(versionCalls.length, count, 'a recent successful check is cached');
-  console.log('PASS Worker version checks: runtime-compatible fetch, rejected redirects, stable tag pagination and cache');
+  console.log('PASS Worker version checks: API-free Release metadata, safe redirects, version identity, size limit and cache');
 } finally { await versionFixture.dispose(); }

@@ -1,12 +1,14 @@
 import { Hono } from 'hono';
 import { PROJECT_REPOSITORY_URL } from '../../../../../shared/project';
-import { compareVersions, STABLE_TAG, type VersionCheck } from '../../../../../shared/project-version';
+import { STABLE_TAG, type VersionCheck } from '../../../../../shared/project-version';
+import { readBoundedBody } from '../http/binary';
 import type { Env } from '../../types';
 
 const TTL = 6 * 60 * 60;
-const repository = new URL(PROJECT_REPOSITORY_URL).pathname.slice(1);
-const tagsUrl = `https://api.github.com/repos/${repository}/tags?per_page=100`;
-const cacheKey = new Request(`https://api.github.com/repos/${repository}/polaris-stable-version`);
+const MAX_RELEASE_BYTES = 64 * 1024;
+const releaseBase = `${PROJECT_REPOSITORY_URL}/releases/download/`;
+const latestRelease = `${PROJECT_REPOSITORY_URL}/releases/latest/download/polaris-update.json`;
+const cacheKey = new Request(`${PROJECT_REPOSITORY_URL}/polaris-latest-release-version`);
 let latest: VersionCheck | undefined;
 let pending: Promise<VersionCheck> | undefined;
 let blockedUntil = 0;
@@ -17,10 +19,24 @@ class VersionError extends Error {
 
 async function fetchVersion(): Promise<VersionCheck> {
   const signal = AbortSignal.timeout(12_000);
+  let next = new URL(latestRelease);
   let tag: string | null = null;
-  for (let page = 1; page <= 10; page++) {
-    const response = await fetch(`${tagsUrl}&page=${page}`, {
-      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Uptime-Polaris', 'X-GitHub-Api-Version': '2026-03-10' },
+  for (let count = 0; count < 5; count++) {
+    if (next.protocol !== 'https:' || next.port || next.username || next.password || next.hash) throw new VersionError('version_invalid_response');
+    if (next.hostname === 'github.com') {
+      if (count !== 0 || next.href !== latestRelease) {
+        const path = next.href.startsWith(releaseBase) ? next.href.slice(releaseBase.length) : '';
+        const match = /^([^/]+)\/polaris-update\.json$/.exec(path);
+        let releaseTag = '';
+        try { releaseTag = match ? decodeURIComponent(match[1]) : ''; } catch {}
+        if (!STABLE_TAG.test(releaseTag) || tag && tag !== releaseTag) throw new VersionError('version_invalid_response');
+        tag = releaseTag;
+      }
+    } else if (next.hostname !== 'release-assets.githubusercontent.com' || !tag) {
+      throw new VersionError('version_invalid_response');
+    }
+    const response = await fetch(next.href, {
+      headers: { Accept: 'application/json', 'User-Agent': 'Uptime-Polaris' },
       redirect: 'manual', signal,
     });
     if (response.status === 429 || response.status === 403 && (response.headers.get('x-ratelimit-remaining') === '0' || response.headers.has('retry-after'))) {
@@ -29,14 +45,25 @@ async function fetchVersion(): Promise<VersionCheck> {
       blockedUntil = Math.max(Date.now() + (retry > 0 ? retry : 60) * 1000, Number.isFinite(reset) ? reset : 0);
       throw new VersionError('version_rate_limited', Math.ceil((blockedUntil - Date.now()) / 1000), response.status);
     }
-    if (!response.ok) throw new VersionError('version_unavailable', 0, response.status);
-    const tags: unknown = await response.json().catch(() => { throw new VersionError('version_invalid_response', 0, response.status); });
-    if (!Array.isArray(tags)) throw new VersionError('version_invalid_response', 0, response.status);
-    for (const row of tags) {
-      if (typeof row?.name !== 'string') throw new VersionError('version_invalid_response', 0, response.status);
-      if (STABLE_TAG.test(row.name) && (!tag || compareVersions(row.name, tag) > 0)) tag = row.name;
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location');
+      if (!location) throw new VersionError('version_invalid_response', 0, response.status);
+      await response.body?.cancel();
+      try { next = new URL(location, next); } catch { throw new VersionError('version_invalid_response', 0, response.status); }
+      continue;
     }
-    if (!response.headers.get('link')?.includes('rel="next"')) return { tag, checkedAt: Date.now() };
+    if (!response.ok) throw new VersionError('version_unavailable', 0, response.status);
+    if (!tag || Number(response.headers.get('content-length')) > MAX_RELEASE_BYTES) throw new VersionError('version_invalid_response', 0, response.status);
+    let info: { version?: unknown } | null;
+    try {
+      const bytes = await readBoundedBody(response.body, MAX_RELEASE_BYTES);
+      info = JSON.parse(new TextDecoder().decode(bytes));
+    } catch {
+      if (signal.aborted) throw signal.reason;
+      throw new VersionError('version_invalid_response', 0, response.status);
+    }
+    if (typeof info?.version !== 'string' || !STABLE_TAG.test(info.version) || info.version.replace(/^v/, '') !== tag.replace(/^v/, '')) throw new VersionError('version_invalid_response', 0, response.status);
+    return { tag, checkedAt: Date.now() };
   }
   throw new VersionError('version_invalid_response');
 }
