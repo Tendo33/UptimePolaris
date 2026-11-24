@@ -102,8 +102,26 @@ jobs:
         env:
           OUTPUT: RELEASE_NOTES.md
           GITHUB_REPO: ${{ github.repository }}
-      - name: Show release notes
-        run: cat RELEASE_NOTES.md
+      - name: Append full changelog link
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat RELEASE_NOTES.md
+          # 空说明会让 release 只有链接，提前失败比发布后再补要好。
+          # An empty body leaves the release with nothing but a link; fail here instead.
+          if ! grep -q '^- ' RELEASE_NOTES.md; then
+            echo 'release notes contain no entries; check the commit messages and cliff.toml' >&2
+            exit 1
+          fi
+          previous="$(git describe --tags --abbrev=0 "$GITHUB_REF_NAME^" 2>/dev/null || true)"
+          {
+            echo
+            if [ -n "$previous" ]; then
+              echo "**Full changelog**: https://github.com/$GITHUB_REPOSITORY/compare/$previous...$GITHUB_REF_NAME"
+            else
+              echo "**Full changelog**: https://github.com/$GITHUB_REPOSITORY/commits/$GITHUB_REF_NAME"
+            fi
+          } >> RELEASE_NOTES.md
       - name: Create and publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

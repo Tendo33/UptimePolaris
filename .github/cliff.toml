@@ -3,18 +3,18 @@
 
 [changelog]
 header = """
-{% if version %}## {{ version }} - {{ timestamp | date(format="%Y-%m-%d") }}{% endif %}
+## {{ version }} - {{ timestamp | date(format="%Y-%m-%d") }}
 """
 body = """
 {% for group, commits in commits | group_by(attribute="group") %}
 ### {{ group }}
 
 {% for commit in commits %}
-- {{ commit.message | split(pat="\n") | first | trim }}{% if commit.scope %} (`{{ commit.scope }}`){% endif %}
-{%- endfor %}
-
+- {{ commit.message | split(pat="\n") | first | trim }}{% if commit.scope %} ({{ commit.scope }}){% endif %}
+{% endfor %}
 {% endfor %}
 """
+footer = ""
 trim = true
 render_always = true
 
@@ -28,15 +28,17 @@ protect_breaking_commits = true
 tag_pattern = "v[0-9]*"
 sort_commits = "oldest"
 commit_parsers = [
-  { message = "^feat", group = "新功能 / Features" },
-  { message = "^fix", group = "修复 / Fixes" },
-  { message = "^perf", group = "性能 / Performance" },
-  { message = "^refactor", group = "重构 / Refactor" },
-  { message = "^docs", group = "文档 / Documentation" },
-  { message = "^test", group = "测试 / Tests" },
-  { message = "^ci", group = "构建与 CI / Build and CI" },
-  { message = "^style", group = "样式 / Style" },
+  { message = "^feat", group = "Features" },
+  { message = "^fix", group = "Bug Fixes" },
+  { message = "^perf", group = "Performance" },
+  { message = "^refactor", group = "Refactoring" },
+  { message = "^docs", group = "Documentation" },
+  { message = "^test", group = "Tests" },
+  { message = "^ci", group = "Build and CI" },
+  { message = "^style", group = "Style" },
+  { message = "^revert", group = "Reverts" },
+  # 版本号提交本身不进说明。
+  # The version bump is not itself a change worth listing.
   { message = "^chore\\(release\\)", skip = true },
-  { message = "^chore", group = "维护 / Maintenance" },
-  { message = "^revert", group = "回滚 / Reverts" },
+  { message = "^chore", skip = true },
 ]
