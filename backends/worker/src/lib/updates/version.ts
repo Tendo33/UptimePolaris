@@ -21,7 +21,7 @@ async function fetchVersion(): Promise<VersionCheck> {
   for (let page = 1; page <= 10; page++) {
     const response = await fetch(`${tagsUrl}&page=${page}`, {
       headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'Uptime-Polaris', 'X-GitHub-Api-Version': '2026-03-10' },
-      redirect: 'error', signal,
+      redirect: 'manual', signal,
     });
     if (response.status === 429 || response.status === 403 && (response.headers.get('x-ratelimit-remaining') === '0' || response.headers.has('retry-after'))) {
       const retry = Number(response.headers.get('retry-after'));

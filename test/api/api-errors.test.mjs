@@ -247,3 +247,51 @@ try {
   await expectError('/api/admin/site-icon', 400, 'filename_invalid', { method: 'POST', headers: { 'content-type': 'image/png', 'x-icon-filename': '%' }, body: png });
   console.log('PASS API errors: stable JSON/status/cache headers, startup boundary, numeric validation, malformed theme bodies and no accidental activation');
 } finally { await mf.dispose(); }
+
+const versionWorker = await build({
+  stdin: { contents: `
+    import { versionRoutes } from './backends/worker/src/lib/updates/version';
+    export default { fetch: (request, env, ctx) => versionRoutes.fetch(request, env, ctx) };
+  `, resolveDir: process.cwd() },
+  bundle: true, write: false, format: 'esm', platform: 'neutral', target: 'es2022', logLevel: 'error',
+});
+let versionMode = 'redirect';
+const versionCalls = [];
+const versionFixture = new Miniflare({
+  modules: true, script: versionWorker.outputFiles[0].text, compatibilityDate: '2025-01-01',
+  outboundService(request) {
+    const url = new URL(request.url);
+    assert.equal(url.origin, 'https://api.github.com');
+    assert.equal(url.pathname, '/repos/XingLingQAQ/UptimePolaris/tags');
+    versionCalls.push(url.searchParams.get('page'));
+    if (versionMode === 'redirect') return new Response(null, { status: 302, headers: { location: 'https://unexpected.example/tags' } });
+    if (versionMode === 'invalid') return Response.json({ message: 'not a tag list' });
+    if (url.searchParams.get('page') === '1') return Response.json([
+      { name: 'v1.0.0-rc.1' }, { name: 'v0.2.1' }, { name: '0.2.0' },
+    ], { headers: { link: '<https://api.github.com/repos/XingLingQAQ/UptimePolaris/tags?per_page=100&page=2>; rel="next"' } });
+    assert.equal(url.searchParams.get('page'), '2');
+    return Response.json([{ name: 'v0.10.0' }, { name: 'v0.3.0' }]);
+  },
+});
+try {
+  const check = () => versionFixture.dispatchFetch('https://fixture.test/api/admin/version?refresh=1');
+  const redirect = await check();
+  assert.equal(redirect.status, 502);
+  assert.deepEqual(await redirect.json(), { error: 'version_unavailable', upstreamStatus: 302 });
+  assert.deepEqual(versionCalls, ['1'], 'upstream redirects must not be followed');
+  versionMode = 'invalid';
+  const invalid = await check();
+  assert.equal(invalid.status, 502);
+  assert.equal((await invalid.json()).error, 'version_invalid_response');
+  versionMode = 'good';
+  const success = await check();
+  assert.equal(success.status, 200, 'version checks must use a redirect mode supported by workerd');
+  const result = await success.json();
+  assert.equal(result.tag, 'v0.10.0');
+  assert.ok(Number.isFinite(result.checkedAt));
+  assert.match(success.headers.get('cache-control'), /no-store/);
+  const count = versionCalls.length;
+  assert.deepEqual(await (await check()).json(), result);
+  assert.equal(versionCalls.length, count, 'a recent successful check is cached');
+  console.log('PASS Worker version checks: runtime-compatible fetch, rejected redirects, stable tag pagination and cache');
+} finally { await versionFixture.dispose(); }
