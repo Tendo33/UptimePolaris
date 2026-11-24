@@ -21,7 +21,9 @@ render_always = true
 [git]
 conventional_commits = true
 filter_unconventional = true
-split_commits = true
+# 不拆提交正文：多行正文会被当成多条提交，导致同一条标题重复出现。
+# Do not split commit bodies: a multi-line body becomes several entries with the same title.
+split_commits = false
 protect_breaking_commits = true
 tag_pattern = "v[0-9]*"
 sort_commits = "oldest"
