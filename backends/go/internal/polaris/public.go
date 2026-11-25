@@ -610,7 +610,11 @@ func (a *App) publicMonitors(w http.ResponseWriter, r *http.Request) error {
 			ungrouped = append(ungrouped, list...)
 		}
 	}
-	groupRows = append(groupRows, Object{"id": 0, "name": nil, "isUngrouped": true, "weight": 9007199254740991, "monitorList": ungrouped})
+	// Omit the ungrouped bucket when empty, as with named groups.
+	// 与命名分组一致，未分组为空时省略。
+	if len(ungrouped) > 0 {
+		groupRows = append(groupRows, Object{"id": 0, "name": nil, "isUngrouped": true, "weight": 9007199254740991, "monitorList": ungrouped})
+	}
 	respond(w, 200, Object{"success": true, "monitorGroups": groupRows, "data": Object{"heartbeatList": heartbeat, "uptimeList": uptime, "uptimeCoverage": coverage}, "timestamp": time.Now().UnixMilli()})
 	return nil
 }

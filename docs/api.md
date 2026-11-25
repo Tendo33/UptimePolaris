@@ -115,6 +115,8 @@ curl --fail-with-body 'https://status.example.com/api/public/status'
 
 `/api/public/monitors` 的 `monitorGroups` 包含监控列表，监控的 `id` 是数字 ID。共享类型为 `http`、`tcp`、`udp`、`icmp`、`push` 和 `agent`；Go 还支持 `dns`、`tls` 和 `websocket`。实际可用类型和执行源以 `/api/capabilities` 为准，Worker 不提供 Go 的三种独立类型。`data.heartbeatList` 以数字 ID 的字符串为键，每个心跳用 `status` 表示状态：`0` 为 DOWN，`1` 为 UP，`2` 为 WARN，`4` 为 PENDING。`time` 是 UTC 时间，`ping` 没有延迟数据时为 `null`。
 
+`monitorGroups` 只包含有公开监控的分组；没有公开监控时为 `[]`。未分组监控存在时放在最后一组，使用 `id: 0`、`name: null` 和 `isUngrouped: true`，名称由客户端本地化；没有未分组监控时省略该组。
+
 `/api/public/maintenance` 返回 `active`、`source`、`serverNow`、统一配置的 `title` 和 `description`、当前窗口的 `startsAt` 和 `endsAt`，以及按开始时间排序的 `scheduled` 列表。`source` 为 `manual`、`scheduled` 或 `null`。手动维护优先于计划维护，一直持续到管理员关闭；手动维护或没有进行中的窗口时，当前窗口时间为 `null`。时间使用 UTC ISO 8601 字符串。响应使用 `no-store`。`/api/public/config` 也提供 `maintenance` 和 `maintenanceList`。维护期间 API 正常服务；公开页面的展示行为见[维护窗口](usage.md#维护窗口)。
 
 ### Worker 历史响应
