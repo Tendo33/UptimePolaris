@@ -14,6 +14,11 @@
   },
   "login": {
     "externalSubmit": "外部認証でログイン",
+    "externalSubmitCloudflare": "Cloudflare Access でログイン",
+    "externalSubmitProxy": "プロキシ認証でログイン",
+    "externalSubmitting": "確認中…",
+    "externalLogoutHint": "Uptime Polaris からログアウトしても、認証プロバイダーからはログアウトされません。",
+    "orLocalAccount": "またはローカルアカウントでログイン",
     "externalFailed": "外部認証を確認できませんでした。認証プロバイダーで再度ログインするか、ローカルアカウントを使用してください。",
     "title": "サインイン",
     "username": "ユーザー名",
@@ -57,6 +62,9 @@
   },
   "account": {
     "externalManaged": "ユーザー名とパスワードは認証プロバイダーで管理されています。",
+    "externalProvider": "認証方法",
+    "externalProviderCloudflare": "Cloudflare Access",
+    "externalProviderProxy": "信頼済みプロキシヘッダー認証",
     "avatarLoading": "画像を読み込み中…",
     "avatarUpload": "画像をアップロード",
     "avatarChange": "画像を変更",

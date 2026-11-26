@@ -106,6 +106,7 @@ const session = requirements => ({ authenticated: false, user: null, needsSetup:
   events.get('expired')();
   state = render({ children: null }).props.value;
   assert.equal(state.session.authenticated, false);
+  assert.equal(state.session.authentication, null);
   assert.deepEqual(state.session.externalAuth, externalAuth);
   rejected = true;
   await assert.rejects(state.externalLogin, /invalid_credentials/);
@@ -118,6 +119,42 @@ const session = requirements => ({ authenticated: false, user: null, needsSetup:
   assert.equal(state.session.authenticated, false);
   assert.equal(state.session.user, null);
   assert.deepEqual(state.session.externalAuth, externalAuth);
+}
+
+{
+  const externalAuth = { mode: 'cloudflare-access' };
+  let response = { authenticated: false, user: null, needsSetup: false, setupCredential: null, setupDatabase: null, externalAuth };
+  let logoutCalls = 0;
+  const render = harness('frontend/src/auth/AuthContext.tsx', 'export function AuthProvider(', 'AuthProvider', {
+    useMemo: compute => compute(), AuthContext: { Provider: 'Provider' },
+    authApi: {
+      session: async () => response,
+      login: async () => ({ user: { id: 'local-owner', username: 'owner' } }),
+      setup: async () => ({ user: { id: 'local-owner', username: 'owner' } }),
+      logout: async () => { logoutCalls++; },
+    },
+    window: { addEventListener() {}, removeEventListener() {} }, SESSION_EXPIRED_EVENT: 'expired',
+  }, 'export function useAuth()');
+  render({ children: null });
+  await new Promise(resolve => setImmediate(resolve));
+  let state = render({ children: null }).props.value;
+
+  await state.login('owner', 'fixture-password');
+  state = render({ children: null }).props.value;
+  assert.equal(state.session.authentication, 'local');
+  assert.deepEqual(state.session.externalAuth, externalAuth, 'local login keeps the configured provider');
+
+  await state.logout();
+  state = render({ children: null }).props.value;
+  assert.equal(logoutCalls, 1);
+  assert.equal(state.session.authenticated, false);
+  assert.equal(state.session.authentication, null);
+  assert.deepEqual(state.session.externalAuth, externalAuth, 'logging out of a local session keeps the provider');
+
+  await state.setup('credential', 'owner', 'fixture-password');
+  state = render({ children: null }).props.value;
+  assert.equal(state.session.authentication, 'local');
+  assert.deepEqual(state.session.externalAuth, externalAuth, 'setup keeps the configured provider');
 }
 
 {

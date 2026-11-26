@@ -14,6 +14,11 @@
   },
   "login": {
     "externalSubmit": "使用外部身分登入",
+    "externalSubmitCloudflare": "使用 Cloudflare Access 登入",
+    "externalSubmitProxy": "使用代理身分登入",
+    "externalSubmitting": "正在驗證…",
+    "externalLogoutHint": "登出 Uptime Polaris 不會同時登出身分提供者。",
+    "orLocalAccount": "或使用本機帳戶",
     "externalFailed": "無法驗證外部身分。請重新透過身分提供者登入，或使用本機帳戶。",
     "title": "登入",
     "username": "使用者名稱",
@@ -57,6 +62,9 @@
   },
   "account": {
     "externalManaged": "使用者名稱和密碼由身分提供者管理。",
+    "externalProvider": "驗證方式",
+    "externalProviderCloudflare": "Cloudflare Access",
+    "externalProviderProxy": "受信任代理標頭驗證",
     "avatarLoading": "正在載入頭像…",
     "avatarUpload": "上傳頭像",
     "avatarChange": "更換頭像",

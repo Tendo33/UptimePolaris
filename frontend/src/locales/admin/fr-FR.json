@@ -14,6 +14,11 @@
   },
   "login": {
     "externalSubmit": "Se connecter avec un fournisseur externe",
+    "externalSubmitCloudflare": "Se connecter avec Cloudflare Access",
+    "externalSubmitProxy": "Se connecter via l’identité du proxy",
+    "externalSubmitting": "Vérification…",
+    "externalLogoutHint": "Se déconnecter d’Uptime Polaris ne vous déconnecte pas de votre fournisseur d’identité.",
+    "orLocalAccount": "Ou utiliser un compte local",
     "externalFailed": "La connexion externe n’a pas pu être vérifiée. Reconnectez-vous auprès de votre fournisseur d’identité ou utilisez votre compte local.",
     "title": "Connexion",
     "username": "Identifiant",
@@ -57,6 +62,9 @@
   },
   "account": {
     "externalManaged": "Votre fournisseur d’identité gère votre nom d’utilisateur et votre mot de passe.",
+    "externalProvider": "Méthode d’authentification",
+    "externalProviderCloudflare": "Cloudflare Access",
+    "externalProviderProxy": "En-tête de proxy de confiance",
     "avatarLoading": "Chargement de la photo…",
     "avatarUpload": "Importer",
     "avatarChange": "Changer",

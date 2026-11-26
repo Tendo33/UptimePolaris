@@ -2,7 +2,7 @@ import { UnauthorizedError } from '@/api/errors';
 import { useApiErrorMessage } from '@/api/useApiErrorMessage';
 import { useAuth } from '@/auth/AuthContext';
 import { Button, Input, Skeleton } from '@heroui/react';
-import { Database, KeyRound, Loader2, RefreshCw, UserRound } from 'lucide-react';
+import { Database, KeyRound, Loader2, RefreshCw, ShieldCheck, UserRound } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { toast } from '@/components/ui/toast';
@@ -242,6 +242,17 @@ export function SettingsPage() {
               if (session?.authentication === 'trusted-header' || session?.authentication === 'cloudflare-access') {
                 return <>
                   <AccountAvatarUpload username={signedInAs} />
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-[var(--polaris-line-soft)] pt-4">
+                    <span className="flex items-center gap-1.5 text-tiny text-default-500">
+                      <ShieldCheck size={14} className="shrink-0 text-[var(--polaris-ink-4)]" aria-hidden="true" />
+                      {t('account.externalProvider')}
+                    </span>
+                    <span className="rounded-small border border-default-300 bg-default-100 px-1.5 py-0.5 font-mono text-tiny text-default-600">
+                      {session.authentication === 'cloudflare-access'
+                        ? t('account.externalProviderCloudflare')
+                        : t('account.externalProviderProxy')}
+                    </span>
+                  </div>
                   <p className="text-small text-default-500">{t('account.externalManaged')}</p>
                 </>;
               }

@@ -15,6 +15,7 @@ import {
   ArrowUpRight,
   Loader2,
   Lock,
+  ShieldCheck,
   UserRound,
 } from 'lucide-react';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
@@ -53,8 +54,14 @@ export function LoginPage() {
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [localSubmitting, setLocalSubmitting] = useState(false);
+  const [externalSubmitting, setExternalSubmitting] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [externalError, setExternalError] = useState<string | null>(null);
+
+  /** One in-flight sign-in at a time, but each entry keeps its own spinner. / 同时只允许一个登录请求，但各自保留加载状态。 */
+  const busy = localSubmitting || externalSubmitting;
+  const externalMode = session?.externalAuth?.mode;
 
   /**
    * Password field ref.
@@ -123,28 +130,36 @@ export function LoginPage() {
     或改变不同渲染之间的 Hook 列表。
   */
   if (session?.needsSetup) return <Navigate to="/setup" replace state={location.state} />;
-
   if (!session) return <AuthSplash />;
 
   async function signInExternally() {
-    if (submitting) return;
-    setSubmitting(true);
-    setError(null);
+    if (busy) return;
+    setExternalSubmitting(true);
+    setExternalError(null);
+    setLocalError(null);
     try {
       await externalLogin();
-    } catch {
-      setError(t('login.externalFailed'));
+    } catch (err) {
+      const code = err instanceof Error ? err.message : String(err);
+      if (code === 'network_error') {
+        setExternalError(t('login.network'));
+      } else if (err instanceof ApiError && err.status >= 500) {
+        setExternalError(t('login.dbUnavailable'));
+      } else {
+        setExternalError(t('login.externalFailed'));
+      }
     } finally {
-      setSubmitting(false);
+      setExternalSubmitting(false);
     }
   }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
-    if (submitting || !username.trim() || !password) return;
+    if (busy || !username.trim() || !password) return;
 
-    setSubmitting(true);
-    setError(null);
+    setLocalSubmitting(true);
+    setLocalError(null);
+    setExternalError(null);
     try {
       await login(username, password);
       // AuthProvider has the session by now; the effect above performs the
@@ -152,15 +167,13 @@ export function LoginPage() {
       // duplicate history entry.
       // AuthProvider 更新会话后由上方 effect 跳转，避免重复导航和历史记录。
     } catch (err) {
-      setError(readableError(err, t));
+      setLocalError(readableError(err, t));
       /** Focus next frame, after `isDisabled` clears. / 下一帧再聚焦，等 `isDisabled` 清除。 */
       requestAnimationFrame(focusPassword);
     } finally {
-      setSubmitting(false);
+      setLocalSubmitting(false);
     }
   }
-
-  if (!session) return <AuthSplash />;
 
   return (
     <div className="polaris flex min-h-dvh bg-[var(--polaris-canvas)] text-[var(--polaris-ink)]">
@@ -186,21 +199,57 @@ export function LoginPage() {
               <p className="mt-1.5 text-[13.5px] text-[var(--polaris-ink-3)]">{t('login.subtitle')}</p>
             </div>
 
+            {session.externalAuth ? (
+              <>
+                <div className="mb-4">
+                  <Button
+                    type="button"
+                    color="primary"
+                    className="h-10 w-full text-[13.5px] font-medium shadow-[0_1px_2px_rgb(0_0_0/0.12),inset_0_1px_0_rgb(255_255_255/0.08)]"
+                    isDisabled={busy}
+                    startContent={externalSubmitting ? <Loader2 className="animate-spin" size={16} /> : <ShieldCheck size={16} />}
+                    onPress={() => void signInExternally()}
+                  >
+                    {externalSubmitting
+                      ? t('login.externalSubmitting')
+                      : externalMode === 'cloudflare-access'
+                        ? t('login.externalSubmitCloudflare')
+                        : externalMode === 'trusted-header'
+                          ? t('login.externalSubmitProxy')
+                          : t('login.externalSubmit')}
+                  </Button>
+                  <p className="mt-2 text-[12px] leading-snug text-[var(--polaris-ink-4)]">
+                    {t('login.externalLogoutHint')}
+                  </p>
+                  {externalError ? (
+                    <p
+                      role="alert"
+                      className="mt-2.5 flex items-start gap-2 rounded-[10px] border border-danger/20 bg-danger/[0.04] px-3 py-2.5 text-[12.5px] text-danger-600"
+                    >
+                      <AlertCircle size={15} className="mt-px shrink-0" />
+                      {externalError}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="mb-4 flex items-center gap-3 text-[12px] text-[var(--polaris-ink-4)]">
+                  <span className="h-px flex-1 bg-[var(--polaris-line)]" />
+                  <span>{t('login.orLocalAccount')}</span>
+                  <span className="h-px flex-1 bg-[var(--polaris-line)]" />
+                </div>
+              </>
+            ) : null}
+
             <form onSubmit={onSubmit} className="flex flex-col gap-3.5" noValidate>
-              {session.externalAuth ? (
-                <Button type="button" variant="bordered" isDisabled={submitting} onPress={() => void signInExternally()}>
-                  {t('login.externalSubmit')}
-                </Button>
-              ) : null}
               <Input
-                autoFocus
+                autoFocus={!session.externalAuth}
                 isRequired
                 label={t('login.username')}
                 labelPlacement="outside"
                 autoComplete="username"
                 value={username}
                 onValueChange={setUsername}
-                isDisabled={submitting}
+                isDisabled={busy}
                 startContent={<UserRound size={15} className="shrink-0 text-[var(--polaris-ink-4)]" />}
               />
 
@@ -215,7 +264,7 @@ export function LoginPage() {
                 autoComplete="current-password"
                 value={password}
                 onValueChange={setPassword}
-                isDisabled={submitting}
+                isDisabled={busy}
                 startContent={<Lock size={15} className="shrink-0 text-[var(--polaris-ink-4)]" />}
               />
 
@@ -224,25 +273,28 @@ export function LoginPage() {
                 on purpose and matches what the Worker returns.
                 使用 role="alert" 播报错误；文案有意保持通用并与 Worker 的返回一致。
               */}
-              {error ? (
+              {localError ? (
                 <p
                   role="alert"
                   className="flex items-start gap-2 rounded-[10px] border border-danger/20 bg-danger/[0.04] px-3 py-2.5 text-[12.5px] text-danger-600"
                 >
                   <AlertCircle size={15} className="mt-px shrink-0" />
-                  {error}
+                  {localError}
                 </p>
               ) : null}
 
               <Button
                 type="submit"
-                color="primary"
-                className="mt-2 h-10 w-full text-[13.5px] font-medium shadow-[0_1px_2px_rgb(0_0_0/0.12),inset_0_1px_0_rgb(255_255_255/0.08)]"
-                isDisabled={submitting || !username.trim() || !password}
-                startContent={submitting ? <Loader2 className="animate-spin" size={16} /> : null}
-                endContent={submitting ? null : <ArrowRight size={16} />}
+                color={session.externalAuth ? 'default' : 'primary'}
+                variant={session.externalAuth ? 'bordered' : 'solid'}
+                className={session.externalAuth
+                  ? 'mt-2 h-10 w-full text-[13.5px] font-medium'
+                  : 'mt-2 h-10 w-full text-[13.5px] font-medium shadow-[0_1px_2px_rgb(0_0_0/0.12),inset_0_1px_0_rgb(255_255_255/0.08)]'}
+                isDisabled={busy || !username.trim() || !password}
+                startContent={localSubmitting ? <Loader2 className="animate-spin" size={16} /> : null}
+                endContent={localSubmitting ? null : <ArrowRight size={16} />}
               >
-                {submitting ? t('login.submitting') : t('login.submit')}
+                {localSubmitting ? t('login.submitting') : t('login.submit')}
               </Button>
             </form>
 

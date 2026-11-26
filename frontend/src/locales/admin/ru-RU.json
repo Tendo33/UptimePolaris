@@ -14,6 +14,11 @@
   },
   "login": {
     "externalSubmit": "Войти через внешний сервис",
+    "externalSubmitCloudflare": "Войти через Cloudflare Access",
+    "externalSubmitProxy": "Войти по заголовку прокси",
+    "externalSubmitting": "Проверка…",
+    "externalLogoutHint": "Выход из Uptime Polaris не завершает сеанс в поставщике удостоверений.",
+    "orLocalAccount": "Или войдите в локальную учётную запись",
     "externalFailed": "Не удалось проверить внешний вход. Войдите снова через поставщика удостоверений или используйте локальную учётную запись.",
     "title": "Вход",
     "username": "Имя пользователя",
@@ -57,6 +62,9 @@
   },
   "account": {
     "externalManaged": "Имя пользователя и пароль управляются поставщиком удостоверений.",
+    "externalProvider": "Способ аутентификации",
+    "externalProviderCloudflare": "Cloudflare Access",
+    "externalProviderProxy": "Заголовок доверенного прокси",
     "avatarLoading": "Загрузка фото…",
     "avatarUpload": "Загрузить",
     "avatarChange": "Заменить",

@@ -14,6 +14,11 @@
   },
   "login": {
     "externalSubmit": "Entrar com autenticação externa",
+    "externalSubmitCloudflare": "Entrar com Cloudflare Access",
+    "externalSubmitProxy": "Entrar pela identidade do proxy",
+    "externalSubmitting": "Verificando…",
+    "externalLogoutHint": "Sair do Uptime Polaris não encerra sua sessão no provedor de identidade.",
+    "orLocalAccount": "Ou entre com uma conta local",
     "externalFailed": "Não foi possível verificar sua autenticação externa. Entre novamente pelo provedor de identidade ou use sua conta local.",
     "title": "Entrar",
     "username": "Usuário",
@@ -57,6 +62,9 @@
   },
   "account": {
     "externalManaged": "Seu nome de usuário e sua senha são gerenciados pelo provedor de identidade.",
+    "externalProvider": "Método de autenticação",
+    "externalProviderCloudflare": "Cloudflare Access",
+    "externalProviderProxy": "Cabeçalho de proxy confiável",
     "avatarLoading": "Carregando foto…",
     "avatarUpload": "Enviar foto",
     "avatarChange": "Trocar foto",

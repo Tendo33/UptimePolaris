@@ -52,7 +52,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const expired = () => {
-      setSession(previous => ({ authenticated: false, user: null, needsSetup: false, setupCredential: null, setupDatabase: null, externalAuth: previous?.externalAuth }));
+      setSession(previous => ({
+        authenticated: false,
+        authentication: null,
+        user: null,
+        needsSetup: false,
+        setupCredential: null,
+        setupDatabase: null,
+        externalAuth: previous?.externalAuth ?? null,
+      }));
       setSessionError(false);
     };
     window.addEventListener(SESSION_EXPIRED_EVENT, expired);
@@ -65,13 +73,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const res = await authApi.login(username, password);
       // 根据登录响应更新本地会话，避免再发一次会话查询。
       // Update local session state from the login response without another session lookup.
-      setSession({
+      // Keep the configured provider so the login page can offer it again after logout.
+      // 保留已配置的外部认证方式，使用户退出后仍能在登录页看到外部登录入口。
+      setSession(previous => ({
         authenticated: true,
+        authentication: 'local',
         user: res.user,
         needsSetup: false,
         setupCredential: null,
         setupDatabase: null,
-      });
+        externalAuth: previous?.externalAuth ?? null,
+      }));
       setSessionError(false);
     },
     [],
@@ -79,13 +91,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const setup = useCallback(async (credential: string, username: string, password: string, database?: SetupDatabaseSelection) => {
     const res = await authApi.setup(credential, username, password, database);
-    setSession({
+    setSession(previous => ({
       authenticated: true,
+      authentication: 'local',
       user: res.user,
       needsSetup: false,
       setupCredential: null,
       setupDatabase: null,
-    });
+      externalAuth: previous?.externalAuth ?? null,
+    }));
     setSessionError(false);
   }, []);
 
@@ -101,11 +115,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await authApi.logout();
     setSession(previous => ({
       authenticated: false,
+      authentication: null,
       user: null,
       needsSetup: false,
       setupCredential: null,
       setupDatabase: null,
-      externalAuth: previous?.externalAuth,
+      externalAuth: previous?.externalAuth ?? null,
     }));
     setSessionError(false);
   }, []);
