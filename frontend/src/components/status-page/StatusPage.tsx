@@ -112,7 +112,7 @@ export function StatusPage({ aiOnly = false }: { aiOnly?: boolean }) {
     否则按监控项名称、URL 或标签匹配。
   */
   const groups = useMemo<PageGroup[]>(() => {
-    if (!isFiltering) return monitorGroups;
+    if (!isFiltering) return monitorGroups.filter((group) => group.monitorList.length > 0);
     const term = searchTerm.toLowerCase();
     const passes = (monitor: Monitor) => filterMonitorByStatus(monitor, filterStatus, monitoringData.heartbeatList);
 
@@ -160,7 +160,7 @@ export function StatusPage({ aiOnly = false }: { aiOnly?: boolean }) {
 
       {isLoading ? (
         <GroupSkeleton />
-      ) : isError && monitorGroups.length === 0 ? (
+      ) : isError && !monitorGroups.some((group) => group.monitorList.length > 0) ? (
         <div className="polaris-card flex flex-col items-center px-6 py-14 text-center">
           <CloudOff size={22} className="text-[var(--polaris-ink-4)]" aria-hidden="true" />
           <p className="mt-3 text-[14px] font-semibold">{t('error.requestData')}</p>

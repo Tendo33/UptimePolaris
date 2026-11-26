@@ -224,18 +224,20 @@ export async function buildPublicMonitorPayload(
     }));
 
   /**
-   * The bucket that holds monitors in no group.
+   * The bucket that holds monitors in no group, omitted when empty.
    *
    * The UI localizes the label when `name` is null and `isUngrouped` is true.
-   * 保存未分组监控的类别。`name` 为 null 且 `isUngrouped` 为 true 时，界面本地化标签。
+   * 保存未分组监控的类别，为空时省略。`name` 为 null 且 `isUngrouped` 为 true 时，界面本地化标签。
    */
-  groupList.push({
-    id: 0,
-    name: null,
-    isUngrouped: true,
-    weight: Number.MAX_SAFE_INTEGER,
-    monitorList: ungrouped,
-  });
+  if (ungrouped.length > 0) {
+    groupList.push({
+      id: 0,
+      name: null,
+      isUngrouped: true,
+      weight: Number.MAX_SAFE_INTEGER,
+      monitorList: ungrouped,
+    });
+  }
 
   return {
     success: true,

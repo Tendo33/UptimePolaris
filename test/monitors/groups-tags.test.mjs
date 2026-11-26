@@ -376,9 +376,13 @@ console.log('\na monitor can carry a group and tags, and unknown references are 
 
 console.log('\n/api/public/monitors: real groups, ordered, with tags attached\n');
 {
+  eq('no monitors yields no public groups', (await json('/api/public/monitors')).monitorGroups, []);
   const { id: heavy } = await (await send('/api/groups', { name: 'Later', weight: 50 })).json();
   const { id: light } = await (await send('/api/groups', { name: 'First', weight: 1 })).json();
   const { id: tagId } = await (await send('/api/tags', { name: 'chip', color: '#123456' })).json();
+
+  await makeMonitor({ name: 'private', type: 'http', target: 'https://example.com', is_public: false });
+  eq('empty named groups and private monitors yield no public groups', (await json('/api/public/monitors')).monitorGroups, []);
 
   await makeMonitor({ name: 'in-later', type: 'http', target: 'https://example.com', group_id: heavy });
   await makeMonitor({
@@ -388,6 +392,9 @@ console.log('\n/api/public/monitors: real groups, ordered, with tags attached\n'
     group_id: light,
     tag_ids: [tagId],
   });
+  const grouped = await json('/api/public/monitors');
+  eq('all grouped monitors omit the ungrouped bucket', grouped.monitorGroups.map((g) => g.name), ['First', 'Later']);
+  check('all grouped monitors have no isUngrouped flag', grouped.monitorGroups.every((g) => !g.isUngrouped));
   await makeMonitor({ name: 'nowhere', type: 'http', target: 'https://example.com' });
 
   const ui = await json('/api/public/monitors');
