@@ -3,6 +3,8 @@ import { HistoryNotice } from '@/components/charts/HistoryNotice';
 
 import { requestJson } from '@/api/client';
 import { ApiError, isRetryableApiError } from '@/api/errors';
+import { publicApiUrl } from '@/api/public-url';
+import { usePageConfig } from '@/components/context/PageConfigContext';
 import { Card, CardBody, CardHeader, Chip } from '@heroui/react';
 import clsx from 'clsx';
 import {
@@ -279,8 +281,9 @@ interface AgentDetailContentProps {
 export function AgentDetailContent({ numId, monitorName, target }: AgentDetailContentProps) {
   // Top-level catalog: `detail.*` is not under the admin namespace. / 顶层词表：`detail.*` 不在 admin 命名空间。
   const t = useTranslations();
+  const { pageId } = usePageConfig();
   const { data: cachedData, error, isLoading, mutate } = useSWR<AgentDetailResponse>(
-    `/api/public/agent/detail/${numId}?minutes=60`,
+    publicApiUrl(`/api/public/agent/detail/${numId}?minutes=60`, pageId),
     fetcher,
     { refreshInterval: 15_000, revalidateOnFocus: false, dedupingInterval: 5_000, shouldRetryOnError: isRetryableApiError, errorRetryCount: 2 },
   );

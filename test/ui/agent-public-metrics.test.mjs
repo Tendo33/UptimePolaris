@@ -7,6 +7,11 @@ const esbuild = require('../../frontend/node_modules/esbuild');
 const React = require('../../frontend/node_modules/react');
 const { renderToStaticMarkup } = require('../../frontend/node_modules/react-dom/server');
 const clsx = require('../../frontend/node_modules/clsx');
+const publicUrlBundle = esbuild.buildSync({
+  entryPoints: ['frontend/src/api/public-url.ts'],
+  bundle: true, write: false, platform: 'node', format: 'esm',
+});
+const { publicApiUrl } = await import(`data:text/javascript;base64,${Buffer.from(publicUrlBundle.outputFiles[0].text).toString('base64')}`);
 const compile = (file, name, env = {}) => {
   const source = readFileSync(`frontend/src/components/agent/${file}`, 'utf8')
     .replace(/^import[\s\S]*?;\r?\n/gm, '').replaceAll('export ', '');
@@ -35,10 +40,15 @@ const data = {
   live: { reported_at: Math.floor(Date.now() / 1000), cpu_usage: null }, buckets: [],
 };
 let state = { data, isLoading: false };
+let pageId = 'default';
+let requestKey;
+const location = new URL('https://status.example/monitor/1');
 const empty = () => null;
 const AgentDetailContent = compile('AgentDetailContent.tsx', 'AgentDetailContent', {
   ApiError, PercentGauge, clsx,
-  useSWR: () => state,
+  useSWR: key => { requestKey = key; return state; },
+  usePageConfig: () => ({ pageId }),
+  publicApiUrl: (path, pageId) => publicApiUrl(path, pageId, location),
   useTranslations: () => key => key,
   useEffect: () => {}, useMemo: fn => fn(), useState: fn => [fn(), () => {}],
   requestJson: empty, isRetryableApiError: empty,
@@ -48,6 +58,25 @@ const AgentDetailContent = compile('AgentDetailContent.tsx', 'AgentDetailContent
   ...Object.fromEntries(['Activity', 'AlertTriangle', 'Check', 'Clock', 'Cpu', 'HardDrive', 'Layers', 'MemoryStick', 'RefreshCw'].map(key => [key, empty])),
 });
 const render = () => renderToStaticMarkup(React.createElement(AgentDetailContent, { numId: 1 }));
+render();
+const defaultKey = requestKey;
+assert.equal(new URL(requestKey, location).searchParams.get('pageId'), 'default');
+pageId = 'custom/page & team';
+render();
+const publicKey = requestKey;
+assert.notEqual(publicKey, defaultKey);
+assert.equal(new URL(publicKey, location).searchParams.get('pageId'), pageId);
+assert.equal(new URL(publicKey, location).searchParams.has('preview'), false);
+location.search = '?preview=monitor&unused=1';
+render();
+const previewUrl = new URL(requestKey, location);
+assert.notEqual(requestKey, publicKey);
+assert.equal(previewUrl.pathname, '/api/public/agent/detail/1');
+assert.deepEqual(Object.fromEntries(previewUrl.searchParams), { minutes: '60', pageId, preview: 'monitor' });
+location.search = '';
+render();
+assert.equal(requestKey, publicKey);
+console.log('PASS public Agent detail page context, preview and separate cache keys');
 assert.match(render(), />detail.up</);
 assert.match(render(), /aria-label="detail.cpuUsage: —"/);
 data.online = false;
