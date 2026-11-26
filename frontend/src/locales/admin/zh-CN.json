@@ -13,6 +13,8 @@
     "subscriptions": "订阅"
   },
   "login": {
+    "externalSubmit": "使用外部身份登录",
+    "externalFailed": "无法验证外部身份。请重新通过身份提供方登录，或使用本地账户。",
     "title": "登录",
     "username": "用户名",
     "usernamePlaceholder": "admin",
@@ -54,6 +56,7 @@
     "previewTitle": "示例数据"
   },
   "account": {
+    "externalManaged": "用户名和密码由身份提供方管理。",
     "avatarLoading": "正在加载头像…",
     "avatarUpload": "上传头像",
     "avatarChange": "更换头像",

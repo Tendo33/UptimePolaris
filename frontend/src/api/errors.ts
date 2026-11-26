@@ -63,6 +63,7 @@ const ERROR_KEYS: Record<string, string> = {
   too_large: 'error.tooLarge', no_storage: 'error.themeStorage', schema_behind: 'error.schemaBehind',
   internal_error: 'error.server', database_unavailable: 'error.server',
   avatar_invalid: 'admin.account.avatarInvalid',
+  external_account_managed: 'admin.account.externalManaged',
   empty_upload: 'error.themePackage', empty_download: 'error.themePackage',
 
   // 输入校验错误提示修改字段；精确业务码仍保留在 ApiError 中。

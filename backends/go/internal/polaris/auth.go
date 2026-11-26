@@ -56,6 +56,12 @@ func (a *App) bearer(r *http.Request) bool {
 	return a.config.AdminToken != "" && len(header) > 7 && strings.EqualFold(header[:7], "Bearer ") && constantEqual(header[7:], a.config.AdminToken)
 }
 func (a *App) user(r *http.Request) Object {
+	if user := a.localUser(r); user != nil {
+		return user
+	}
+	return a.externalUser(r)
+}
+func (a *App) localUser(r *http.Request) Object {
 	cookie, e := r.Cookie("polaris_session")
 	if e != nil {
 		return nil
@@ -117,7 +123,31 @@ func (a *App) authRoutes() {
 			}
 		}
 		u := a.user(r)
-		respond(w, 200, Object{"authenticated": u != nil || a.bearer(r), "user": publicUser(u), "needsSetup": needs, "setupCredential": credential, "setupDatabase": database})
+		var authentication any
+		if u != nil {
+			authentication = str(u, "auth_provider")
+			if authentication == "" {
+				authentication = "local"
+			}
+		} else if a.bearer(r) {
+			authentication = "bearer"
+		}
+		var external any
+		if a.externalAuth != nil && !needs {
+			external = Object{"mode": a.externalAuth.mode}
+		}
+		respond(w, 200, Object{"authenticated": u != nil || a.bearer(r), "user": publicUser(u), "authentication": authentication, "externalAuth": external, "needsSetup": needs, "setupCredential": credential, "setupDatabase": database})
+		return nil
+	})
+	a.route("POST /api/auth/external", true, func(w http.ResponseWriter, r *http.Request) error {
+		if a.externalAuth == nil {
+			return failure("not_found", 404)
+		}
+		if a.externalAuth.user(r) == nil {
+			return failure("invalid_credentials", 401)
+		}
+		a.setExternalLogout(w, r, false)
+		respond(w, 200, Object{"ok": true})
 		return nil
 	})
 	a.route("POST /api/auth/setup", true, func(w http.ResponseWriter, r *http.Request) error {
@@ -241,6 +271,9 @@ func (a *App) authRoutes() {
 			}
 		}
 		a.setCookie(w, r, "", -1)
+		if a.externalAuth != nil {
+			a.setExternalLogout(w, r, true)
+		}
 		respond(w, 200, Object{"ok": true})
 		return nil
 	})
@@ -248,6 +281,9 @@ func (a *App) authRoutes() {
 		u := a.user(r)
 		if u == nil {
 			return failure("unauthorized", 401)
+		}
+		if str(u, "auth_provider") != "" {
+			return failure("external_account_managed", 403)
 		}
 		b, e := body(r)
 		if e != nil {

@@ -22,7 +22,14 @@ function harness(file, start, name, env, end) {
     return [state[index], value => { state[index] = typeof value === 'function' ? value(state[index]) : value; }];
   };
   const useRef = initial => { const index = cursor++; return state[index] ??= { current: initial }; };
-  const useCallback = callback => { cursor++; return callback; };
+  const useCallback = (callback, deps) => {
+    const index = cursor++;
+    if (!dependencies[index] || deps.some((dep, i) => dep !== dependencies[index][i])) {
+      dependencies[index] = deps;
+      state[index] = callback;
+    }
+    return state[index];
+  };
   const useEffect = (callback, deps) => {
     const index = cursor++;
     if (!dependencies[index] || deps.some((dep, i) => dep !== dependencies[index][i])) {
@@ -72,6 +79,45 @@ const session = requirements => ({ authenticated: false, user: null, needsSetup:
   state = render({ children: null }).props.value;
   assert.equal(state.session, response, 'failed refresh retains the last session for recovery');
   assert.equal(state.sessionError, true);
+}
+
+{
+  const externalAuth = { mode: 'trusted-header' };
+  const identity = { id: 'external:fixture', username: 'owner@example.com' };
+  let response = { authenticated: false, user: null, needsSetup: false, setupCredential: null, setupDatabase: null, externalAuth };
+  let rejected = false;
+  const events = new Map();
+  const render = harness('frontend/src/auth/AuthContext.tsx', 'export function AuthProvider(', 'AuthProvider', {
+    useMemo: compute => compute(), AuthContext: { Provider: 'Provider' },
+    authApi: {
+      session: async () => response,
+      externalLogin: async () => { if (rejected) throw new Error('invalid_credentials'); response = { ...response, authenticated: true, user: identity, authentication: 'trusted-header' }; },
+      logout: async () => {},
+    },
+    window: { addEventListener: (name, handler) => events.set(name, handler), removeEventListener: name => events.delete(name) }, SESSION_EXPIRED_EVENT: 'expired',
+  }, 'export function useAuth()');
+  render({ children: null });
+  await new Promise(resolve => setImmediate(resolve));
+  let state = render({ children: null }).props.value;
+  await state.externalLogin();
+  state = render({ children: null }).props.value;
+  assert.equal(state.session.authentication, 'trusted-header');
+  assert.deepEqual(state.session.user, identity);
+  events.get('expired')();
+  state = render({ children: null }).props.value;
+  assert.equal(state.session.authenticated, false);
+  assert.deepEqual(state.session.externalAuth, externalAuth);
+  rejected = true;
+  await assert.rejects(state.externalLogin, /invalid_credentials/);
+  assert.equal(render({ children: null }).props.value.session.authenticated, false);
+  rejected = false;
+  await state.externalLogin();
+  state = render({ children: null }).props.value;
+  await state.logout();
+  state = render({ children: null }).props.value;
+  assert.equal(state.session.authenticated, false);
+  assert.equal(state.session.user, null);
+  assert.deepEqual(state.session.externalAuth, externalAuth);
 }
 
 {

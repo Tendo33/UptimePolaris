@@ -239,6 +239,12 @@ export function SettingsPage() {
             }
 
             if (group === 'account') {
+              if (session?.authentication === 'trusted-header' || session?.authentication === 'cloudflare-access') {
+                return <>
+                  <AccountAvatarUpload username={signedInAs} />
+                  <p className="text-small text-default-500">{t('account.externalManaged')}</p>
+                </>;
+              }
               return (
                 <>
                   <AccountAvatarUpload username={signedInAs} />

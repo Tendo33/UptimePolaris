@@ -13,6 +13,8 @@
     "subscriptions": "Assinaturas"
   },
   "login": {
+    "externalSubmit": "Entrar com autenticação externa",
+    "externalFailed": "Não foi possível verificar sua autenticação externa. Entre novamente pelo provedor de identidade ou use sua conta local.",
     "title": "Entrar",
     "username": "Usuário",
     "usernamePlaceholder": "admin",
@@ -54,6 +56,7 @@
     "previewTitle": "Dados de exemplo"
   },
   "account": {
+    "externalManaged": "Seu nome de usuário e sua senha são gerenciados pelo provedor de identidade.",
     "avatarLoading": "Carregando foto…",
     "avatarUpload": "Enviar foto",
     "avatarChange": "Trocar foto",

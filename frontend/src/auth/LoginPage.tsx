@@ -47,7 +47,7 @@ const DEFAULT_REDIRECT = '/admin';
  */
 export function LoginPage() {
   const t = useTranslations('admin');
-  const { session, login } = useAuth();
+  const { session, login, externalLogin } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -126,6 +126,19 @@ export function LoginPage() {
 
   if (!session) return <AuthSplash />;
 
+  async function signInExternally() {
+    if (submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await externalLogin();
+    } catch {
+      setError(t('login.externalFailed'));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (submitting || !username.trim() || !password) return;
@@ -174,6 +187,11 @@ export function LoginPage() {
             </div>
 
             <form onSubmit={onSubmit} className="flex flex-col gap-3.5" noValidate>
+              {session.externalAuth ? (
+                <Button type="button" variant="bordered" isDisabled={submitting} onPress={() => void signInExternally()}>
+                  {t('login.externalSubmit')}
+                </Button>
+              ) : null}
               <Input
                 autoFocus
                 isRequired

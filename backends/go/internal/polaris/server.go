@@ -35,6 +35,7 @@ type Config struct {
 	UpdaterURL          string
 	UpdaterToken        string
 	Deployment          string
+	ExternalAuth        ExternalAuthConfig
 }
 
 func DefaultConfig() Config {
@@ -58,6 +59,7 @@ type App struct {
 	aiClient           *http.Client
 	subscriptionClient *http.Client
 	trustedProxies     []netip.Prefix
+	externalAuth       *externalAuthenticator
 }
 
 type apiError struct {
@@ -79,6 +81,10 @@ func NewForOfflineMigration(ctx context.Context, c Config) (*App, error) {
 }
 
 func newApp(ctx context.Context, c Config, offlineMigration bool) (*App, error) {
+	externalAuth, err := newExternalAuthenticator(c.ExternalAuth)
+	if err != nil {
+		return nil, err
+	}
 	trustedProxies, err := parseTrustedProxies(c.TrustedProxies)
 	if err != nil {
 		return nil, err
@@ -117,6 +123,7 @@ func newApp(ctx context.Context, c Config, offlineMigration bool) (*App, error) 
 	a := &App{config: c, store: s, mux: http.NewServeMux(), ctx: ctx, cancel: cancel, semaphore: make(chan struct{}, c.Concurrency), icmpAvailable: icmpPermission(), startedAt: time.Now(), setupReady: make(chan struct{})}
 	a.subscriptionClient = newSubscriptionClient()
 	a.trustedProxies = trustedProxies
+	a.externalAuth = externalAuth
 	if len(users) > 0 {
 		a.markSetupReady()
 	}
@@ -208,7 +215,7 @@ func (a *App) Handler() http.Handler {
 		stop := context.AfterFunc(a.ctx, cancel)
 		defer stop()
 		defer cancel()
-		r = r.WithContext(ctx)
+		r = r.WithContext(context.WithValue(ctx, requestIdentityKey{}, &requestIdentity{}))
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "same-origin")
 		r.Body = http.MaxBytesReader(w, r.Body, 32<<20)

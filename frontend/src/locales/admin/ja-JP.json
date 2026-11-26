@@ -13,6 +13,8 @@
     "subscriptions": "サブスクリプション"
   },
   "login": {
+    "externalSubmit": "外部認証でログイン",
+    "externalFailed": "外部認証を確認できませんでした。認証プロバイダーで再度ログインするか、ローカルアカウントを使用してください。",
     "title": "サインイン",
     "username": "ユーザー名",
     "usernamePlaceholder": "admin",
@@ -54,6 +56,7 @@
     "previewTitle": "サンプルデータ"
   },
   "account": {
+    "externalManaged": "ユーザー名とパスワードは認証プロバイダーで管理されています。",
     "avatarLoading": "画像を読み込み中…",
     "avatarUpload": "画像をアップロード",
     "avatarChange": "画像を変更",

@@ -42,6 +42,8 @@ Content-Type: application/json
 
 `GET /api/auth/session` 读取登录和初始化状态；`POST /api/auth/login`、`POST /api/auth/logout` 管理会话。`POST /api/auth/setup` 只用于还没初始化的环境，实际操作建议走 `/setup`。没有开放用户注册接口。
 
+Go 的 `GET /api/auth/session` 还返回 `authentication`（`local`、`bearer`、`trusted-header`、`cloudflare-access` 或 `null`）和 `externalAuth`（启用且完成初始化时为 `{ mode }`，否则为 `null`）。外部身份每次请求重新验证，不签发独立的 Polaris 登录 Cookie。`POST /api/auth/logout` 会在当前浏览器会话中暂停外部自动登录；`POST /api/auth/external` 验证当前代理身份后恢复，返回 `{ ok: true }`。未启用时恢复接口返回 404，无有效身份时返回 401，跨源写入返回 403。外部身份修改本地用户名或密码会返回 403 `external_account_managed`。配置和使用方法见[外部认证](external-auth.md)。
+
 ### 初始化数据库契约
 
 `GET /api/auth/session` 在 `needsSetup` 为 `true` 时返回 `setupDatabase`（Worker 未绑定 D1 时，`types` 为 `["postgres"]`，默认类型为 `postgres`）；初始化完成后该字段为 `null`。响应从不包含数据库连接 URL。
@@ -494,6 +496,8 @@ This reference describes endpoints, authentication and request fields for integr
 ### Authentication and identifiers
 
 Management endpoints accept a signed-in session cookie or a bearer token: Worker uses `ADMIN_TOKEN`; Go uses `POLARIS_ADMIN_TOKEN`. Keep tokens in protected storage, not browser bundles or logs. Sessions are scoped to the current hostname. Monitor `id` is a UUID for management, while `num_id` identifies public details. Push and Agent tokens are separate per-object credentials. `GET /api/auth/session`, `POST /api/auth/login`, `POST /api/auth/logout` and the initial `POST /api/auth/setup` handle access; there is no open registration endpoint.
+
+Go also supports opt-in trusted-header and Cloudflare Access authentication. The session response identifies the active `authentication` method and configured `externalAuth` mode. `POST /api/auth/external` verifies the current upstream identity to restore external sign-in after logout; it does not issue a local login cookie. See [external authentication](external-auth.md#english) for configuration, response fields and errors.
 
 ### Setup database contract
 

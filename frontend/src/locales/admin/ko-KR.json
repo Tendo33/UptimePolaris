@@ -13,6 +13,8 @@
     "subscriptions": "구독"
   },
   "login": {
+    "externalSubmit": "외부 인증으로 로그인",
+    "externalFailed": "외부 인증을 확인할 수 없습니다. 인증 제공업체를 통해 다시 로그인하거나 로컬 계정을 사용하세요.",
     "title": "로그인",
     "username": "사용자 이름",
     "usernamePlaceholder": "admin",
@@ -54,6 +56,7 @@
     "previewTitle": "예시 데이터"
   },
   "account": {
+    "externalManaged": "사용자 이름과 비밀번호는 인증 제공업체에서 관리합니다.",
     "avatarLoading": "사진을 불러오는 중…",
     "avatarUpload": "사진 업로드",
     "avatarChange": "사진 변경",

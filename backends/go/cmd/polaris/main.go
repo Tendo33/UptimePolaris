@@ -51,6 +51,14 @@ func main() {
 	flag.Lookup("database-url").DefValue = ""
 	c.AdminToken = env("POLARIS_ADMIN_TOKEN", "")
 	c.SetupKey = env("POLARIS_SETUP_KEY", "")
+	c.ExternalAuth = polaris.ExternalAuthConfig{
+		Mode:              env("POLARIS_AUTH_MODE", "disabled"),
+		Header:            env("POLARIS_AUTH_HEADER", "Remote-User"),
+		TrustedProxies:    env("POLARIS_AUTH_TRUSTED_PROXIES", ""),
+		TeamDomain:        env("POLARIS_AUTH_CF_TEAM_DOMAIN", ""),
+		Audience:          env("POLARIS_AUTH_CF_AUDIENCE", ""),
+		AllowedIdentities: env("POLARIS_AUTH_ALLOWED_IDENTITIES", ""),
+	}
 	c.AICredentialKeyFile = env("POLARIS_AI_KEY_FILE", "")
 	c.UpdaterURL = env("POLARIS_UPDATER_URL", "")
 	c.UpdaterToken = env("POLARIS_UPDATER_TOKEN", "")

@@ -3,6 +3,8 @@ import type { SetupDatabaseOptions, SetupRequirement } from '../../../shared/set
 export interface SessionInfo {
   authenticated: boolean;
   user: { id: string; username: string } | null;
+  authentication?: 'local' | 'bearer' | 'trusted-header' | 'cloudflare-access' | null;
+  externalAuth?: { mode: 'trusted-header' | 'cloudflare-access' } | null;
   /** True before the first administrator account is created. / 创建首个管理员账户前为 true。 */
   needsSetup: boolean;
   /** Accepted setup binding name; null after setup or when neither setup secret is configured. / 接受的设置绑定名称；设置完成或未配置设置密钥时为 null。 */

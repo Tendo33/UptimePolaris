@@ -92,6 +92,8 @@ Docker 托管更新要求固定宿主机端口，并关闭容器自动删除。�
 
 ## 部署配置
 
+反向代理或 Cloudflare Access 登录见[外部认证](../../docs/external-auth.md)。默认关闭，仅 Go 后端支持。
+
 程序读取进程当前工作目录里的 `.env`。优先级从高到低：命令行参数 > 进程环境变量 > `.env` > 默认值。服务管理器或容器仍可以直接传环境变量。
 
 可以复制 [`.env.example`](.env.example) 到启动目录再改。`.env` 不存在时正常启动；格式错误时停止启动。支持 `KEY=value`、单双引号、行尾注释和 `export` 前缀，不执行命令，也不展开变量。含空格或特殊字符的值要加引号。保护 `.env` 和带初始化密钥的日志，不要提交或公开。
@@ -107,6 +109,7 @@ Docker 托管更新要求固定宿主机端口，并关闭容器自动删除。�
 | `POLARIS_TRUSTED_PROXIES` | `--trusted-proxies` | 空；不信任转发的客户端 IP |
 | `POLARIS_SETUP_KEY` | 无 | 初始化凭据；未设置时使用 `POLARIS_ADMIN_TOKEN` |
 | `POLARIS_ADMIN_TOKEN` | 无 | 可选的管理 API Bearer 凭据 |
+| `POLARIS_AUTH_MODE` | 无 | `disabled`；`trusted-header` 和 `cloudflare-access` 的配置见[外部认证](../../docs/external-auth.md) |
 | `POLARIS_AI_KEY_FILE` | 无 | AI 渠道与订阅的加密密钥文件；PostgreSQL 使用 AI 监控或订阅时必填，SQLite 默认用数据目录的 `ai-credential.key` |
 
 PostgreSQL 连接串形如 `postgresql://user:password@host:5432/database?sslmode=verify-full`。启动时创建 Go 自己的表；SQLite 和 PostgreSQL 的数据含义一致。主题资产始终在数据目录里，不会存进 PostgreSQL。
@@ -212,6 +215,7 @@ Choose SQLite or PostgreSQL during first setup. An explicit selection is saved i
 | `POLARIS_TRUSTED_PROXIES` | `--trusted-proxies` | Empty; ignore forwarded client IPs |
 | `POLARIS_SETUP_KEY` | none | Setup credential; falls back to `POLARIS_ADMIN_TOKEN` |
 | `POLARIS_ADMIN_TOKEN` | none | Optional admin API bearer credential |
+| `POLARIS_AUTH_MODE` | none | `disabled`; see [external authentication](../../docs/external-auth.md#english) for `trusted-header` and `cloudflare-access` |
 | `POLARIS_AI_KEY_FILE` | none | Protected AI and subscription encryption key file; required for AI monitoring or subscriptions on PostgreSQL. SQLite defaults to `ai-credential.key` in the data directory |
 
 The AI key file contains 32 raw random bytes, identical across instances. Back it up with the matching database. See [AI monitoring](../../docs/ai-monitoring.md#english) for setup and recovery. It is not required when AI monitoring is unused.

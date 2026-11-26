@@ -21,6 +21,7 @@ interface AuthState {
   sessionError: boolean;
   /** Sign in. Throws on failure so the form can render the message. / 登录；失败时抛错以便表单显示消息。 */
   login: (username: string, password: string) => Promise<void>;
+  externalLogin: () => Promise<void>;
   setup: (credential: string, username: string, password: string, database?: SetupDatabaseSelection) => Promise<void>;
   logout: () => Promise<void>;
   /** Re-read the session, e.g. after a password change. / 重新读取会话，例如在修改密码后。 */
@@ -51,7 +52,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const expired = () => {
-      setSession({ authenticated: false, user: null, needsSetup: false, setupCredential: null, setupDatabase: null });
+      setSession(previous => ({ authenticated: false, user: null, needsSetup: false, setupCredential: null, setupDatabase: null, externalAuth: previous?.externalAuth }));
       setSessionError(false);
     };
     window.addEventListener(SESSION_EXPIRED_EVENT, expired);
@@ -88,15 +89,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSessionError(false);
   }, []);
 
+  const externalLogin = useCallback(async () => {
+    await authApi.externalLogin();
+    const next = await authApi.session();
+    if (!next.authenticated) throw new Error('invalid_credentials');
+    setSession(next);
+    setSessionError(false);
+  }, []);
+
   const logout = useCallback(async () => {
     await authApi.logout();
-    setSession({
+    setSession(previous => ({
       authenticated: false,
       user: null,
       needsSetup: false,
       setupCredential: null,
       setupDatabase: null,
-    });
+      externalAuth: previous?.externalAuth,
+    }));
     setSessionError(false);
   }, []);
 
@@ -109,8 +119,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<AuthState>(
-    () => ({ session, sessionError, login, setup, logout, refresh, applyAccountChange }),
-    [session, sessionError, login, setup, logout, refresh, applyAccountChange],
+    () => ({ session, sessionError, login, externalLogin, setup, logout, refresh, applyAccountChange }),
+    [session, sessionError, login, externalLogin, setup, logout, refresh, applyAccountChange],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

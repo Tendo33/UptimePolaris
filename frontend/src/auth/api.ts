@@ -13,6 +13,8 @@ function changeAccount(current: string, fields: { next?: string; username?: stri
 export const authApi = {
   session: () => request<SessionInfo>('/api/auth/session'),
 
+  externalLogin: () => request<{ ok: true }>('/api/auth/external', { method: 'POST' }),
+
   setup: (credential: string, username: string, password: string, database?: SetupDatabaseSelection) =>
     request<{ ok: true; user: { id: string; username: string } }>(
       '/api/auth/setup',

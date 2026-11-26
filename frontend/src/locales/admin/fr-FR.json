@@ -13,6 +13,8 @@
     "subscriptions": "Abonnements"
   },
   "login": {
+    "externalSubmit": "Se connecter avec un fournisseur externe",
+    "externalFailed": "La connexion externe n’a pas pu être vérifiée. Reconnectez-vous auprès de votre fournisseur d’identité ou utilisez votre compte local.",
     "title": "Connexion",
     "username": "Identifiant",
     "usernamePlaceholder": "admin",
@@ -54,6 +56,7 @@
     "previewTitle": "Données d’exemple"
   },
   "account": {
+    "externalManaged": "Votre fournisseur d’identité gère votre nom d’utilisateur et votre mot de passe.",
     "avatarLoading": "Chargement de la photo…",
     "avatarUpload": "Importer",
     "avatarChange": "Changer",
